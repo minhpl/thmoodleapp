@@ -257,6 +257,8 @@ export class CoreUrlUtilsProvider {
             }
         }
 
+        docsUrl = "https://tnut.aum.edu.vn/";
+
         try {
             let lang = await CoreLang.getCurrentLanguage();
             lang = CoreLang.getParentLanguage(lang) || lang;
