@@ -2,39 +2,33 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>AD_UNIT_ID_FOR_BANNER_TEST</key>
-    <string></string>
-    <key>AD_UNIT_ID_FOR_INTERSTITIAL_TEST</key>
-    <string></string>
     <key>CLIENT_ID</key>
-    <string></string>
+    <string>343856164343-qm42nn2f9ggtou40c571h6b0c36dlsvj.apps.googleusercontent.com</string>
     <key>REVERSED_CLIENT_ID</key>
-    <string></string>
+    <string>com.googleusercontent.apps.343856164343-qm42nn2f9ggtou40c571h6b0c36dlsvj</string>
     <key>API_KEY</key>
-    <string></string>
+    <string>AIzaSyDtPafHF_TK2gpLhWqeHmxiIYDO4wDkHV4</string>
     <key>GCM_SENDER_ID</key>
-    <string></string>
+    <string>343856164343</string>
     <key>PLIST_VERSION</key>
     <string>1</string>
     <key>BUNDLE_ID</key>
-    <string>com.moodle.moodlemobile</string>
+    <string>vn.edu.aum.tnu</string>
     <key>PROJECT_ID</key>
-    <string>moodlemobile-push</string>
+    <string>aumtnuapp</string>
     <key>STORAGE_BUCKET</key>
-    <string></string>
+    <string>aumtnuapp.appspot.com</string>
     <key>IS_ADS_ENABLED</key>
     <false></false>
     <key>IS_ANALYTICS_ENABLED</key>
     <false></false>
     <key>IS_APPINVITE_ENABLED</key>
-    <false></false>
+    <true></true>
     <key>IS_GCM_ENABLED</key>
-    <false></false>
+    <true></true>
     <key>IS_SIGNIN_ENABLED</key>
-    <false></false>
+    <true></true>
     <key>GOOGLE_APP_ID</key>
-    <string></string>
-    <key>DATABASE_URL</key>
-    <string></string>
+    <string>1:343856164343:ios:f3940530b5acf52c59d2f2</string>
 </dict>
 </plist>
