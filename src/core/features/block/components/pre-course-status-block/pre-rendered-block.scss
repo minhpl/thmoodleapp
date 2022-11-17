@@ -1,0 +1,43 @@
+.btn_cancel {
+    background-color: #f28585;
+    margin-left: 16px;
+    color: #fff;
+    border-radius: 0;
+    border: solid #dbdbdb 1px;
+}
+
+.btn_confirm {
+    background-color: #80cc76;
+    color: #fff;
+    border-radius: 0;
+    border: solid #dbdbdb 1px;
+}
+
+.un_btn_confirm {
+    background: #f7f7f7;
+    background-image: linear-gradient(to bottom,#f7f7f7,#f2f2f2);
+    border-radius: 0;
+    border: solid #dbdbdb 1px;
+    color: #524e52;
+}
+
+.un_btn_cancel {
+    margin-left: 16px;
+    background: #f7f7f7;
+    background-image: linear-gradient(to bottom,#f7f7f7,#f2f2f2);
+    border-radius: 0;
+    border: solid #dbdbdb 1px;
+    color: #524e52;
+}
+
+
+
+button {
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+
+ion-icon {
+    //background-color: #fff;
+}
