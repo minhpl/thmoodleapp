@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget android-versionCode="40203" id="com.moodle.moodlemobile" ios-CFBundleVersion="4.0.2.2" version="4.0.2" versionCode="40203" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-    <name>Moodle</name>
-    <description>Moodle official app</description>
-    <author email="mobile@moodle.com" href="http://moodle.com">Moodle Mobile team</author>
+<widget android-versionCode="40203" id="vn.edu.aum.aof" ios-CFBundleVersion="4.0.2.2" version="4.0.2" versionCode="40203" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>AOF</name>
+    <description>AOF official app</description>
+    <author email="mobile@moodle.com" href="http://moodle.com">AOF Mobile team</author>
     <content src="index.html" />
     <access origin="*" />
     <access launch-external="yes" origin="tel:*" />
