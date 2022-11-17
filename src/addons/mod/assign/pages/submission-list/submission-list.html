@@ -1,0 +1,82 @@
+<ion-header>
+    <ion-toolbar>
+        <ion-buttons slot="start">
+            <ion-back-button [text]="'core.back' | translate"></ion-back-button>
+        </ion-buttons>
+        <ion-title>
+            <h1>
+                <core-format-text [text]="title" contextLevel="module" [contextInstanceId]="moduleId" [courseId]="courseId">
+                </core-format-text>
+            </h1>
+        </ion-title>
+
+        <ion-buttons slot="end"></ion-buttons>
+    </ion-toolbar>
+</ion-header>
+
+<ion-content>
+    <core-split-view>
+        <ion-refresher slot="fixed" [disabled]="!submissions.loaded" (ionRefresh)="refreshList($event.target)">
+            <ion-refresher-content pullingText="{{ 'core.pulltorefresh' | translate }}"></ion-refresher-content>
+        </ion-refresher>
+        <core-loading [hideUntil]="submissions.loaded">
+            <ion-list>
+                <ion-item class="ion-text-wrap core-group-selector" *ngIf="(groupInfo.separateGroups || groupInfo.visibleGroups)">
+                    <ion-label id="addon-assign-groupslabel-list">
+                        <ng-container *ngIf="groupInfo.separateGroups">{{'core.groupsseparate' | translate }}</ng-container>
+                        <ng-container *ngIf="groupInfo.visibleGroups">{{'core.groupsvisible' | translate }}</ng-container>
+                    </ion-label>
+                    <ion-select [(ngModel)]="groupId" (ionChange)="reloadSubmissions()" aria-labelledby="addon-assign-groupslabel-list"
+                        interface="action-sheet" slot="end" [interfaceOptions]="{header: 'core.group' | translate}">
+                        <ion-select-option *ngFor="let groupOpt of groupInfo.groups" [value]="groupOpt.id">
+                            {{groupOpt.name}}
+                        </ion-select-option>
+                    </ion-select>
+                </ion-item>
+                <!-- List of submissions. -->
+                <ng-container *ngFor="let submission of submissions.items">
+                    <ion-item class="ion-text-wrap" (click)="submissions.select(submission)" button
+                        [attr.aria-current]="submissions.getItemAriaCurrent(submission)" detail="true">
+                        <core-user-avatar [user]="submission" [linkProfile]="false" slot="start"></core-user-avatar>
+                        <ion-label>
+                            <p class="item-heading" *ngIf="submission.userfullname">{{submission.userfullname}}</p>
+                            <p class="item-heading" *ngIf="!submission.userfullname">
+                                {{ 'addon.mod_assign.hiddenuser' | translate }}{{submission.blindid}}
+                            </p>
+                            <p *ngIf="assign && assign!.teamsubmission">
+                                <span *ngIf="submission.groupname" class="core-groupname">
+                                    {{submission.groupname}}
+                                </span>
+                                <span *ngIf="assign!.preventsubmissionnotingroup && !submission.groupname && submission.noGroups
+                                    && !submission.blindid" class="text-danger">
+                                    {{ 'addon.mod_assign.noteam' | translate }}
+                                </span>
+                                <span *ngIf="assign!.preventsubmissionnotingroup && !submission.groupname && submission.manyGroups
+                                    && !submission.blindid" class="text-danger">
+                                    {{ 'addon.mod_assign.multipleteams' | translate }}
+                                </span>
+                                <span *ngIf="!assign!.preventsubmissionnotingroup && !submission.groupname">
+                                    {{ 'addon.mod_assign.defaultteam' | translate }}
+                                </span>
+                            </p>
+                            <p *ngIf="submission.statusTranslated">
+                                <ion-badge class="ion-text-center ion-text-wrap" [color]="submission.statusColor">
+                                    {{ submission.statusTranslated }}
+                                </ion-badge>
+                            </p>
+                            <p *ngIf="submission.gradingStatusTranslationId">
+                                <ion-badge class="ion-text-center ion-text-wrap" [color]="submission.gradingColor">
+                                    {{ submission.gradingStatusTranslationId | translate }}
+                                </ion-badge>
+                            </p>
+                        </ion-label>
+                    </ion-item>
+                </ng-container>
+            </ion-list>
+
+            <core-empty-box *ngIf="!submissions || submissions.empty" icon="fas-file-signature"
+                [message]="'addon.mod_assign.submissionstatus_' | translate">
+            </core-empty-box>
+        </core-loading>
+    </core-split-view>
+</ion-content>

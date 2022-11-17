@@ -1,0 +1,14 @@
+:host {
+    .core-timer {
+        --background: transparent !important;
+        border-radius: var(--big-radius);
+
+        .core-timer-time-left, .core-timesup {
+            font-weight: bold;
+        }
+
+        span {
+            margin-right: 5px;
+        }
+    }
+}

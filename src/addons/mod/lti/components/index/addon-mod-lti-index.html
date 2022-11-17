@@ -1,0 +1,27 @@
+<!-- Buttons to add to the header. -->
+<core-navbar-buttons slot="end">
+    <ion-button fill="clear" (click)="openModuleSummary()" aria-haspopup="true" [attr.aria-label]="'core.info' | translate">
+        <ion-icon name="fas-info-circle" slot="icon-only" aria-hidden="true"></ion-icon>
+    </ion-button>
+</core-navbar-buttons>
+
+<!-- Content. -->
+<core-loading [hideUntil]="!showLoading">
+
+    <!-- Activity info. -->
+    <core-course-module-info [module]="module" [description]="displayDescription && description" [component]="component"
+        [componentId]="componentId" [courseId]="courseId" (completionChanged)="onCompletionChange()">
+    </core-course-module-info>
+
+    <div collapsible-footer *ngIf="!showLoading" slot="fixed">
+        <div class="list-item-limited-width">
+            <ion-button expand="block" (click)="launch()" class="ion-margin ion-text-wrap">
+                {{ 'addon.mod_lti.launchactivity' | translate }}
+                <ion-icon name="fas-external-link-alt" slot="end" aria-hidden="true"></ion-icon>
+            </ion-button>
+        </div>
+
+        <core-course-module-navigation [courseId]="courseId" [currentModuleId]="module.id">
+        </core-course-module-navigation>
+    </div>
+</core-loading>

@@ -1,0 +1,81 @@
+This files describes API changes in the Moodle Mobile app,
+information provided here is intended especially for developers.
+
+=== 4.0.0 ===
+
+- The versioncode in moodle.config.json has changed from 4 digits to 5 digits to match the actual value for the stores: the 4.0.0 version's versioncode is now 40000 instead of 4000. If you maintain a Moodle plugin with mobile support and you use the versioncode that is sent in every request, you might need to check if this change will affect your code.
+- The parameters of the functions confirmAndPrefetchCourse and confirmAndPrefetchCourses have changed, they now accept an object with options.
+- Component core-navigation-bar changed to add an slider inside. previous, previousTitle, next, nextTitle, info and title have been removed.
+  Now you have to pass all items and 3 optional params have been added.
+- CoreCourseModulePrefetchDelegate.getPrefetchHandlerFor now admits module name instead of full module object.
+- CoreCourse.getModuleBasicInfoByInstance and CoreCourse.getModuleBasicInfo have been modified to accept an "options" parameter instead of only siteId.
+- The function CoreFilepool.isFileDownloadingByUrl now returns Promise<boolean> instead of relying on resolve/reject.
+- downloadEnabled input has been removed from CoreBlockSideBlocksComponent, CoreCourseFormatComponent, CoreCourseFormatSingleActivityComponent and CoreCourseModuleComponent.
+- There were several breaking changes done in CoreUserDelegate and its handlers:
+    The function CoreUserDelegate.getProfileHandlersFor must now receive a context + contextId instead of a courseId.
+    The user handler function isEnabledForCourse is now called isEnabledForContext and receives a context + contextId instead of a courseId.
+    Some user handler's functions have also changed to accept context + contextId instead of a courseId: isEnabledForUser, getDisplayData, action.
+- CoreCourseHelperProvider.openCourse parameters changed, now it admits CoreNavigationOptions + siteId on the same object that includes Params passed to page.
+- displaySectionSelector has been deprecated on CoreCourseFormatHandler, use displayCourseIndex instead.
+- Most of the functions or callbacks that handle redirects/deeplinks have been modified to accept an object instead of just path + options. E.g.: CoreLoginHelper.isSiteLoggedOut, CoreLoginHelper.openBrowserForSSOLogin, CoreLoginHelper.openBrowserForOAuthLogin, CoreLoginHelper.prepareForSSOLogin, CoreApp.storeRedirect, CoreSites.loadSite.
+- Course preview page route has changed from course/:courseId/preview to course/:courseId/summary to match with the page name and characteristics.
+- The parameters of the following functions in CoreCourseHelper have changed: navigateToModuleByInstance, navigateToModule, openModule.
+- fillContextMenu, expandDescription, gotoBlog, prefetch and removeFiles functions have been removed from CoreCourseModuleMainResourceComponent.
+- contextMenuPrefetch and fillContextMenu have been removed from CoreCourseHelper.
+- The variable "loaded" in CoreCourseModuleMainResourceComponent has been changed to "showLoading" to reflect its purpose better.
+- The function getCurrentSection of course formats can now return a forceSelected boolean along with the section (defaults to false if not returned).
+- The link handlers functions (CoreContentLinksHandler) will now always receive a relative URL instead of an absolute URL. The CoreContentLinksHandlerBase class now adds "^" to the start of the pattern by default to prevent false positives.
+- The function CoreLoginHelper.setWaitingForBrowser has been removed, use CoreLoginHelper.waitForBrowser and CoreLoginHelper.stopWaitingForBrowser instead.
+
+
+=== 3.9.5 ===
+
+- Several functions inside AddonNotificationsProvider have been modified to accept an "options" parameter instead of having several optional parameters.
+- Schemas are now registered using Angular providers with the CORE_SITE_SCHEMAS injection token instead of CoreSitesProvider.registerSiteSchema.
+
+=== 3.9.3 ===
+
+- In the core-attachments component, passing a -1 as maxSize or maxSubmissions used to mean "unknown limit". Now -1 means unlimited. Also, passing a 0 to maxSize used to mean "unknown" too, now 0 means user max size.
+- Most functions that call a WebService in addons/mod have been modified to accept an "options" parameter instead of having several optional parameters.
+
+=== 3.8.3 ===
+
+- CoreFileProvider.writeFileDataInFile has been deprecated. Please use CoreFileHelperProvider.writeFileDataInFile instead.
+
+=== 3.8.0 ===
+
+- CoreDomUtilsProvider.extractDownloadableFilesFromHtml and CoreDomUtilsProvider.extractDownloadableFilesFromHtmlAsFakeFileObjects have been deprecated. Please use CoreFilepoolProvider.extractDownloadableFilesFromHtml and CoreFilepoolProvider.extractDownloadableFilesFromHtmlAsFakeFileObjects. We had to move them to prevent a circular dependency.
+
+=== 3.7.1 ===
+
+- CoreGroupsProvider.getActivityAllowedGroups and CoreGroupsProvider.getActivityAllowedGroupsIfEnabled now return the full response of core_group_get_activity_allowed_groups instead of just the groups.
+
+=== 3.7.0 ===
+
+- The pushnotifications addon has been moved to core. All imports of that addon need to be fixed to use the right path and name.
+- Now the expirationTime of cache entries contains the time the entry was modified, not the expiration time. This is to allow calculating dynamic expiration times. We decided to reuse the same field to prevent modifying the database table.
+
+=== 3.6.1 ===
+
+- The local notifications plugin was updated to its latest version. The new API has some breaking changes, so please check its documentation if you're using local notifications. Also, you need to run "npm install" to update the ionic-native library.
+- New method CoreSitesProvider.registerSiteSchema allows to register table schemas and migration functions for site databases. Prefer this method over CoreSitesProvider.createTablesFromSchema: it supports schema migrations and it tracks the installed version of the schema, so it does not try to create the tables on every app boot.
+
+=== 3.6.0 ===
+
+- gulp was updated to v4. In order for gulp to work, you need to install gulp-cli: npm install -g gulp-cli
+  It's also recommended to update ionic cli to v4, otherwise some errors could be raised while building: npm install -g ionic
+- The value of the constant CoreCourseProvider.ALL_SECTIONS_ID has changed from -1 to -2.
+- Use of completionstatus on the module object has been deprecated, use completiondata instead.
+- The function CoreSitesProvider.loadSite has changed, now it will trigger SESSION_EXPIRED event if the site is logged out. Its params and return value have changed.
+- When using CoreDomUtils.showAlert, please use alert.didDismiss.subscribe() instead of alert.onDidDismiss().
+- The page CoreSharedFilesChooseSitePage now expects to receive the full path to the file (file.toURL()) instead of the relative path.
+- The following strings have been deprecated:
+    core.dfdaymonthyear. Please use core.strftimedatefullshort instead.
+    core.dfdayweekmonth. Please use core.strftimedayshort instead.
+    core.dffulldate. Please use core.strftimedaydatetime instead.
+    core.dfmediumdate. Please use core.strftimedaydatetime instead.
+    core.dftimedate. Please use core.strftimetime instead.
+
+=== 3.5.2 ===
+
+- CoreChartDirective changed from directive to component (CoreChartComponent) and the selector to use it changed from canvas[core-chart] to core-chart.

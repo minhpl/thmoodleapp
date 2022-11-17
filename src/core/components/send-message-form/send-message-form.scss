@@ -1,0 +1,37 @@
+:host {
+    --textarea-background: var(--core-input-background);
+    --textarea-color: var(--core-input-text);
+    --textarea-border-width: var(--core-input-border-width);
+    --textarea-border-color: var(--core-input-stroke);
+    --textarea-radius: var(--huge-radius);
+
+    form {
+        position: relative;
+        display: flex;
+        align-items: center;
+        width: 100%;
+        background: var(--ion-item-background);
+    }
+
+    .core-send-message-input {
+        appearance: none;
+        display: block;
+        width: 100%;
+        font-family: inherit;
+
+        background: var(--textarea-background);
+        color: var(--textarea-color);
+        border: var(--textarea-border-width) solid var(--textarea-border-color);
+        border-radius: var(--textarea-radius);
+
+        min-height: var(--a11y-min-target-size);
+        line-height: 20px;
+        padding: 10px;
+        margin: 4px 8px;
+        resize: vertical;
+    }
+
+    .core-send-message-input::placeholder {
+        color: var(--ion-placeholder-color);
+    }
+}

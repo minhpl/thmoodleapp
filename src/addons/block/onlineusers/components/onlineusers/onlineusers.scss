@@ -1,0 +1,51 @@
+@import "~theme/globals";
+
+:host .core-block-content ::ng-deep {
+    max-height: 200px;
+    overflow-y: auto;
+    .item-inner,
+    .input-wrapper {
+        overflow-y: visible;
+        align-self: start;
+    }
+
+    .list {
+        margin-left: 0;
+        margin-right: 0;
+        -webkit-padding-start: 0;
+
+        li.listentry {
+            clear: both;
+            list-style-type: none;
+
+            .user {
+                @include float(start);
+                position: relative;
+                padding-bottom: 16px;
+
+                .core-adapted-img-container {
+                    display: inline;
+                    @include margin-horizontal(0px, 8px);
+                }
+
+                .userpicture {
+                    border-radius: 50%;
+                }
+            }
+
+            .message {
+                @include float(end);
+                margin-top: 3px;
+            }
+
+            .uservisibility { // No support on the app.
+                display: none;
+            }
+        }
+    }
+
+    .info {
+        text-align: center;
+    }
+
+}

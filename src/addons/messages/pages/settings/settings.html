@@ -1,0 +1,148 @@
+<ion-header>
+    <ion-toolbar>
+        <ion-buttons slot="start">
+            <ion-back-button [text]="'core.back' | translate"></ion-back-button>
+        </ion-buttons>
+        <ion-title>
+            <h1>{{ 'addon.messages.messages' | translate }}</h1>
+        </ion-title>
+    </ion-toolbar>
+</ion-header>
+<ion-content>
+    <ion-refresher slot="fixed" [disabled]="!preferencesLoaded" (ionRefresh)="refreshPreferences($event.target)">
+        <ion-refresher-content pullingText="{{ 'core.pulltorefresh' | translate }}"></ion-refresher-content>
+    </ion-refresher>
+    <core-loading [hideUntil]="preferencesLoaded">
+        <!-- Contactable privacy. -->
+        <ion-card>
+            <ion-item *ngIf="!advancedContactable">
+                <ion-label>{{ 'addon.messages.blocknoncontacts' | translate }}</ion-label>
+                <ion-toggle [(ngModel)]="contactablePrivacy" (ngModelChange)="saveContactablePrivacy(contactablePrivacy)">
+                </ion-toggle>
+            </ion-item>
+
+            <ion-list *ngIf="advancedContactable" class="ion-text-wrap">
+                <ion-radio-group [(ngModel)]="contactablePrivacy" (ionChange)="saveContactablePrivacy(contactablePrivacy)">
+                    <ion-item-divider>
+                        <ion-label>
+                            <h2>{{ 'addon.messages.contactableprivacy' | translate }}</h2>
+                        </ion-label>
+                    </ion-item-divider>
+                    <ion-item>
+                        <ion-label>{{ 'addon.messages.contactableprivacy_onlycontacts' | translate }}</ion-label>
+                        <ion-radio slot="start" [value]="onlyContactsValue"></ion-radio>
+                    </ion-item>
+                    <ion-item>
+                        <ion-label>{{ 'addon.messages.contactableprivacy_coursemember' | translate }}</ion-label>
+                        <ion-radio slot="start" [value]="courseMemberValue"></ion-radio>
+                    </ion-item>
+                    <ion-item *ngIf="allowSiteMessaging">
+                        <ion-label>{{ 'addon.messages.contactableprivacy_site' | translate }}</ion-label>
+                        <ion-radio slot="start" [value]="siteValue"></ion-radio>
+                    </ion-item>
+                </ion-radio-group>
+            </ion-list>
+        </ion-card>
+
+        <!-- Notifications. -->
+        <ng-container *ngIf="preferences">
+            <ng-container *ngIf="!groupMessagingEnabled">
+                <ng-container *ngTemplateOutlet="legacySettings; context: {preferences: preferences}"></ng-container>
+            </ng-container>
+            <ng-container *ngIf="groupMessagingEnabled">
+                <ng-container *ngTemplateOutlet="settings; context: {preferences: preferences}"></ng-container>
+            </ng-container>
+        </ng-container>
+
+        <!-- General settings. -->
+        <ion-card>
+            <ion-list class="ion-text-wrap">
+                <ion-item-divider>
+                    <ion-label>
+                        <h2>{{ 'core.settings.general' | translate }}</h2>
+                    </ion-label>
+                </ion-item-divider>
+                <ion-item class="ion-text-wrap">
+                    <ion-label>
+                        <p class="item-heading">{{ 'addon.messages.useentertosend' | translate }}</p>
+                    </ion-label>
+                    <ion-toggle [(ngModel)]="sendOnEnter" (ngModelChange)="sendOnEnterChanged()" slot="end"></ion-toggle>
+                </ion-item>
+            </ion-list>
+        </ion-card>
+    </core-loading>
+</ion-content>
+
+<!-- Only 3.5 version -->
+<ng-template #legacySettings let-preferences="preferences">
+    <ng-container *ngFor="let component of preferences.components">
+        <ion-card *ngFor="let notification of component.notifications">
+            <ion-card-header class="ion-no-padding">
+                <ion-item class="ion-text-wrap">
+                    <ion-label>
+                        <h2>{{ notification.displayname }}</h2>
+                    </ion-label>
+                </ion-item>
+            </ion-card-header>
+            <ion-card-content class="ion-no-padding">
+                <ng-container *ngFor="let processor of notification.processors">
+                    <ion-item-divider class="ion-text-wrap">
+                        <ion-label>
+                            <p class="item-heading">{{ processor.displayname }}</p>
+                        </ion-label>
+                    </ion-item-divider>
+                    <!-- If notifications not disabled, show toggles.
+                        If notifications are disabled, show "Disabled" instead of toggle. -->
+                    <ion-item *ngFor="let state of ['loggedin', 'loggedoff']" class="ion-text-wrap">
+                        <ion-label>{{ 'core.settings.' + state | translate }}</ion-label>
+                        <ng-container *ngIf="!preferences.disableall">
+                            <!-- If notifications enabled, show toggle. -->
+                            <core-button-with-spinner *ngIf="!processor.locked" [loading]="notification['updating'+state]">
+                                <ion-toggle [(ngModel)]="processor[state].checked"
+                                    (ngModelChange)="changePreferenceLegacy(notification, processor, state)">
+                                </ion-toggle>
+                            </core-button-with-spinner>
+                            <span *ngIf="processor.locked && processor[state].checked" class="text-gray">
+                                {{'core.settings.forced' | translate }}
+                            </span>
+                            <span *ngIf="processor.locked && !processor[state].checked" class="text-gray">
+                                {{'core.settings.disallowed' | translate }}
+                            </span>
+                        </ng-container>
+                        <span *ngIf="preferences.disableall">{{ 'core.settings.disabled' | translate }}</span>
+                    </ion-item>
+                </ng-container>
+            </ion-card-content>
+        </ion-card>
+    </ng-container>
+</ng-template>
+
+
+<ng-template #settings let-preferences="preferences">
+    <ng-container *ngFor="let component of preferences.components">
+        <ion-card *ngFor="let notification of component.notifications">
+            <ion-item-divider class="ion-text-wrap">
+                <ion-label>
+                    <h2>{{ 'addon.notifications.notificationpreferences' | translate }}</h2>
+                </ion-label>
+            </ion-item-divider>
+            <ng-container *ngFor="let processor of notification.processors">
+                <!-- If group messaging is enabled, display a simplified view. -->
+                <ion-item class="ion-text-wrap">
+                    <ion-label>{{ processor.displayname }}</ion-label>
+                    <ng-container *ngIf="!preferences.disableall">
+                        <!-- If notifications enabled, show toggle. -->
+                        <core-button-with-spinner *ngIf="!processor.locked" [loading]="notification.updating">
+                            <ion-toggle [(ngModel)]="processor.enabled" (ngModelChange)="changePreference(notification, processor)">
+                            </ion-toggle>
+                        </core-button-with-spinner>
+                        <span class="text-gray" *ngIf="processor.locked">
+                            {{ processor.lockedmessage }}
+                        </span>
+                    </ng-container>
+                    <span *ngIf="preferences.disableall" class="text-gray">{{ 'core.settings.disabled' | translate }}</span>
+                </ion-item>
+            </ng-container>
+        </ion-card>
+    </ng-container>
+</ng-template>
