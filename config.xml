@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
-<widget android-versionCode="40203" id="com.moodle.moodlemobile" ios-CFBundleVersion="4.0.2.2" version="4.0.2" versionCode="40203" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-    <name>Moodle</name>
-    <description>Moodle official app</description>
-    <author email="mobile@moodle.com" href="http://moodle.com">Moodle Mobile team</author>
+<widget android-versionCode="40203" id="vn.edu.aum.tnut" ios-CFBundleVersion="4.0.2.2" version="4.0.2" versionCode="40203" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
+    <name>TNUT</name>
+    <description>TNUT official app</description>
+    <author email="mobile@moodle.com" href="http://moodle.com">TNUT Mobile team</author>
     <content src="index.html" />
     <access origin="*" />
     <access launch-external="yes" origin="tel:*" />
@@ -27,7 +27,7 @@
     <preference name="UIWebViewBounce" value="false" />
     <preference name="DisallowOverscroll" value="true" />
     <preference name="prerendered-icon" value="true" />
-    <preference name="AppendUserAgent" value="MoodleMobile 4.0.2 (40203)" />
+    <preference name="AppendUserAgent" value="TNUTMobile 4.0.2 (40203)" />
     <preference name="BackupWebStorage" value="none" />
     <preference name="ScrollEnabled" value="false" />
     <preference name="KeyboardDisplayRequiresUserAction" value="false" />
@@ -267,7 +267,7 @@
             <false />
         </config-file>
         <config-file parent="NSCrossWebsiteTrackingUsageDescription" target="*-Info.plist">
-            <string>This app needs third party cookies to correctly render embedded content from the Moodle site.</string>
+            <string>This app needs third party cookies to correctly render embedded content from the TNUT site.</string>
         </config-file>
         <config-file parent="ITSAppUsesNonExemptEncryption" target="*-Info.plist">
             <false />
