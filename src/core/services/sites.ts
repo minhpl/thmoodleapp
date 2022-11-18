@@ -90,7 +90,7 @@ export class CoreSitesProvider {
     protected schemasTables: Record<string, AsyncInstance<CoreDatabaseTable<SchemaVersionsDBEntry, 'name'>>> = {};
     protected sitesTable = asyncInstance<CoreDatabaseTable<SiteDBEntry>>();
 
-    constructor(@Optional() @Inject(CORE_SITE_SCHEMAS) siteSchemas: CoreSiteSchema[][] = [], private nav:NavController) {
+    constructor(@Optional() @Inject(CORE_SITE_SCHEMAS) siteSchemas: CoreSiteSchema[][] = [], private nav: NavController) {
         this.logger = CoreLogger.getInstance('CoreSitesProvider');
         this.siteSchemas = CoreArray.flatten(siteSchemas).reduce(
             (siteSchemas, schema) => {
@@ -1306,9 +1306,8 @@ export class CoreSitesProvider {
         /**
          * TH_edit
          */
-         this.nav.navigateForward(['login/sites'])
-         //CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
-     }
+        this.nav.navigateForward(['login/sites']);
+        // CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
     }
 
     /**
