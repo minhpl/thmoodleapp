@@ -18,7 +18,7 @@ import { Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
 import { CoreApp } from '@services/app';
-import { CoreSites } from '@services/sites';
+import { CoreSites, CoreSitesProvider } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
 import { CoreConstants } from '@/core/constants';
@@ -62,7 +62,7 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
     protected valueChangeSubscription?: Subscription;
 
     constructor(
-        protected fb: FormBuilder,
+        protected fb: FormBuilder, private sitesProvider: CoreSitesProvider,
     ) {}
 
     /**
@@ -263,6 +263,10 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
             this.credForm.controls['password'].reset();
 
             this.siteId = id;
+
+            //TH_edit
+
+            this.sitesProvider.savelogininfotosite();
 
             await CoreNavigator.navigateToSiteHome({ params: { urlToOpen: this.urlToOpen } });
         } catch (error) {
