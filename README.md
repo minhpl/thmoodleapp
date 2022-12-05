@@ -18,6 +18,12 @@ Ví dụ: 2 thiết bị được đăng nhập đồng thời vào ứng dụng
 - Thiết bị B: đăng nhập 12h
 - Thiết bị C: đăng nhập 13h => thiết bị A sẽ bị force logout
 
+Trường hợp 2:
+
+- Thiết bị A: đăng nhập 10h
+- Thiết bị B: đăng nhập 12h sau đó chủ động đăng xuất
+- Thiết bị C: đăng nhập 13h => thiết bị A và C vẫn đăng nhập bình thường. Không thiết bị nào bị logout
+
 # 2. Mô tả chi tiết/ hướng dẫn sử dụng/ hướng dẫn cài đặt
 
 **B1: Quản trị viên truy cập link: Dashboard/ Site administration/ Plugins/ Local plugins/ TH th_managelogin trên hệ thống Web để setup số lượng truy cập trên thiết bị mobile**:
