@@ -13,9 +13,9 @@ Hạn chế người dùng đăng nhập tài khoản trên nhiều thiết vào
 
 Ví dụ: 2 thiết bị được đăng nhập đồng thời vào ứng dụng
 
-Thiết bị A: đăng nhập 10h
-Thiết bị B: đăng nhập 12h
-Thiết bị C: đăng nhập 13h => thiết bị A sẽ bị force logout
+- Thiết bị A: đăng nhập 10h
+- Thiết bị B: đăng nhập 12h
+- Thiết bị C: đăng nhập 13h => thiết bị A sẽ bị force logout
 
 # 2. Mô tả chi tiết/ hướng dẫn sử dụng/ hướng dẫn cài đặt
 
