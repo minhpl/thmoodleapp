@@ -1,11 +1,14 @@
 # **Tài liệu phát triển tính năng chống đăng nhập đồng thời trên nhiều thiết bị
 
+# **Tài liệu phát triển tính năng chống đăng nhập đồng thời trên nhiều thiết bị
+
 1. **Tên tính năng**: Chống đăng nhập đồng thời trên nhiều thiết bị
 2. **Project**:  tnu,aof,tnut,vmc
 3. **Người phát triển**: huytq72@wru.vn
 6. **Người yêu cầu**: Phạm Lê Minh
 7. **Tham chiếu ERP:** TASK-19
-8. **Mã nguồn (branch):** https://github.com/minhpl/thmoodleapp/tree/feature_chong_dang_nhap_dong_thoi_fix_loi _ start from:
+8. **Mã nguồn (branch):** https://github.com/minhpl/thmoodleapp/tree/feature_chong_dang_nhap_dong_thoi_fix_loi
+9. **Bắt đầu từ commit:** https://github.com/minhpl/thmoodleapp/commit/ef5348e03b8b9d745fea5292a5345b1ae901be04
 
 # 1. Yêu cầu:
 
