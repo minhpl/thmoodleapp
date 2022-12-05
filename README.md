@@ -5,7 +5,7 @@
 3. **Người phát triển**: huytq72@wru.vn
 6. **Người yêu cầu**: Phạm Lê Minh
 7. **Tham chiếu ERP:** TASK-19
-8. **Mã nguồn (branch):** https://github.com/minhpl/thmoodleapp/tree/feature_chong_dang_nhap_dong_thoi_fix_loi
+8. **Mã nguồn (branch):** https://github.com/minhpl/thmoodleapp/tree/feature_chong_dang_nhap_dong_thoi_fix_loi _ start from:
 
 # 1. Yêu cầu:
 
