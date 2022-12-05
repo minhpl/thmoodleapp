@@ -1,7 +1,5 @@
 # **Tài liệu phát triển tính năng chống đăng nhập đồng thời trên nhiều thiết bị
 
-# **Tài liệu phát triển tính năng chống đăng nhập đồng thời trên nhiều thiết bị
-
 1. **Tên tính năng**: Chống đăng nhập đồng thời trên nhiều thiết bị
 2. **Project**:  tnu,aof,tnut,vmc
 3. **Người phát triển**: huytq72@wru.vn
