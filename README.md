@@ -15,7 +15,7 @@ Người dùng đăng nhập tài khoản trên nhiều thiết vào App. Thiế
 
 **B1: Quản trị viên truy cập link: Dashboard/ Site administration/ Plugins/ Local plugins/ TH th_managelogin trên hệ thống Web để setup số lượng truy cập trên thiết bị mobile**:
 
-![Screenshot 2022-12-05 114628](https://user-images.githubusercontent.com/58178423/205551628-6928ed35-ceec-4122-a046-d4eb88fe24f2.png)
+![Screenshot 2022-12-05 114628](https://user-images.githubusercontent.com/13426817/205584115-9c9ef7dd-0f2b-4447-a80b-0f9776dd5cef.png)
 
 **B2: Người dùng đăng nhập tài khoản của mình trên nhiều thiết bị và truy cập vào khóa học. Khi đó, thiết bị được đăng nhập đầu tiên khi truy cập vào khóa học sẽ hiện thông báo buộc người dùng phải bấm đồng ý để đăng xuất thiết bị. Còn những thiết bị còn lại sẽ được truy cập vào khóa học và học tập bình thường**:
 
