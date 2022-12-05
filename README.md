@@ -9,7 +9,13 @@
 
 # 1. Yêu cầu:
 
-Người dùng đăng nhập tài khoản trên nhiều thiết vào App. Thiết bị đầu tiên đăng nhập sẽ bị buộc đăng xuất khi truy cập khóa học, các thiết bị truy cập sau sẽ học tập bình thường tùy vào số lượng gia hạn thiết bị trên Web.
+Hạn chế người dùng đăng nhập tài khoản trên nhiều thiết vào App một cách đồng thời.
+
+Ví dụ: 2 thiết bị được đăng nhập đồng thời vào ứng dụng
+
+Thiết bị A: đăng nhập 10h
+Thiết bị B: đăng nhập 12h
+Thiết bị C: đăng nhập 13h => thiết bị A sẽ bị force logout
 
 # 2. Mô tả chi tiết/ hướng dẫn sử dụng/ hướng dẫn cài đặt
 
@@ -29,4 +35,5 @@ Người dùng đăng nhập tài khoản trên nhiều thiết vào App. Thiế
 https://github.com/minhpl/thmoodleapp/compare/ef5348e03b8b9d745fea5292a5345b1ae901be04...9586ca4661bcef1b56fcd7e574ce696f3da5e783
 
 # 5. Triển khai (nếu cần)
+
 # 6. Kiểm thử (nếu cần)
