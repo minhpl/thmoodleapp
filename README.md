@@ -37,6 +37,178 @@ Trường hợp 2:
 **B3:Thiết bị bị buộc đăng xuất sau khi bấm đồng ý sẽ trở về giao diện đăng nhập.Nếu người dùng đăng nhập trên thiết bị này thì thiết bị đăng nhập thứ 2 sẽ bị buộc đăng xuất và tương tự cho các trường hợp khác.**
 # 3. Phân tích thiết kế (database, functions nếu cần)
 
+B1: Viết hàm savelogininfotosite(), savelogoutinfotosite(),logout_isloggedin_valid() trong file src\core\services\sites.ts:
+
+    savelogininfotosite(): void {
+      var uuid = '';
+      if (this.device.uuid) {
+          uuid = this.device.uuid;
+      }
+
+      this.getSite().then((site) => {
+          const userId = site.getUserId();
+          var data: any = {
+              userid: userId,
+              uuid: uuid,
+              loginstatus: 1,
+          };
+
+          const preSets = {
+              getFromCache: false,
+          };
+
+          site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
+              console.log(courses)
+          }).catch((e) => {
+          });
+      }).catch((e) => {
+      });
+    }
+
+    savelogoutinfotosite(): void {
+        var uuid = '';
+        if (this.device.uuid) {
+            uuid = this.device.uuid;
+        }
+
+        this.getSite().then((site) => {
+            const userId = site.getUserId();
+            var data: any = {
+                userid: userId,
+                uuid: uuid,
+                loginstatus: 0,
+            };
+
+            const preSets = {
+                getFromCache: false,
+            };
+
+            site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
+                // console.log(courses,data)
+            }).catch((e) => {
+                // console.log(e)
+            });
+        }).catch((e) => {
+            // console.log(e)
+        });
+    }
+
+    async logout_isloggedin_valid(options: CoreSitesLogoutOptions = {}): Promise<void> {
+      if (!this.currentSite) {
+          return;
+      }
+
+      const promises: Promise<unknown>[] = [];
+      const siteConfig = this.currentSite.getStoredConfig();
+      const siteId = this.currentSite.getId();
+
+      // this.currentSite = undefined;
+
+      if (options.forceLogout || (siteConfig && siteConfig.tool_mobile_forcelogout == '1')) {
+          promises.push(this.setSiteLoggedOut(siteId));
+      }
+
+      promises.push(this.removeStoredCurrentSite());
+
+      await CoreUtils.ignoreErrors(Promise.all(promises));
+
+      if (options.removeAccount) {
+          await CoreSites.deleteSite(siteId);
+      }
+
+      /**
+       * TH_edit
+       */
+
+
+      await this.nav.navigateForward(['login/sites'])
+      //CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
+    }
+
+Ta gọi hàm savelogininfotosite() trong 2 file src\core\features\login\pages\credentials\credentials.ts và C:\Mobile\moodleappVMCNEW-4.0.1\src\core\features\login\pages\reconnect\reconnect.ts
+để gửi thông tin người dùng và thiết bị lên hàm local_th_managelogin_save_userinfo mỗi khi người dùng đăng nhập.
+
+Ta gọi hàm savelogoutinfotosite() trong hàm logout() ở file src\core\services\sites.ts để lưu lại thông tin người dùng và thiết bị vừa bấm đăng xuất.
+
+B2: Ta viết hàm checkisloginvalidandlogout() vào file src\core\features\course\components\course-format\course-format.ts để check trạng thái đăng nhập từ hàm local_th_managelogin_checklogin_valid
+
+
+
+    async checkisloginvalidandlogout(): Promise<void> {
+      const site = await CoreSites.getSite();
+      var uuid = '';
+          if (this.device.uuid) {
+              uuid = this.device.uuid;
+      }
+
+      const userId = site.getUserId()
+
+      var data: any = {
+          userid: userId,
+          uuid: uuid,
+          loginstatus: 1,
+      };
+
+      const preSets = {
+          getFromCache: false,
+      };
+
+      site.write('local_th_managelogin_checklogin_valid', data, preSets).then(async (courses) => {
+          const jsonValue = JSON.stringify(courses);
+          console.log(jsonValue)
+          let temp = JSON.parse(jsonValue)
+          if (temp.isloggedin_valid == 0) {
+                  const alert = await this.alertCtrl.create({
+                  header: 'Thông báo',
+                  message: 'Tài khoản của bạn bị đăng xuất do được đăng nhập trên thiết bị mới!',
+                  buttons: [ {
+                      text: 'Đồng ý',
+                      role: 'destructive',
+                      handler: () => this.logout()
+                      }]
+              });
+
+
+              await alert.present();
+
+              const { role } = await alert.onDidDismiss();
+
+              if(role == 'backdrop') {
+                  this.logout()
+              }
+          }
+      });
+    }
+
+    async logout () {
+
+        if (CoreNavigator.currentRouteCanBlockLeave()) {
+            await CoreDomUtils.showAlert(undefined, Translate.instant('core.cannotlogoutpageblocks'));
+            return;
+        }
+
+        if (this.removeAccountOnLogout) {
+            // Ask confirm.
+            const siteName = this.siteName ?
+                await CoreFilter.formatText(this.siteName, { clean: true, singleLine: true, filter: false }, [], this.siteId) :
+                '';
+
+            try {
+                await CoreDomUtils.showDeleteConfirm('core.login.confirmdeletesite', { sitename: siteName });
+            } catch (error) {
+                // User cancelled, stop.
+                return;
+            }
+        }
+
+        await CoreSites.logout_isloggedin_valid({
+            forceLogout: true,
+            removeAccount: this.removeAccountOnLogout,
+        });
+    }
+
+Trong hàm logout() ta gọi đến hàm logout_isloggedin_valid() đã viết ở file src\core\services\sites.ts đã liệt kê bên trên để thiết bị bị buộc logout khi bị bật sẽ mượt không còn giật lag.
+
 # 4. mã nguồn (nếu cần hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này)
 
 https://github.com/minhpl/thmoodleapp/compare/ef5348e03b8b9d745fea5292a5345b1ae901be04...9586ca4661bcef1b56fcd7e574ce696f3da5e783
