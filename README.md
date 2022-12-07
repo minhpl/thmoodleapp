@@ -1,15 +1,46 @@
-Moodle App
-=================
+# **Tài liệu phát triển tính năng chống đăng nhập đồng thời trên nhiều thiết bị
 
-This is the primary repository of source code for the official mobile app for Moodle.
+1. **Tên tính năng**: Chống đăng nhập đồng thời trên nhiều thiết bị
+2. **Project**:  tnu,aof,tnut,vmc
+3. **Người phát triển**: huytq72@wru.vn
+6. **Người yêu cầu**: Phạm Lê Minh
+7. **Tham chiếu ERP:** TASK-19
+8. **Mã nguồn (branch):** https://github.com/minhpl/thmoodleapp/tree/feature_chong_dang_nhap_dong_thoi_fix_loi
+9. **Bắt đầu từ commit:** https://github.com/minhpl/thmoodleapp/commit/ef5348e03b8b9d745fea5292a5345b1ae901be04
 
-* [User documentation](https://docs.moodle.org/en/Moodle_app)
-* [Developer documentation](http://docs.moodle.org/dev/Moodle_App)
-* [Development environment setup](https://docs.moodle.org/dev/Setting_up_your_development_environment_for_the_Moodle_App)
-* [Bug Tracker](https://tracker.moodle.org/browse/MOBILE)
-* [Release Notes](https://docs.moodle.org/dev/Moodle_App_Release_Notes)
+# 1. Yêu cầu:
 
-License
--------
+Hạn chế người dùng đăng nhập tài khoản trên nhiều thiết vào App một cách đồng thời.
 
-[Apache 2.0](http://www.apache.org/licenses/LICENSE-2.0)
+Ví dụ: 2 thiết bị được đăng nhập đồng thời vào ứng dụng
+
+- Thiết bị A: đăng nhập 10h
+- Thiết bị B: đăng nhập 12h
+- Thiết bị C: đăng nhập 13h => thiết bị A sẽ bị force logout
+
+Trường hợp 2:
+
+- Thiết bị A: đăng nhập 10h
+- Thiết bị B: đăng nhập 12h sau đó chủ động đăng xuất
+- Thiết bị C: đăng nhập 13h => thiết bị A và C vẫn đăng nhập bình thường. Không thiết bị nào bị logout
+
+# 2. Mô tả chi tiết/ hướng dẫn sử dụng/ hướng dẫn cài đặt
+
+**B1: Quản trị viên truy cập link: Dashboard/ Site administration/ Plugins/ Local plugins/ TH th_managelogin trên hệ thống Web để setup số lượng truy cập trên thiết bị mobile**:
+
+![Screenshot 2022-12-05 114628](https://user-images.githubusercontent.com/13426817/205584115-9c9ef7dd-0f2b-4447-a80b-0f9776dd5cef.png)
+
+**B2: Người dùng đăng nhập tài khoản của mình trên nhiều thiết bị và truy cập vào khóa học. Khi đó, thiết bị được đăng nhập đầu tiên khi truy cập vào khóa học sẽ hiện thông báo buộc người dùng phải bấm đồng ý để đăng xuất thiết bị. Còn những thiết bị còn lại sẽ được truy cập vào khóa học và học tập bình thường**:
+
+![imge](https://user-images.githubusercontent.com/58178423/205550633-2e9a765d-e5b1-4c35-8e28-5f8b18cc0c49.jpg)
+
+**B3:Thiết bị bị buộc đăng xuất sau khi bấm đồng ý sẽ trở về giao diện đăng nhập.Nếu người dùng đăng nhập trên thiết bị này thì thiết bị đăng nhập thứ 2 sẽ bị buộc đăng xuất và tương tự cho các trường hợp khác.**
+# 3. Phân tích thiết kế (database, functions nếu cần)
+
+# 4. mã nguồn (nếu cần hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này)
+
+https://github.com/minhpl/thmoodleapp/compare/ef5348e03b8b9d745fea5292a5345b1ae901be04...9586ca4661bcef1b56fcd7e574ce696f3da5e783
+
+# 5. Triển khai (nếu cần)
+
+# 6. Kiểm thử (nếu cần)
