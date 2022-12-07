@@ -242,7 +242,13 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
 
 
                 await alert.present();
+                const { role } = await alert.onDidDismiss();
+
+                if(role == 'backdrop') {
+                    this.logout()
+                }
             }
+
         });
     }
 
