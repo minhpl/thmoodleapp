@@ -238,7 +238,7 @@ Trong hàm logout() ta gọi đến hàm logout_isloggedin_valid() đã viết �
 
 https://github.com/minhpl/thmoodleapp/compare/ef5348e03b8b9d745fea5292a5345b1ae901be04...9586ca4661bcef1b56fcd7e574ce696f3da5e783
 
-# 5. Triển khai (Hướng dẫn triểu khai, lưu ý khi upload nên appstore. nếu cần)
+# 5. Triển khai (Hướng dẫn triển khai, lưu ý khi upload nên appstore. nếu cần)
 
 # 6. Kiểm thử (nếu cần)
 
