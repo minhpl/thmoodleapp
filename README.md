@@ -142,7 +142,7 @@ async logout_isloggedin_valid(options: CoreSitesLogoutOptions = {}): Promise<voi
 }
 ```
 
-Ta gọi hàm savelogininfotosite() trong 2 file src\core\features\login\pages\credentials\credentials.ts và C:\Mobile\moodleappVMCNEW-4.0.1\src\core\features\login\pages\reconnect\reconnect.ts
+Ta gọi hàm savelogininfotosite() trong 2 file src\core\features\login\pages\credentials\credentials.ts và src\core\features\login\pages\reconnect\reconnect.ts
 để gửi thông tin người dùng và thiết bị lên hàm local_th_managelogin_save_userinfo mỗi khi người dùng đăng nhập.
 
 Ta gọi hàm savelogoutinfotosite() trong hàm logout() ở file src\core\services\sites.ts để lưu lại thông tin người dùng và thiết bị vừa bấm đăng xuất.
