@@ -9,14 +9,14 @@
 7. **Tham chiếu ERP:** [[ví dụ TASK-108]]
 8. **Mã nguồn:** https://github.com/minhngb/th/tree/master/local/th_tnuapi]]
 
-# 1. Yêu cầu:
+# 1. Yêu cầu: (bắt buộc)
 
-# 2. Mô tả chi tiết/ hướng dẫn sử dụng/ hướng dẫn cài đặt
+# 2. Mô tả chi tiết/ hướng dẫn sử dụng/ hướng dẫn cài đặt: (bắt buộc)
 
-# 3. Phân tích thiết kế (database, chú ý về các method, method call flowchart nếu cần)
+# 3. Phân tích thiết kế: database, chú ý về các method, method call flowchart (nếu cần)
 
-# 4. mã nguồn (hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này nếu cần )
+# 4. mã nguồn: hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này (nếu cần)
 
-# 5. Triển khai (nếu cần)
+# 5. Triển khai: (nếu cần)
 
-# 6. Kiểm thử (nếu cần)
+# 6. Kiểm thử: (nếu cần)
