@@ -5,10 +5,10 @@
 3. **Người phát triển**: huytq72@wru.vn
 6. **Người yêu cầu**: Phạm Lê Minh
 7. **Tham chiếu ERP:** TASK-19
-8. **Mã nguồn:** 
+8. **Mã nguồn:**
 	1. **branch**: https://github.com/minhpl/thmoodleapp/tree/feature_chong_dang_nhap_dong_thoi_fix_loi
 	2. **Bắt đầu từ commit:** https://github.com/minhpl/thmoodleapp/commit/ef5348e03b8b9d745fea5292a5345b1ae901be04
-    
+
 # 1. Yêu cầu:
 
 Hạn chế người dùng đăng nhập tài khoản trên nhiều thiết vào App một cách đồng thời.
@@ -40,91 +40,107 @@ Trường hợp 2:
 
 B1: Viết hàm savelogininfotosite(), savelogoutinfotosite(),logout_isloggedin_valid() trong file src\core\services\sites.ts:
 
-    savelogininfotosite(): void {
-      var uuid = '';
-      if (this.device.uuid) {
-          uuid = this.device.uuid;
-      }
-
-      this.getSite().then((site) => {
-          const userId = site.getUserId();
-          var data: any = {
-              userid: userId,
-              uuid: uuid,
-              loginstatus: 1,
-          };
-
-          const preSets = {
-              getFromCache: false,
-          };
-
-          site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
-              console.log(courses)
-          }).catch((e) => {
-          });
-      }).catch((e) => {
-      });
+```javascript
+/**
+    * Lưu thông tin login bao gồm userid, uuid, loginstatus trên website thông qua gọi webservice
+    *
+    * @returns void
+    */
+savelogininfotosite(): void {
+    var uuid = '';
+    if (this.device.uuid) {
+        uuid = this.device.uuid;
     }
 
-    savelogoutinfotosite(): void {
-        var uuid = '';
-        if (this.device.uuid) {
-            uuid = this.device.uuid;
-        }
+    this.getSite().then((site) => {
+        const userId = site.getUserId();
+        var data: any = {
+            userid: userId,
+            uuid: uuid,
+            loginstatus: 1,
+        };
 
-        this.getSite().then((site) => {
-            const userId = site.getUserId();
-            var data: any = {
-                userid: userId,
-                uuid: uuid,
-                loginstatus: 0,
-            };
+        const preSets = {
+            getFromCache: false,
+        };
 
-            const preSets = {
-                getFromCache: false,
-            };
+        site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
+            console.log(courses)
+        }).catch((e) => {
+        });
+    }).catch((e) => {
+    });
+}
 
-            site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
-                // console.log(courses,data)
-            }).catch((e) => {
-                // console.log(e)
-            });
+/**
+    * Lưu thông tin logout bao gồm userid, uuid, loginstatus trên website thông qua gọi webservice
+    *
+    * @returns void
+    */
+savelogoutinfotosite(): void {
+    var uuid = '';
+    if (this.device.uuid) {
+        uuid = this.device.uuid;
+    }
+
+    this.getSite().then((site) => {
+        const userId = site.getUserId();
+        var data: any = {
+            userid: userId,
+            uuid: uuid,
+            loginstatus: 0,
+        };
+
+        const preSets = {
+            getFromCache: false,
+        };
+
+        site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
+            // console.log(courses,data)
         }).catch((e) => {
             // console.log(e)
         });
+    }).catch((e) => {
+        // console.log(e)
+    });
+}
+
+/**
+    * @param  {CoreSitesLogoutOptions={}} options
+    * @returns Promise
+    */
+async logout_isloggedin_valid(options: CoreSitesLogoutOptions = {}): Promise<void> {
+    if (!this.currentSite) {
+        return;
     }
 
-    async logout_isloggedin_valid(options: CoreSitesLogoutOptions = {}): Promise<void> {
-      if (!this.currentSite) {
-          return;
-      }
+    const promises: Promise<unknown>[] = [];
+    const siteConfig = this.currentSite.getStoredConfig();
+    const siteId = this.currentSite.getId();
 
-      const promises: Promise<unknown>[] = [];
-      const siteConfig = this.currentSite.getStoredConfig();
-      const siteId = this.currentSite.getId();
+    // this.currentSite = undefined;
 
-      // this.currentSite = undefined;
-
-      if (options.forceLogout || (siteConfig && siteConfig.tool_mobile_forcelogout == '1')) {
-          promises.push(this.setSiteLoggedOut(siteId));
-      }
-
-      promises.push(this.removeStoredCurrentSite());
-
-      await CoreUtils.ignoreErrors(Promise.all(promises));
-
-      if (options.removeAccount) {
-          await CoreSites.deleteSite(siteId);
-      }
-
-      /**
-       * TH_edit
-       */
-
-
-      await this.nav.navigateForward(['login/sites'])
-      //CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
+    if (options.forceLogout || (siteConfig && siteConfig.tool_mobile_forcelogout == '1')) {
+        promises.push(this.setSiteLoggedOut(siteId));
     }
+
+    promises.push(this.removeStoredCurrentSite());
+
+    await CoreUtils.ignoreErrors(Promise.all(promises));
+
+    if (options.removeAccount) {
+        await CoreSites.deleteSite(siteId);
+    }
+
+    /**
+        * TH_edit
+        */
+
+
+    await this.nav.navigateForward(['login/sites'])
+    //CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
+}
+```
 
 Ta gọi hàm savelogininfotosite() trong 2 file src\core\features\login\pages\credentials\credentials.ts và C:\Mobile\moodleappVMCNEW-4.0.1\src\core\features\login\pages\reconnect\reconnect.ts
 để gửi thông tin người dùng và thiết bị lên hàm local_th_managelogin_save_userinfo mỗi khi người dùng đăng nhập.
@@ -134,79 +150,87 @@ Ta gọi hàm savelogoutinfotosite() trong hàm logout() ở file src\core\servi
 B2: Ta viết hàm checkisloginvalidandlogout() vào file src\core\features\course\components\course-format\course-format.ts để check trạng thái đăng nhập từ hàm local_th_managelogin_checklogin_valid
 
 
+```javascript
+/**
+ * kiểm tra nếu không được phép login thì người dùng sẽ bị logout ra khỏi ứng dụng
+ *
+ * @returns Promise
+ */
+async checkisloginvalidandlogout(): Promise<void> {
+    const site = await CoreSites.getSite();
 
-    async checkisloginvalidandlogout(): Promise<void> {
-      const site = await CoreSites.getSite();
-      var uuid = '';
-          if (this.device.uuid) {
-              uuid = this.device.uuid;
-      }
-
-      const userId = site.getUserId()
-
-      var data: any = {
-          userid: userId,
-          uuid: uuid,
-          loginstatus: 1,
-      };
-
-      const preSets = {
-          getFromCache: false,
-      };
-
-      site.write('local_th_managelogin_checklogin_valid', data, preSets).then(async (courses) => {
-          const jsonValue = JSON.stringify(courses);
-          console.log(jsonValue)
-          let temp = JSON.parse(jsonValue)
-          if (temp.isloggedin_valid == 0) {
-                  const alert = await this.alertCtrl.create({
-                  header: 'Thông báo',
-                  message: 'Tài khoản của bạn bị đăng xuất do được đăng nhập trên thiết bị mới!',
-                  buttons: [ {
-                      text: 'Đồng ý',
-                      role: 'destructive',
-                      handler: () => this.logout()
-                      }]
-              });
-
-
-              await alert.present();
-
-              const { role } = await alert.onDidDismiss();
-
-              if(role == 'backdrop') {
-                  this.logout()
-              }
-          }
-      });
+    let uuid = '';
+    if (this.device.uuid) {
+        uuid = this.device.uuid;
     }
 
-    async logout () {
+    const userId = site.getUserId();
 
-        if (CoreNavigator.currentRouteCanBlockLeave()) {
-            await CoreDomUtils.showAlert(undefined, Translate.instant('core.cannotlogoutpageblocks'));
-            return;
-        }
+    const data: any = {
+        userid: userId,
+        uuid: uuid,
+        loginstatus: 1,
+    };
 
-        if (this.removeAccountOnLogout) {
-            // Ask confirm.
-            const siteName = this.siteName ?
-                await CoreFilter.formatText(this.siteName, { clean: true, singleLine: true, filter: false }, [], this.siteId) :
-                '';
+    const preSets = {
+        getFromCache: false,
+    };
 
-            try {
-                await CoreDomUtils.showDeleteConfirm('core.login.confirmdeletesite', { sitename: siteName });
-            } catch (error) {
-                // User cancelled, stop.
-                return;
+    site.write('local_th_managelogin_checklogin_valid', data, preSets).then(async (courses) => {
+        const jsonValue = JSON.stringify(courses);
+        console.log(jsonValue);
+        const temp = JSON.parse(jsonValue);
+        if (temp.isloggedin_valid == 0) {
+            const alert = await this.alertCtrl.create({
+                header: 'Thông báo',
+                message: 'Tài khoản của bạn bị đăng xuất do được đăng nhập trên thiết bị mới!',
+                buttons: [{
+                    text: 'Đồng ý',
+                    role: 'destructive',
+                    handler: () => this.logout(),
+                }],
+            });
+
+            await alert.present();
+            const { role } = await alert.onDidDismiss();
+
+            if(role == 'backdrop') {
+                this.logout();
             }
         }
+        else{
+            return false;
+        }
+    });
+}
 
-        await CoreSites.logout_isloggedin_valid({
-            forceLogout: true,
-            removeAccount: this.removeAccountOnLogout,
-        });
+async logout () {
+
+    if (CoreNavigator.currentRouteCanBlockLeave()) {
+        await CoreDomUtils.showAlert(undefined, Translate.instant('core.cannotlogoutpageblocks'));
+        return;
     }
+
+    if (this.removeAccountOnLogout) {
+        // Ask confirm.
+        const siteName = this.siteName ?
+            await CoreFilter.formatText(this.siteName, { clean: true, singleLine: true, filter: false }, [], this.siteId) :
+            '';
+
+        try {
+            await CoreDomUtils.showDeleteConfirm('core.login.confirmdeletesite', { sitename: siteName });
+        } catch (error) {
+            // User cancelled, stop.
+            return;
+        }
+    }
+
+    await CoreSites.logout_isloggedin_valid({
+        forceLogout: true,
+        removeAccount: this.removeAccountOnLogout,
+    });
+}
+```
 
 Trong hàm logout() ta gọi đến hàm logout_isloggedin_valid() đã viết ở file src\core\services\sites.ts đã liệt kê bên trên để thiết bị buộc logout khi bị bật sẽ mượt không còn giật lag.
 
