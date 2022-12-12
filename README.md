@@ -1,4 +1,4 @@
-# **Tài liệu phát triển tính năng chống đăng nhập đồng thời trên nhiều thiết bị
+# Tài liệu phát triển tính năng chống đăng nhập đồng thời trên nhiều thiết bị
 
 1. **Tên tính năng**: Chống đăng nhập đồng thời trên nhiều thiết bị
 2. **Project**:  tnu,aof,tnut,vmc
@@ -234,7 +234,7 @@ async logout () {
 
 Trong hàm logout() ta gọi đến hàm logout_isloggedin_valid() đã viết ở file src\core\services\sites.ts đã liệt kê bên trên để thiết bị buộc logout khi bị bật sẽ mượt không còn giật lag.
 
-# 4. mã nguồn (nếu cần hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này)
+# 4. Mã nguồn (nếu cần hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này)
 
 https://github.com/minhpl/thmoodleapp/compare/ef5348e03b8b9d745fea5292a5345b1ae901be04...9586ca4661bcef1b56fcd7e574ce696f3da5e783
 
