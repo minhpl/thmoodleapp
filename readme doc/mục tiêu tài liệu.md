@@ -9,5 +9,6 @@
 
 ## **Template của một tài liệu như bên dưới:**
 
+https://github.com/minhpl/thmoodleapp/blob/main/readme%20doc/template_simple.md
 
 ## **Ví dụ:**
