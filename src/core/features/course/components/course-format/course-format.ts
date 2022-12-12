@@ -203,8 +203,11 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     }
 
 
-
-
+    /**
+     * kiểm tra nếu không được phép login thì người dùng sẽ bị logout ra khỏi ứng dụng
+     *
+     * @returns Promise
+     */
     async checkisloginvalidandlogout(): Promise<void> {
         const site = await CoreSites.getSite();
 

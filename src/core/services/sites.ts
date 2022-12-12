@@ -1268,6 +1268,13 @@ export class CoreSitesProvider {
     * TH_edit
     */
 
+
+    
+    /**
+     * Lưu thông tin login bao gồm userid, uuid, loginstatus trên website thông qua gọi webservice
+     * 
+     * @returns void 
+     */
     savelogininfotosite(): void {
         var uuid = '';
         if (this.device.uuid) {
@@ -1308,14 +1315,10 @@ export class CoreSitesProvider {
     }
 
     /**
-     *
-     * Logout the user.
-     *
-     * @param forceLogout If true, site will be marked as logged out, no matter the value tool_mobile_forcelogout.
-     * @return Promise resolved when the user is logged out.
-     * TH_edit
+     * Lưu thông tin logout bao gồm userid, uuid, loginstatus trên website thông qua gọi webservice
+     * 
+     * @returns void
      */
-
     savelogoutinfotosite(): void {
         var uuid = '';
         if (this.device.uuid) {
@@ -1343,6 +1346,15 @@ export class CoreSitesProvider {
             // console.log(e)
         });
     }
+
+     /**
+     *
+     * Logout the user.
+     *
+     * @param forceLogout If true, site will be marked as logged out, no matter the value tool_mobile_forcelogout.
+     * @return Promise resolved when the user is logged out.
+     * TH_edit
+     */
 
     async logout(options: CoreSitesLogoutOptions = {}): Promise<void> {
         this.savelogoutinfotosite();
@@ -1380,7 +1392,12 @@ export class CoreSitesProvider {
     /**
      * TH_edit
      */
-
+    
+    
+    /**
+     * @param  {CoreSitesLogoutOptions={}} options
+     * @returns Promise
+     */
     async logout_isloggedin_valid(options: CoreSitesLogoutOptions = {}): Promise<void> {
         if (!this.currentSite) {
             return;
