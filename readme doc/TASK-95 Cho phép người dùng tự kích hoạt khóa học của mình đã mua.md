@@ -17,6 +17,8 @@ Cho phép người dùng tự kích hoạt khóa học của mình đã mua
 
  1. Người dùng ấn nút kích hoạt khóa học để tự enrol vào khóa học theo phương thức Manual enrolments
  2. Người dùng sẽ học trong khóa học trong thời gian nhất định, được thiết lập trong cài đặt mặc định thời gian ghi danh thủ công của khóa học
+
+ Cần sử dụng kèm chức năng quản lý đăng kí khóa học trong plugin: th_manage_activatecourses để quản lý việc đăng kí người dùng vào các khóa học
  
 # 3. Phân tích thiết kế (database, functions nếu cần)
 bảng **th_registeredcourses**
