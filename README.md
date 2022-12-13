@@ -238,9 +238,7 @@ Trong hàm logout() ta gọi đến hàm logout_isloggedin_valid() đã viết �
 
 https://github.com/minhpl/thmoodleapp/compare/ef5348e03b8b9d745fea5292a5345b1ae901be04...9586ca4661bcef1b56fcd7e574ce696f3da5e783
 
-# 5. Triển khai (Hướng dẫn triểu khai, lưu ý khi upload nên appstore. nếu cần)
-
-# 6. Kiểm thử (nếu cần)
+# 5. Kiểm thử (nếu cần)
 
 | Mã yêu cầu |  Mã trường hợp   | Tiêu đề                                       | Mô tả                                                                                    | Kết quả mong đợi                                           | Người thực hiện | Kết quả lần 1 |
 | ---------- | ---------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------- | --------------- | ------------- |
@@ -254,3 +252,5 @@ https://github.com/minhpl/thmoodleapp/compare/ef5348e03b8b9d745fea5292a5345b1ae9
 | CN\_1      | <Testcase 8>     | 3 thiết bị được đăng nhập và học tập trên App | Máy 1, Máy 2, Máy 3, Máy 4 lần lượt đăng nhập. Sau đó Máy 3 đăng xuất                    | Máy 1, Máy 2, Máy 4 hoạt động bình thường                  | datdt,huytq     | Pass          |
 | CN\_1      | <Testcase 9>     | 3 thiết bị được đăng nhập và học tập trên App | Máy 1, Máy 2, Máy 3, Máy 4 lần lượt đăng nhập. Sau đó Máy 4 đăng xuất                    | Máy 1, Máy 2, Máy 3 hoạt động bình thường                  | datdt,huytq     | Pass          |
 | CN\_1      | <Testcase 10>    | 3 thiết bị được đăng nhập và học tập trên App | Máy 1, Máy 2, Máy 3, Máy 4 lần lượt đăng nhập. Sau đó Máy 2, Máy 3, Máy 4 cùng đăng xuất | Máy 1 hoạt động bình thường                                | datdt,huytq     | Pass          |
+
+# 6. Triển khai (Hướng dẫn triển khai, lưu ý khi upload nên appstore. nếu cần)
