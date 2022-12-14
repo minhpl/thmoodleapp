@@ -3,7 +3,7 @@
 1. **Tên tính năng**: Chống đăng nhập đồng thời trên nhiều thiết bị
 2. **Project**:  tnu,aof,tnut,vmc
 3. **Người phát triển**: huytq72@wru.vn
-6. **Người yêu cầu**: Phạm Lê Minh
+6. **Người yêu cầu**: minhpl@aum.edu.vn
 7. **Tham chiếu ERP:** TASK-19
 8. **Mã nguồn:**
 	1. **branch**: https://github.com/minhpl/thmoodleapp/tree/feature_chong_dang_nhap_dong_thoi_fix_loi
