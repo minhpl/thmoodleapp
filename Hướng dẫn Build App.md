@@ -6,6 +6,9 @@
 
 # 1. Hướng dẫn dựng Ứng dụng Moodle cho Mobile
 ## 1.1. Tạo logo của Trường cần xây dựng Ứng dụng
+- Ứng dụng chỉnh sửa logo:
+  - https://www.faststone.org/download.htm
+  - https://photoshoponlinemienphi.com
 - Thư mục resources
   - logo.png: kích thước 1024x1024 , background transparent -> dạng icon
   - login_logo.png: kích thước 600x154, logo ở chính giữa
