@@ -1,6 +1,6 @@
 {
-    "app_id": "vn.edu.aum.tnu",
-    "appname": "TNU-e",
+    "app_id": "vn.edu.aum.tuaf",
+    "appname": "TUAF-e",
     "versioncode": 40200,
     "versionname": "4.0.2",
     "cache_update_frequency_usually": 420000,
@@ -31,7 +31,7 @@
         "high": 120
     },
     "customurlscheme": "moodlemobile",
-    "siteurl": "http://tnu.aum.edu.vn",
+    "siteurl": "",
     "sitename": "",
     "multisitesdisplay": "",
     "sitefindersettings": {},
@@ -39,14 +39,14 @@
     "skipssoconfirmation": false,
     "forcedefaultlanguage": false,
     "privacypolicy": "https://moodle.net/moodle-app-privacy/",
-    "notificoncolor": "#f98012",
+    "notificoncolor": "#22762e",
     "enableanalytics": false,
     "enableonboarding": true,
     "forceColorScheme": "",
     "forceLoginLogo": false,
     "ioswebviewscheme": "moodleappfs",
     "appstores": {
-        "android": "vn.edu.aum.tnu",
+        "android": "vn.edu.aum.tuaf",
         "ios": "id633359593"
     },
     "wsrequestqueuelimit": 10,

@@ -1,8 +1,8 @@
 <?xml version='1.0' encoding='utf-8'?>
 <widget android-versionCode="40204" id="vn.edu.aum.tnu" ios-CFBundleVersion="4.0.2.2" version="4.0.2" versionCode="40203" xmlns="http://www.w3.org/ns/widgets" xmlns:android="http://schemas.android.com/apk/res/android" xmlns:cdv="http://cordova.apache.org/ns/1.0">
-    <name>TNU</name>
-    <description>TNU official app</description>
-    <author email="mobile@moodle.com" href="http://moodle.com">TNU Mobile team</author>
+    <name>TUAF</name>
+    <description>TUAF official app</description>
+    <author email="mobile@moodle.com" href="http://moodle.com">TUAF Mobile team</author>
     <content src="index.html" />
     <access origin="*" />
     <access launch-external="yes" origin="tel:*" />
