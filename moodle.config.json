@@ -1,5 +1,5 @@
 {
-    "app_id": "vn.edu.aum.tuaf",
+    "app_id": "com.moodle.moodlemobile",
     "appname": "TUAF-e",
     "versioncode": 40200,
     "versionname": "4.0.2",
@@ -31,7 +31,7 @@
         "high": 120
     },
     "customurlscheme": "moodlemobile",
-    "siteurl": "",
+    "siteurl": "http://tuaf.aum.edu.vn",
     "sitename": "",
     "multisitesdisplay": "",
     "sitefindersettings": {},
