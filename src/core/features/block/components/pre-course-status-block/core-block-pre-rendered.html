@@ -1,0 +1,20 @@
+<ion-item-divider class="ion-text-wrap" *ngIf="block_status" sticky="true">
+    <ion-label>
+        <h2>
+            <core-format-text [text]="title | translate" contextLevel="block" [contextInstanceId]="block.instanceid" [courseId]="courseId">
+            </core-format-text>
+        </h2>
+    </ion-label>
+</ion-item-divider>
+<core-loading [hideUntil]="loaded" [fullscreen]="false" *ngIf="block_status">
+    <button class={{btn_cancel}} (click)="Cancel()" ng-disabled="disable_button">
+        <ion-icon *ngIf="icon_cancel" name="close-circle-outline"></ion-icon> {{ 'core.block.Cancel' | translate }}
+    </button>
+    <button class={{btn_confirm}} (click)="Confirm()">
+        <ion-icon *ngIf="icon_confirm" name="checkmark-circle-outline"></ion-icon> {{ 'core.block.Confirm' | translate }}
+    </button>
+    <ul>
+        <li>{{ 'core.block.Cancel' | translate }} : {{ 'core.block.NoteUnpublish' | translate }}</li>
+        <li>{{ 'core.block.Confirm' | translate }} : {{ 'core.block.NotePublished' | translate }}</li>
+    </ul>
+</core-loading>
