@@ -1,6 +1,6 @@
 {
-    "app_id": "vn.edu.aum.tnu",
-    "appname": "TNU-e",
+    "app_id": "com.moodle.moodlemobile",
+    "appname": "HCCT-e",
     "versioncode": 40200,
     "versionname": "4.0.2",
     "cache_update_frequency_usually": 420000,
@@ -8,8 +8,8 @@
     "cache_update_frequency_sometimes": 3600000,
     "cache_update_frequency_rarely": 43200000,
     "default_lang": "en",
-    "languages": {        
-        "en": "English",        
+    "languages": {
+        "en": "English",
         "vi": "Vietnamese",
     },
     "wsservice": "moodle_mobile_app",
@@ -31,8 +31,8 @@
         "high": 120
     },
     "customurlscheme": "moodlemobile",
-    "siteurl": "http://tnu.aum.edu.vn",
-    "sitename": "",
+    "siteurl": "https://hcct.aum.edu.vn",
+    "sitename": "HCCT e-Learning",
     "multisitesdisplay": "",
     "sitefindersettings": {},
     "onlyallowlistedsites": false,
@@ -46,7 +46,7 @@
     "forceLoginLogo": false,
     "ioswebviewscheme": "moodleappfs",
     "appstores": {
-        "android": "vn.edu.aum.tnu",
+        "android": "vn.edu.aum.hcct",
         "ios": "id633359593"
     },
     "wsrequestqueuelimit": 10,
