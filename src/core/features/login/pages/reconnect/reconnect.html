@@ -25,7 +25,7 @@
             <p *ngIf="siteName" class="ion-padding core-sitename">
                 <core-format-text [text]="siteName" [filter]="false"></core-format-text>
             </p>
-            <p class="core-siteurl">{{siteUrl}}</p>
+            <!-- <p class="core-siteurl">{{siteUrl}}</p> -->
 
             <ion-card *ngIf="!isLoggedOut" class="core-danger-card core-login-reconnect-warning">
                 <ion-item>
@@ -61,13 +61,13 @@
                 </ion-button>
             </div>
 
-            <ng-container *ngIf="showScanQR">
+            <!-- <ng-container *ngIf="showScanQR">
                 <div class="ion-text-center ion-padding">{{ 'core.login.or' | translate }}</div>
                 <ion-button expand="block" fill="outline" class="ion-margin" (click)="showInstructionsAndScanQR()">
                     <ion-icon slot="start" name="fas-qrcode" aria-hidden="true"></ion-icon>
                     {{ 'core.scanqr' | translate }}
                 </ion-button>
-            </ng-container>
+            </ng-container> -->
         </form>
 
         <!-- Forgotten password option. -->

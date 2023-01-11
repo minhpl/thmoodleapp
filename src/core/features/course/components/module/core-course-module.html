@@ -52,14 +52,14 @@
                     (completionChanged)="completionChanged.emit($event)">
                 </core-course-module-completion-legacy>
 
-                <div class="core-module-buttons-more">
-                    <!-- Buttons defined by the module handler. -->
+                <!-- <div class="core-module-buttons-more">
+
                     <ion-button fill="clear" *ngFor="let button of module.handlerData.buttons"
                         [hidden]="button.hidden || module.handlerData.spinner" class="core-animate-show-hide"
                         (click)="buttonClicked($event, button)" [attr.aria-label]="button.label | translate:{$a: module.handlerData.title}">
                         <ion-icon [name]="button.icon" slot="icon-only" aria-hidden="true"></ion-icon>
                     </ion-button>
-                </div>
+                </div> -->
             </div>
         </ion-item>
         <ion-item *ngIf="hasInfo" id="core-course-module-{{module.id}}-info" detail="false"
