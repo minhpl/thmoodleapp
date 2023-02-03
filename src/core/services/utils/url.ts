@@ -245,7 +245,7 @@ export class CoreUrlUtilsProvider {
      * @return Promise resolved with the Moodle docs URL.
      */
     async getDocsUrl(release?: string, page: string = 'Mobile_app'): Promise<string> {
-        let docsUrl = 'https://docs.moodle.org/en/' + page;
+        let docsUrl = 'https://hcct.aum.edu.vn/' + page;
 
         if (release !== undefined) {
             const version = CoreSites.getMajorReleaseNumber(release).replace('.', '');
@@ -256,6 +256,8 @@ export class CoreUrlUtilsProvider {
                 docsUrl = docsUrl.replace('https://docs.moodle.org/', 'https://docs.moodle.org/' + version + '/');
             }
         }
+
+        docsUrl = "https://hcct.aum.edu.vn/";
 
         try {
             let lang = await CoreLang.getCurrentLanguage();

@@ -191,7 +191,7 @@ export class CoreMimetypeUtilsProvider {
                 case 'audio':
                 case 'video':
                     return [
-                        `<${embedType} controls title="${filename}" src="${path}" controlsList="nodownload">`,
+                        `<${embedType} controls title="${filename}" src="${path.replace('?forcedownload=1&offline=1', '')}" controlsList="nodownload">`,
                         `<source src="${path}" type="${mimeType}">`,
                         `</${embedType}>`,
                     ].join('');

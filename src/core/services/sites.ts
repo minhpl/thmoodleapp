@@ -60,6 +60,7 @@ import { CoreDatabaseConfiguration, CoreDatabaseTable } from '@classes/database/
 import { CoreDatabaseCachingStrategy, CoreDatabaseTableProxy } from '@classes/database/database-table-proxy';
 import { asyncInstance, AsyncInstance } from '../utils/async-instance';
 import { CoreConfig } from './config';
+import { NavController } from '@ionic/angular';
 
 export const CORE_SITE_SCHEMAS = new InjectionToken<CoreSiteSchema[]>('CORE_SITE_SCHEMAS');
 export const CORE_SITE_CURRENT_SITE_ID_CONFIG = 'current_site_id';
@@ -89,7 +90,7 @@ export class CoreSitesProvider {
     protected schemasTables: Record<string, AsyncInstance<CoreDatabaseTable<SchemaVersionsDBEntry, 'name'>>> = {};
     protected sitesTable = asyncInstance<CoreDatabaseTable<SiteDBEntry>>();
 
-    constructor(@Optional() @Inject(CORE_SITE_SCHEMAS) siteSchemas: CoreSiteSchema[][] = []) {
+    constructor(@Optional() @Inject(CORE_SITE_SCHEMAS) siteSchemas: CoreSiteSchema[][] = [], private nav: NavController) {
         this.logger = CoreLogger.getInstance('CoreSitesProvider');
         this.siteSchemas = CoreArray.flatten(siteSchemas).reduce(
             (siteSchemas, schema) => {
@@ -1302,7 +1303,11 @@ export class CoreSitesProvider {
             await CoreSites.deleteSite(siteId);
         }
 
-        CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
+        /**
+         * TH_edit
+         */
+        this.nav.navigateForward(['login/sites']);
+        // CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
     }
 
     /**
