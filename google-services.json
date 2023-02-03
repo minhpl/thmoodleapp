@@ -1,42 +1,43 @@
 {
   "project_info": {
-    "project_number": "",
-    "firebase_url": "",
-    "project_id": "",
-    "storage_bucket": ""
+    "project_number": "53838765805",
+    "project_id": "thhcctapp-10891",
+    "storage_bucket": "thhcctapp-10891.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:111111111111:android:1111111111111111",
+        "mobilesdk_app_id": "1:53838765805:android:5befad9c1886595cd3f6e4",
         "android_client_info": {
-          "package_name": "com.moodle.moodlemobile"
+          "package_name": "vn.edu.aum.hcct"
         }
       },
       "oauth_client": [
         {
-          "client_id": "",
+          "client_id": "53838765805-phk1oe0epqlmqo6bu88nnpo4lvb2h9qc.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": ""
-        },
-        {
-          "current_key": ""
+          "current_key": "AIzaSyCTnYKNeSjzfugtRo-r-kCdgDyPksRxvSk"
         }
       ],
       "services": {
-        "analytics_service": {
-          "status": 1
-        },
         "appinvite_service": {
-          "status": 1,
-          "other_platform_oauth_client": []
-        },
-        "ads_service": {
-          "status": 2
+          "other_platform_oauth_client": [
+            {
+              "client_id": "53838765805-phk1oe0epqlmqo6bu88nnpo4lvb2h9qc.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "53838765805-60k3cq7db8j8p86nqm8aj3i7gag0h2aa.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "vn.edu.aum.hcct"
+              }
+            }
+          ]
         }
       }
     }

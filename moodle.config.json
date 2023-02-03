@@ -1,5 +1,5 @@
 {
-    "app_id": "com.moodle.moodlemobile",
+    "app_id": "vn.edu.aum.hcct",
     "appname": "HCCT-e",
     "versioncode": 40200,
     "versionname": "4.0.2",
@@ -7,7 +7,7 @@
     "cache_update_frequency_often": 1200000,
     "cache_update_frequency_sometimes": 3600000,
     "cache_update_frequency_rarely": 43200000,
-    "default_lang": "en",
+    "default_lang": "vi",
     "languages": {
         "en": "English",
         "vi": "Vietnamese",
@@ -31,7 +31,7 @@
         "high": 120
     },
     "customurlscheme": "moodlemobile",
-    "siteurl": "https://hcct.aum.edu.vn",
+    "siteurl": "https://hcct.aum.edu.vn/",
     "sitename": "HCCT e-Learning",
     "multisitesdisplay": "",
     "sitefindersettings": {},
@@ -39,7 +39,7 @@
     "skipssoconfirmation": false,
     "forcedefaultlanguage": false,
     "privacypolicy": "https://moodle.net/moodle-app-privacy/",
-    "notificoncolor": "#f98012",
+    "notificoncolor": "#1e73be",
     "enableanalytics": false,
     "enableonboarding": true,
     "forceColorScheme": "",
