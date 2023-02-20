@@ -5,7 +5,7 @@
  * http://ionicframework.com/docs/theming/
  */
 
-:root {
+ :root {
 
     // Color palette
     --black: #{$black};
@@ -143,10 +143,10 @@
     }
 
     --core-header-toolbar-button-image-size: var(--a11y-min-target-size);
-    --core-header-toolbar-background: var(--white);
+    --core-header-toolbar-background: #55185d;
     --core-header-toolbar-border-width: 0px;
     --core-header-toolbar-border-color: var(--stroke);
-    --core-header-toolbar-color: var(--text-color);
+    --core-header-toolbar-color: var(--white);
     --core-header-toolbar-height: 48px;
     --core-header-shadow: none;
     --core-header-buttons-background: var(--core-header-toolbar-background);

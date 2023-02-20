@@ -15,7 +15,7 @@
 import { Component, OnInit, OnDestroy } from '@angular/core';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
 import { CoreTimeUtils } from '@services/utils/time';
-import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
+import { CoreSites, CoreSitesProvider, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreCoursesProvider, CoreCourses, CoreCoursesMyCoursesUpdatedEventData } from '@features/courses/services/courses';
 import { CoreCoursesHelper, CoreEnrolledCourseDataWithOptions } from '@features/courses/services/courses-helper';
 import { CoreCourseHelper, CorePrefetchStatusInfo } from '@features/course/services/course-helper';
@@ -102,6 +102,7 @@ export class AddonBlockMyOverviewComponent extends CoreBlockBaseComponent implem
      * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
+
         // Refresh the enabled flags if enabled.
         this.downloadCourseEnabled = !CoreCourses.isDownloadCourseDisabledInSite();
         this.downloadCoursesEnabled = !CoreCourses.isDownloadCoursesDisabledInSite();
@@ -156,6 +157,8 @@ export class AddonBlockMyOverviewComponent extends CoreBlockBaseComponent implem
         Promise.all(promises).finally(() => {
             super.ngOnInit();
         });
+
+
     }
 
     /**

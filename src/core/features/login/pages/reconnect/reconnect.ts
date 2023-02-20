@@ -16,7 +16,7 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/co
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 import { CoreApp } from '@services/app';
-import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
+import { CoreSites, CoreSitesProvider, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
@@ -60,7 +60,7 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
     protected loginSuccessful = false;
 
     constructor(
-        protected fb: FormBuilder,
+        protected fb: FormBuilder, protected sitesProvider: CoreSitesProvider,
     ) {
         const currentSite = CoreSites.getCurrentSite();
 
@@ -222,6 +222,10 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
 
             // Reset fields so the data is not in the view anymore.
             this.credForm.controls['password'].reset();
+
+            //TH_edit
+
+            this.sitesProvider.savelogininfotosite();
 
             // Go to the site initial page.
             this.loginSuccessful = true;

@@ -42,6 +42,8 @@ export class CoreSitePluginsModuleIndexPage implements OnInit, CanLeave {
         this.title = CoreNavigator.getRouteParam('title');
         this.module = CoreNavigator.getRouteParam('module');
         this.courseId = CoreNavigator.getRouteNumberParam('courseId');
+
+        console.log(this.title)
     }
 
     /**

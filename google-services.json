@@ -1,42 +1,43 @@
 {
   "project_info": {
-    "project_number": "",
-    "firebase_url": "",
-    "project_id": "",
-    "storage_bucket": ""
+    "project_number": "316829127109",
+    "project_id": "thvmcapp",
+    "storage_bucket": "thvmcapp.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:111111111111:android:1111111111111111",
+        "mobilesdk_app_id": "1:316829127109:android:973243f3a0cdc8c170fbac",
         "android_client_info": {
-          "package_name": "com.moodle.moodlemobile"
+          "package_name": "org.vmcvietnam.elearning"
         }
       },
       "oauth_client": [
         {
-          "client_id": "",
+          "client_id": "316829127109-8fnlsrk6auea49nf6b1kb6vhbn9c1521.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": ""
-        },
-        {
-          "current_key": ""
+          "current_key": "AIzaSyDqknoKMVyytjMnqha2IbcZTr18NBrU6ec"
         }
       ],
       "services": {
-        "analytics_service": {
-          "status": 1
-        },
         "appinvite_service": {
-          "status": 1,
-          "other_platform_oauth_client": []
-        },
-        "ads_service": {
-          "status": 2
+          "other_platform_oauth_client": [
+            {
+              "client_id": "316829127109-8fnlsrk6auea49nf6b1kb6vhbn9c1521.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "316829127109-isdskhpf3h4narkep8cghmcmlp6c4ltj.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "org.vmcvietnam.elearning"
+              }
+            }
+          ]
         }
       }
     }

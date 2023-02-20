@@ -45,6 +45,10 @@ const appRoutes: Routes = [
         path: 'reload',
         loadChildren: () => import('./pages/reload/reload.module').then( m => m.CoreMainMenuReloadPageModule),
     },
+    {
+        path: 'transcript',
+        loadChildren: () => import('./pages/transcript/transcript.module').then( m => m.TranscriptPageModule),
+    },
 ];
 
 @NgModule({

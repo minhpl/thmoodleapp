@@ -92,6 +92,8 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
         this.fetchUser().finally(() => {
             this.userLoaded = true;
         });
+
+        console.log(this.userId)
     }
 
     /**
@@ -119,6 +121,10 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
             this.title = user.fullname;
 
             this.user.address = CoreUserHelper.formatAddress('', user.city, user.country);
+
+            console.log(this.user);
+
+            console.log(this.courseId)
 
             await this.checkUserImageUpdated();
         } catch (error) {

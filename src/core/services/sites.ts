@@ -60,6 +60,8 @@ import { CoreDatabaseConfiguration, CoreDatabaseTable } from '@classes/database/
 import { CoreDatabaseCachingStrategy, CoreDatabaseTableProxy } from '@classes/database/database-table-proxy';
 import { asyncInstance, AsyncInstance } from '../utils/async-instance';
 import { CoreConfig } from './config';
+import { Device } from '@ionic-native/device/ngx';
+import { NavController } from '@ionic/angular';
 
 export const CORE_SITE_SCHEMAS = new InjectionToken<CoreSiteSchema[]>('CORE_SITE_SCHEMAS');
 export const CORE_SITE_CURRENT_SITE_ID_CONFIG = 'current_site_id';
@@ -89,7 +91,7 @@ export class CoreSitesProvider {
     protected schemasTables: Record<string, AsyncInstance<CoreDatabaseTable<SchemaVersionsDBEntry, 'name'>>> = {};
     protected sitesTable = asyncInstance<CoreDatabaseTable<SiteDBEntry>>();
 
-    constructor(@Optional() @Inject(CORE_SITE_SCHEMAS) siteSchemas: CoreSiteSchema[][] = []) {
+    constructor(@Optional() @Inject(CORE_SITE_SCHEMAS) siteSchemas: CoreSiteSchema[][] = [], private device: Device, private nav:NavController) {
         this.logger = CoreLogger.getInstance('CoreSitesProvider');
         this.siteSchemas = CoreArray.flatten(siteSchemas).reduce(
             (siteSchemas, schema) => {
@@ -1262,6 +1264,37 @@ export class CoreSitesProvider {
     }
 
     /**
+    * TH_edit
+    */
+
+    savelogininfotosite(): void {
+        var uuid = '';
+        if (this.device.uuid) {
+            uuid = this.device.uuid;
+        }
+
+        this.getSite().then((site) => {
+            const userId = site.getUserId();
+            var data: any = {
+                userid: userId,
+                uuid: uuid,
+                loginstatus: 1,
+            };
+
+            const preSets = {
+                getFromCache: false,
+            };
+
+            site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
+                console.log(courses)
+            }).catch((e) => {
+            });
+        }).catch((e) => {
+        });
+    }
+
+
+    /**
      * Login the user in a site.
      *
      * @param siteid ID of the site the user is accessing.
@@ -1273,13 +1306,46 @@ export class CoreSitesProvider {
         CoreEvents.trigger(CoreEvents.LOGIN, {}, siteId);
     }
 
+
     /**
+     *
      * Logout the user.
      *
      * @param forceLogout If true, site will be marked as logged out, no matter the value tool_mobile_forcelogout.
      * @return Promise resolved when the user is logged out.
+     * TH_edit
      */
+
+    savelogoutinfotosite(): void {
+        var uuid = '';
+        if (this.device.uuid) {
+            uuid = this.device.uuid;
+        }
+
+        this.getSite().then((site) => {
+            const userId = site.getUserId();
+            var data: any = {
+                userid: userId,
+                uuid: uuid,
+                loginstatus: 0,
+            };
+
+            const preSets = {
+                getFromCache: false,
+            };
+
+            site.write('local_th_managelogin_save_userinfo', data, preSets).then((courses) => {
+                // console.log(courses,data)
+            }).catch((e) => {
+                // console.log(e)
+            });
+        }).catch((e) => {
+            // console.log(e)
+        });
+    }
+
     async logout(options: CoreSitesLogoutOptions = {}): Promise<void> {
+        this.savelogoutinfotosite();
         if (!this.currentSite) {
             return;
         }
@@ -1302,7 +1368,45 @@ export class CoreSitesProvider {
             await CoreSites.deleteSite(siteId);
         }
 
-        CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
+        /**
+         * TH_edit
+         */
+
+
+        await this.nav.navigateForward(['login/sites'])
+        //CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
+    }
+
+    async logout_isloggedin_valid(options: CoreSitesLogoutOptions = {}): Promise<void> {
+        if (!this.currentSite) {
+            return;
+        }
+
+        const promises: Promise<unknown>[] = [];
+        const siteConfig = this.currentSite.getStoredConfig();
+        const siteId = this.currentSite.getId();
+
+        // this.currentSite = undefined;
+
+        if (options.forceLogout || (siteConfig && siteConfig.tool_mobile_forcelogout == '1')) {
+            promises.push(this.setSiteLoggedOut(siteId));
+        }
+
+        promises.push(this.removeStoredCurrentSite());
+
+        await CoreUtils.ignoreErrors(Promise.all(promises));
+
+        if (options.removeAccount) {
+            await CoreSites.deleteSite(siteId);
+        }
+
+        /**
+         * TH_edit
+         */
+
+
+        await this.nav.navigateForward(['login/sites'])
+        //CoreEvents.trigger(CoreEvents.LOGOUT, {}, siteId);
     }
 
     /**
