@@ -512,9 +512,11 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
                 }
 
                 fileEntry = await CoreFile.writeFile(this.getFilePath(), this.mediaBlob);
+                console.log(fileEntry)
             }
 
             if (!fileEntry) {
+
                 throw new CoreError('File not found.');
             }
 

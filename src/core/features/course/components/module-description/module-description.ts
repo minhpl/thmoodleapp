@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, Input } from '@angular/core';
+import { Component, Input, OnInit } from '@angular/core';
 
 /**
  * Component to display the description of a module.
@@ -36,7 +36,7 @@ import { Component, Input } from '@angular/core';
     selector: 'core-course-module-description',
     templateUrl: 'core-course-module-description.html',
 })
-export class CoreCourseModuleDescriptionComponent {
+export class CoreCourseModuleDescriptionComponent implements OnInit{
 
     @Input() description?: string; // The description to display.
     @Input() note?: string; // A note to display along with the description.
@@ -47,4 +47,8 @@ export class CoreCourseModuleDescriptionComponent {
     @Input() contextInstanceId?: number; // The instance ID related to the context.
     @Input() courseId?: number; // Course ID the text belongs to. It can be used to improve performance with filters.
 
+
+    async ngOnInit() {
+        console.log(this.description,this.note)
+    }
 }

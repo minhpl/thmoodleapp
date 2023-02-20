@@ -31,6 +31,12 @@ import { trigger, state, style, transition, animate } from '@angular/animations'
 import { CoreSites } from '@services/sites';
 import { CoreDom } from '@singletons/dom';
 import { CoreLogger } from '@singletons/logger';
+import { CoreUser, CoreUserProfile } from '@features/user/services/user';
+import { CoreSite } from '@classes/site';
+import { SafeUrl } from '@angular/platform-browser';
+import { CoreTextUtils } from '@services/utils/text';
+import { CoreUserHelper } from '@features/user/services/user-helper';
+import { CoreDomUtils } from '@services/utils/dom';
 
 const ANIMATION_DURATION = 500;
 
@@ -74,6 +80,21 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
     moreBadge = false;
     visibility = 'hidden';
 
+    courseId!: number;
+    canChangeProfilePicture: any;
+    protected userId!: number;
+    protected site!: CoreSite;
+    userLoaded = false;
+    hasContact = false;
+    hasDetails = false;
+    user?: CoreUserProfile;
+    title?: string;
+    formattedAddress?: string;
+    encodedAddress?: SafeUrl;
+    interests?: string[];
+    theuser: any = {};
+    paymetboolean: boolean| undefined;
+
     protected subscription?: Subscription;
     protected navSubscription?: Subscription;
     protected keyboardObserver?: CoreEventObserver;
@@ -92,6 +113,8 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
     tabAction: CoreMainMenuRoleTab;
 
     constructor() {
+        this.courseId = CoreNavigator.getRouteNumberParam('courseId') || this.courseId; // Use 0 for site badges.
+        this.userId = CoreNavigator.getRouteNumberParam('userId') || CoreSites.getRequiredCurrentSite().getUserId();
         this.backButtonFunction = this.backButtonClicked.bind(this);
         this.tabAction = new CoreMainMenuRoleTab(this);
         this.logger = CoreLogger.getInstance('CoreMainMenuPage');
@@ -109,6 +132,9 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
      * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
+        this.fetchUser().finally(() => {
+            this.userLoaded = true;
+        });
         this.showTabs = true;
         this.urlToOpen = CoreNavigator.getRouteParam('urlToOpen');
         this.redirectPath = CoreNavigator.getRouteParam('redirectPath');
@@ -151,6 +177,39 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
         }
     }
 
+    async fetchUser(): Promise<void> {
+        try {
+            const user = await CoreUser.getProfile(this.userId, this.courseId);
+
+            if (user.address) {
+                this.formattedAddress = CoreUserHelper.formatAddress(user.address, user.city, user.country);
+                this.encodedAddress = CoreTextUtils.buildAddressURL(this.formattedAddress);
+            }
+
+            this.interests = user.interests ?
+                user.interests.split(',').map(interest => interest.trim()) :
+                undefined;
+
+            this.hasContact = !!(user.email || user.phone1 || user.phone2 || user.city || user.country || user.address);
+            this.hasDetails = !!(user.url || user.interests || (user.customfields && user.customfields.length > 0));
+
+            this.user = user;
+            this.title = user.fullname;
+            this.theuser = this.user
+            if(this.theuser.email == "hv1@example.com") {
+              this.paymetboolean = false
+            } else {
+              this.paymetboolean = true
+            }
+
+
+            this.user.address = CoreUserHelper.formatAddress('', user.city, user.country);
+
+        } catch (error) {
+            CoreDomUtils.showErrorModalDefault(error, 'core.user.errorloaduser', true);
+        }
+      }
+
     /**
      * Init handlers on change (size or handlers).
      */
@@ -168,6 +227,8 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
         // Re-build the list of tabs. If a handler is already in the list, use existing object to prevent re-creating the tab.
         const newTabs: CoreMainMenuHandlerToDisplay[] = [];
 
+
+
         for (let i = 0; i < handlers.length; i++) {
             const handler = handlers[i];
 
@@ -180,6 +241,8 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
 
             newTabs.push(tab || handler);
         }
+
+
 
         this.tabs = newTabs;
 

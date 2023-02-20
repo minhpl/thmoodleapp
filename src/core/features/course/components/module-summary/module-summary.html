@@ -24,8 +24,8 @@
                     </core-format-text>
                 </h1>
             </ion-label>
-            <ion-button fill="clear" *ngIf="displayOptions.displayOpenInBrowser && externalUrl" [href]="externalUrl" core-link
-                [showBrowserWarning]="false" [attr.aria-label]="'core.openinbrowser' | translate" slot="end">
+            <ion-button fill="clear" *ngIf="displayOptions.displayOpenInBrowser" [href]="externalUrl" core-link [showBrowserWarning]="false"
+                [attr.aria-label]="'core.openinbrowser' | translate" slot="end">
                 <ion-icon name="fas-external-link-alt" slot="icon-only" aria-hidden="true"></ion-icon>
             </ion-button>
         </ion-item>
@@ -153,7 +153,7 @@
             </ion-list>
         </ion-card>
 
-        <ion-card *ngIf="(canPrefetch && displayOptions.displayPrefetch) || (size && displayOptions.displaySize)">
+        <!-- <ion-card *ngIf="(canPrefetch && displayOptions.displayPrefetch) || (size && displayOptions.displaySize)">
             <ion-item lines="full" class="ion-text-wrap card-header">
                 <ion-label>
                     <h2>
@@ -186,7 +186,7 @@
                     {{ 'core.download' | translate }}
                 </ion-label>
             </ion-button>
-        </ion-card>
+        </ion-card> -->
 
         <ion-item button *ngIf="blog && displayOptions.displayBlog" (click)="gotoBlog()" [detail]="true">
             <ion-icon name="far-newspaper" slot="start" aria-hidden="true"></ion-icon>

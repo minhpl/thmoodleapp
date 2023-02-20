@@ -26,10 +26,11 @@ import {
     CoreUserDelegateContext,
 } from '@features/user/services/user-delegate';
 import { CoreNavigator } from '@services/navigator';
-import { CoreSites } from '@services/sites';
+import { CoreSites, CoreSitesProvider } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { ModalController, Translate } from '@singletons';
 import { Subscription } from 'rxjs';
+import { LoadingController, NavController } from '@ionic/angular';
 
 /**
  * Component to display a user menu.
@@ -52,12 +53,15 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
     user?: CoreUserProfile;
     displaySwitchAccount = true;
     removeAccountOnLogout = false;
+    theuser: any = {};
 
     protected subscription!: Subscription;
 
     /**
      * @inheritdoc
      */
+
+    constructor( private nav: NavController,private loadingController:LoadingController,private sitesProvider: CoreSitesProvider, ) {}
     async ngOnInit(): Promise<void> {
         const currentSite = CoreSites.getRequiredCurrentSite();
         this.siteId = currentSite.getId();
@@ -72,6 +76,8 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         // Load the handlers.
         if (this.siteInfo) {
             this.user = await CoreUser.getProfile(this.siteInfo.userid);
+
+            this.theuser = this.user
 
             this.subscription = CoreUserDelegate.getProfileHandlersFor(this.user, CoreUserDelegateContext.USER_MENU)
                 .subscribe((handlers) => {
@@ -150,6 +156,13 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         CoreNavigator.navigateToSitePath('preferences');
     }
 
+    openPreferencess() {
+        this.nav.navigateForward(['main/purchase_history', { data: JSON.stringify(this.theuser)  }])
+    }
+
+    Transcript() {
+        this.nav.navigateForward(['main/transcript'])
+    }
     /**
      * A handler was clicked.
      *

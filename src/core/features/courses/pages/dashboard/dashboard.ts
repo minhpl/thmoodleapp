@@ -13,17 +13,22 @@
 // limitations under the License.
 
 import { Component, OnDestroy, OnInit, QueryList, ViewChildren } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
+import { AlertController, IonRefresher, ModalController } from '@ionic/angular';
 
 import { CoreCourses } from '../../services/courses';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { CoreSites } from '@services/sites';
+import { CoreSites, CoreSitesProvider } from '@services/sites';
 import { CoreCoursesDashboard } from '@features/courses/services/dashboard';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreCourseBlock } from '@features/course/services/course';
 import { CoreBlockComponent } from '@features/block/components/block/block';
 import { CoreNavigator } from '@services/navigator';
 import { CoreBlockDelegate } from '@features/block/services/block-delegate';
+import { Translate } from '@singletons';
+import { CoreConstants } from '@/core/constants';
+import { CoreFilter } from '@features/filter/services/filter';
+import { Device } from '@ionic-native/device/ngx';
+
 
 /**
  * Page that displays the dashboard page.
@@ -43,17 +48,26 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
     userId?: number;
     blocks: Partial<CoreCourseBlock>[] = [];
     loaded = false;
+    removeAccountOnLogout = false;
+    siteName?: string;
+    siteId?: string;
 
     protected updateSiteObserver: CoreEventObserver;
 
-    constructor() {
+    constructor(private sitesProvider: CoreSitesProvider,private device: Device, public alertCtrl: AlertController) {
         // Refresh the enabled flags if site is updated.
         this.updateSiteObserver = CoreEvents.on(CoreEvents.SITE_UPDATED, () => {
+            const currentSite = CoreSites.getRequiredCurrentSite();
             this.searchEnabled = !CoreCourses.isSearchCoursesDisabledInSite();
             this.downloadCourseEnabled = !CoreCourses.isDownloadCourseDisabledInSite();
             this.downloadCoursesEnabled = !CoreCourses.isDownloadCoursesDisabledInSite();
+            this.removeAccountOnLogout = !!CoreConstants.CONFIG.removeaccountonlogout;
+            this.siteName = currentSite.getSiteName();
+            this.siteId = currentSite.getId();
 
         }, CoreSites.getCurrentSiteId());
+
+
     }
 
     /**
@@ -63,8 +77,76 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
         this.searchEnabled = !CoreCourses.isSearchCoursesDisabledInSite();
         this.downloadCourseEnabled = !CoreCourses.isDownloadCourseDisabledInSite();
         this.downloadCoursesEnabled = !CoreCourses.isDownloadCoursesDisabledInSite();
-
         this.loadContent();
+        // this.checkisloginvalidandlogout();
+    }
+
+    async checkisloginvalidandlogout(): Promise<void> {
+        const site = await CoreSites.getSite();
+
+        var uuid = '';
+            if (this.device.uuid) {
+                uuid = this.device.uuid;
+        }
+
+        const userId = site.getUserId()
+
+        var data: any = {
+            userid: userId,
+            uuid: uuid,
+            loginstatus: 1,
+        };
+
+        const preSets = {
+            getFromCache: false,
+        };
+
+        site.write('local_th_managelogin_checklogin_valid', data, preSets).then(async (courses) => {
+            const jsonValue = JSON.stringify(courses);
+            console.log(jsonValue)
+            let temp = JSON.parse(jsonValue)
+            if (temp.isloggedin_valid == 1) {
+                    const alert = await this.alertCtrl.create({
+                    header: 'Thông báo',
+                    message: 'Tài khoản của bạn bị đăng xuất do được đăng nhập trên thiết bị mới!',
+                    buttons: [ {
+                        text: 'Đồng ý',
+                        role: 'destructive',
+                        handler: () => this.logout()
+                        }]
+                });
+
+
+                await alert.present();
+            }
+        });
+    }
+
+    async logout () {
+
+        if (CoreNavigator.currentRouteCanBlockLeave()) {
+            await CoreDomUtils.showAlert(undefined, Translate.instant('core.cannotlogoutpageblocks'));
+            return;
+        }
+
+        if (this.removeAccountOnLogout) {
+            // Ask confirm.
+            const siteName = this.siteName ?
+                await CoreFilter.formatText(this.siteName, { clean: true, singleLine: true, filter: false }, [], this.siteId) :
+                '';
+
+            try {
+                await CoreDomUtils.showDeleteConfirm('core.login.confirmdeletesite', { sitename: siteName });
+            } catch (error) {
+                // User cancelled, stop.
+                return;
+            }
+        }
+
+        await CoreSites.logout_isloggedin_valid({
+            forceLogout: true,
+            removeAccount: this.removeAccountOnLogout,
+        });
     }
 
     /**
@@ -156,4 +238,7 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
         this.updateSiteObserver.off();
     }
 
+}
+function reject(arg0: string) {
+    throw new Error('Function not implemented.');
 }

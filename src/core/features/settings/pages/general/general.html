@@ -20,7 +20,7 @@
                 <ion-select-option *ngFor="let entry of languages" [value]="entry.code">{{ entry.name }}</ion-select-option>
             </ion-select>
         </ion-item>
-        <ion-item class="ion-text-wrap core-settings-general-font-size item-interactive" lines="none">
+        <!-- <ion-item class="ion-text-wrap core-settings-general-font-size item-interactive" lines="none">
             <ion-label>
                 <h2>{{ 'core.settings.fontsize' | translate }}</h2>
             </ion-label>
@@ -29,7 +29,7 @@
                     [ngStyle]="{'font-size.px': zoomLevel.style}">
                     <ion-label>
                         {{ 'core.settings.fontsizecharacter' | translate }}
-                        <!-- Empty element styled with the largest font size, so all buttons share a common baseline. -->
+
                         <span [ngStyle]="{'font-size.px': zoomLevels[zoomLevels.length - 1].style}"></span>
                     </ion-label>
                 </ion-segment-button>
@@ -45,7 +45,7 @@
                 <ion-select-option *ngFor="let scheme of colorSchemes" [value]="scheme">
                     {{ 'core.settings.colorscheme-' + scheme | translate }}</ion-select-option>
             </ion-select>
-        </ion-item>
+        </ion-item> -->
         <ion-item text-wrap *ngIf="colorSchemes.length > 0 && selectedScheme=='system' && isAndroid" lines="none">
             <ion-label>
                 <p>{{ 'core.settings.colorscheme-system-notice' | translate }}</p>

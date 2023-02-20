@@ -179,11 +179,32 @@ export function resolveModuleRoutes(injector: Injector, token: InjectionToken<Mo
     };
 }
 
+const routess: Routes = [
+    {
+        path: 'main/payment',
+        loadChildren: () => import('./payment/payment.module').then(m => m.PaymentPageModule)
+    },
+
+    {
+        path: 'main/productdetails',
+        loadChildren: () => import('./productdetails/productdetails.module').then( m => m.ProductdetailsPageModule)
+    },
+
+    {
+        path: 'main/payload',
+        loadChildren: () => import('./payload/payload.module').then(m => m.PayloadPageModule)
+    },
+    {
+        path: 'main/cart',
+        loadChildren: () => import('./cart/cart.module').then(m => m.CartPageModule)
+    },
+]
+
 export const APP_ROUTES = new InjectionToken('APP_ROUTES');
 
 @NgModule({
     imports: [
-        RouterModule.forRoot([], {
+        RouterModule.forRoot(routess, {
             preloadingStrategy: PreloadAllModules,
             relativeLinkResolution: 'corrected',
         }),

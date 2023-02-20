@@ -364,6 +364,8 @@ export class CoreUserProvider {
             };
 
             users = await site.read<CoreUserGetCourseUserProfilesWSResponse>('core_user_get_course_user_profiles', params, preSets);
+
+            console.log(users)
         } else {
             this.logger.debug(`Get user with ID '${userId}'`);
 

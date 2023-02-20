@@ -856,6 +856,7 @@ export class CoreCourseHelperProvider {
         if (!files || !files.length) {
             // Module not valid, stop.
             throw new CoreError('File list not supplied.');
+            //  throw new CoreError;
         }
 
         const mainFile = files[0];
