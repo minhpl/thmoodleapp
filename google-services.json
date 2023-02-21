@@ -1,42 +1,43 @@
 {
   "project_info": {
-    "project_number": "",
-    "firebase_url": "",
-    "project_id": "",
-    "storage_bucket": ""
+    "project_number": "859472982443",
+    "project_id": "thtuafapp",
+    "storage_bucket": "thtuafapp.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:111111111111:android:1111111111111111",
+        "mobilesdk_app_id": "1:859472982443:android:a29382a494614292f362ee",
         "android_client_info": {
-          "package_name": "com.moodle.moodlemobile"
+          "package_name": "vn.edu.aum.tuaf"
         }
       },
       "oauth_client": [
         {
-          "client_id": "",
+          "client_id": "859472982443-16i030esuhkekq1u9j6ssks1b6nd451u.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": ""
-        },
-        {
-          "current_key": ""
+          "current_key": "AIzaSyBBL7gEmNKugEXrBJ_SeRjPwM3F4mHFqrM"
         }
       ],
       "services": {
-        "analytics_service": {
-          "status": 1
-        },
         "appinvite_service": {
-          "status": 1,
-          "other_platform_oauth_client": []
-        },
-        "ads_service": {
-          "status": 2
+          "other_platform_oauth_client": [
+            {
+              "client_id": "859472982443-16i030esuhkekq1u9j6ssks1b6nd451u.apps.googleusercontent.com",
+              "client_type": 3
+            },
+            {
+              "client_id": "859472982443-3gavgajfd7sn67r3t2642a5ivt6s879q.apps.googleusercontent.com",
+              "client_type": 2,
+              "ios_info": {
+                "bundle_id": "vn.edu.aum.tuaf"
+              }
+            }
+          ]
         }
       }
     }
