@@ -3,9 +3,5 @@
     "noblocks": "No blocks found!",
     "opendrawerblocks": "Open block drawer",
     "tour_navigation_dashboard_content": "This side panel can contain more features.",
-    "tour_navigation_dashboard_title": "Expand to explore",
-    "Confirm": "Published",
-    "Cancel": "Unpublish",
-    "NoteUnpublish" : "Course is hidden from students.",
-    "NotePublished" : "Course is visible to students"
+    "tour_navigation_dashboard_title": "Expand to explore"
 }

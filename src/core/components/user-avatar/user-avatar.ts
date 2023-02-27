@@ -14,12 +14,12 @@
 
 import { Component, Input, OnInit, OnChanges, OnDestroy, SimpleChange } from '@angular/core';
 
-import { CoreApp } from '@services/app';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { CoreUserProvider, CoreUserBasicData } from '@features/user/services/user';
+import { USER_PROFILE_PICTURE_UPDATED, CoreUserBasicData } from '@features/user/services/user';
 import { CoreNavigator } from '@services/navigator';
+import { CoreNetwork } from '@services/network';
 
 /**
  * Component to display a "user avatar".
@@ -45,7 +45,7 @@ export class CoreUserAvatarComponent implements OnInit, OnChanges, OnDestroy {
     avatarUrl?: string;
 
     // Variable to check if we consider this user online or not.
-    // @TODO: Use setting when available (see MDL-63972) so we can use site setting.
+    // @todo Use setting when available (see MDL-63972) so we can use site setting.
     protected timetoshowusers = 300000; // Miliseconds default.
     protected currentUserId: number;
     protected pictureObserver: CoreEventObserver;
@@ -54,7 +54,7 @@ export class CoreUserAvatarComponent implements OnInit, OnChanges, OnDestroy {
         this.currentUserId = CoreSites.getCurrentSiteUserId();
 
         this.pictureObserver = CoreEvents.on(
-            CoreUserProvider.PROFILE_PICTURE_UPDATED,
+            USER_PROFILE_PICTURE_UPDATED,
             (data) => {
                 if (data.userId == this.userId) {
                     this.avatarUrl = data.picture;
@@ -65,7 +65,7 @@ export class CoreUserAvatarComponent implements OnInit, OnChanges, OnDestroy {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         this.setFields();
@@ -101,7 +101,7 @@ export class CoreUserAvatarComponent implements OnInit, OnChanges, OnDestroy {
     /**
      * Helper function for checking the time meets the 'online' condition.
      *
-     * @return boolean
+     * @returns boolean
      */
     isOnline(): boolean {
         if (!this.user) {
@@ -114,12 +114,12 @@ export class CoreUserAvatarComponent implements OnInit, OnChanges, OnDestroy {
 
         if (this.user.lastaccess) {
             // If the time has passed, don't show the online status.
-            const time = new Date().getTime() - this.timetoshowusers;
+            const time = Date.now() - this.timetoshowusers;
 
             return this.user.lastaccess * 1000 >= time;
         } else {
             // You have to have Internet access first.
-            return !!this.user.isonline && CoreApp.isOnline();
+            return !!this.user.isonline && CoreNetwork.isOnline();
         }
     }
 
@@ -156,7 +156,7 @@ export class CoreUserAvatarComponent implements OnInit, OnChanges, OnDestroy {
 /**
  * Type with all possible formats of user.
  */
-type CoreUserWithAvatar = CoreUserBasicData & {
+export type CoreUserWithAvatar = CoreUserBasicData & {
     userpictureurl?: string;
     userprofileimageurl?: string;
     profileimageurlsmall?: string;

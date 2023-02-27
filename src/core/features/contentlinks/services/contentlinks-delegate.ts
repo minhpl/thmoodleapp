@@ -19,6 +19,7 @@ import { CoreUrlUtils } from '@services/utils/url';
 import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton } from '@singletons';
 import { CoreText } from '@singletons/text';
+import { CoreUrl } from '@singletons/url';
 
 /**
  * Interface that all handlers must implement.
@@ -54,7 +55,7 @@ export interface CoreContentLinksHandler {
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param courseId Course ID related to the URL. Optional but recommended.
      * @param data Extra data to handle the URL.
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
     getActions(
         siteIds: string[],
@@ -68,7 +69,7 @@ export interface CoreContentLinksHandler {
      * Check if a URL is handled by this handler.
      *
      * @param url The URL to check. It's a relative URL, it won't include the site URL.
-     * @return Whether the URL is handled by this handler
+     * @returns Whether the URL is handled by this handler
      */
     handles(url: string): boolean;
 
@@ -76,7 +77,7 @@ export interface CoreContentLinksHandler {
      * If the URL is handled by this handler, return the site URL.
      *
      * @param url The URL to check.
-     * @return Site URL if it is handled, undefined otherwise.
+     * @returns Site URL if it is handled, undefined otherwise.
      */
     getSiteUrl(url: string): string | undefined;
 
@@ -88,7 +89,7 @@ export interface CoreContentLinksHandler {
      * @param url The URL to treat.  It's a relative URL, it won't include the site URL.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param courseId Course ID related to the URL. Optional but recommended.
-     * @return Whether the handler is enabled for the URL and site.
+     * @returns Whether the handler is enabled for the URL and site.
      */
     isEnabled?(siteId: string, url: string, params: Record<string, string>, courseId?: number): Promise<boolean>;
 }
@@ -155,7 +156,7 @@ export class CoreContentLinksDelegateService {
      * @param courseId Course ID related to the URL. Optional but recommended.
      * @param username Username to use to filter sites.
      * @param data Extra data to handle the URL.
-     * @return Promise resolved with the actions.
+     * @returns Promise resolved with the actions.
      */
     async getActionsFor(url: string, courseId?: number, username?: string, data?: unknown): Promise<CoreContentLinksAction[]> {
         if (!url) {
@@ -174,12 +175,12 @@ export class CoreContentLinksDelegateService {
         const linkActions: CoreContentLinksHandlerActions[] = [];
         const promises: Promise<void>[] = [];
         const params = CoreUrlUtils.extractUrlParams(url);
-        const relativeUrl = CoreText.addStartingSlash(url.replace(site.getURL(), ''));
+        const relativeUrl = CoreText.addStartingSlash(CoreUrl.toRelativeURL(site.getURL(), url));
 
         for (const name in this.handlers) {
             const handler = this.handlers[name];
             const checkAll = handler.checkAllUsers;
-            const isEnabledFn = this.isHandlerEnabled.bind(this, handler, relativeUrl, params, courseId);
+            const isEnabledFn = (siteId: string) => this.isHandlerEnabled(handler, relativeUrl, params, courseId, siteId);
 
             if (!handler.handles(relativeUrl)) {
                 // Invalid handler or it doesn't handle the URL. Stop.
@@ -250,7 +251,7 @@ export class CoreContentLinksDelegateService {
      * Get the site URL if the URL is supported by any handler.
      *
      * @param url URL to handle.
-     * @return Site URL if the URL is supported by any handler, undefined otherwise.
+     * @returns Site URL if the URL is supported by any handler, undefined otherwise.
      */
     getSiteUrl(url: string): string | void {
         if (!url) {
@@ -276,13 +277,13 @@ export class CoreContentLinksDelegateService {
      * @param params The params of the URL
      * @param courseId Course ID the URL belongs to (can be undefined).
      * @param siteId The site ID to check.
-     * @return Promise resolved with boolean: whether the handler is enabled.
+     * @returns Promise resolved with boolean: whether the handler is enabled.
      */
     protected async isHandlerEnabled(
         handler: CoreContentLinksHandler,
         url: string,
         params: Record<string, string>,
-        courseId: number,
+        courseId: number | undefined,
         siteId: string,
     ): Promise<boolean> {
 
@@ -301,14 +302,14 @@ export class CoreContentLinksDelegateService {
             return true;
         }
 
-        return await handler.isEnabled(siteId, url, params, courseId);
+        return handler.isEnabled(siteId, url, params, courseId);
     }
 
     /**
      * Register a handler.
      *
      * @param handler The handler to register.
-     * @return True if registered successfully, false otherwise.
+     * @returns True if registered successfully, false otherwise.
      */
     registerHandler(handler: CoreContentLinksHandler): boolean {
         if (this.handlers[handler.name] !== undefined) {
@@ -326,7 +327,7 @@ export class CoreContentLinksDelegateService {
      * Sort actions by priority.
      *
      * @param actions Actions to sort.
-     * @return Sorted actions.
+     * @returns Sorted actions.
      */
     protected sortActionsByPriority(actions: CoreContentLinksHandlerActions[]): CoreContentLinksAction[] {
         let sorted: CoreContentLinksAction[] = [];

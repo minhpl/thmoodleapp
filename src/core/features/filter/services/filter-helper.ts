@@ -14,8 +14,8 @@
 
 import { Injectable } from '@angular/core';
 
-import { CoreApp } from '@services/app';
-import { CoreSites } from '@services/sites';
+import { CoreNetwork } from '@services/network';
+import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreFilterDelegate } from './filter-delegate';
 import {
     CoreFilter,
@@ -31,6 +31,7 @@ import { CoreEvents, CoreEventSiteData } from '@singletons/events';
 import { CoreLogger } from '@singletons/logger';
 import { CoreSite } from '@classes/site';
 import { CoreCourseHelper } from '@features/course/services/course-helper';
+import { firstValueFrom } from '@/core/utils/rxjs';
 
 /**
  * Helper service to provide filter functionalities.
@@ -72,10 +73,14 @@ export class CoreFilterHelperProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the contexts.
+     * @returns Promise resolved with the contexts.
      */
     async getBlocksContexts(courseId: number, siteId?: string): Promise<CoreFiltersGetAvailableInContextWSParamContext[]> {
-        const blocks = await CoreCourse.getCourseBlocks(courseId, siteId);
+        // Use stale while revalidate, but always use the first value. If data is updated it will be stored in DB.
+        const blocks = await firstValueFrom(CoreCourse.getCourseBlocksObservable(courseId, {
+            readingStrategy: CoreSitesReadingStrategy.STALE_WHILE_REVALIDATE,
+            siteId,
+        }));
 
         const contexts: CoreFiltersGetAvailableInContextWSParamContext[] = [];
 
@@ -94,9 +99,10 @@ export class CoreFilterHelperProvider {
      *
      * @param contextLevel The context level.
      * @param instanceId Instance ID related to the context.
+     * @param getFilters Function to get filter contexts from.
      * @param options Options for format text.
-     * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the filters.
+     * @param site Site. If not defined, current site.
+     * @returns Promise resolved with the filters.
      */
     protected async getCacheableFilters(
         contextLevel: string,
@@ -128,7 +134,7 @@ export class CoreFilterHelperProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the contexts.
+     * @returns Promise resolved with the contexts.
      */
     async getCourseContexts(courseId: number, siteId?: string): Promise<CoreFiltersGetAvailableInContextWSParamContext[]> {
         const courseIds = await CoreCourses.getCourseIdsIfEnrolled(courseId, siteId);
@@ -150,10 +156,15 @@ export class CoreFilterHelperProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the contexts.
+     * @returns Promise resolved with the contexts.
      */
     async getCourseModulesContexts(courseId: number, siteId?: string): Promise<CoreFiltersGetAvailableInContextWSParamContext[]> {
-        const sections = await CoreCourse.getSections(courseId, false, true, undefined, siteId);
+        // Use stale while revalidate, but always use the first value. If data is updated it will be stored in DB.
+        const sections = await firstValueFrom(CoreCourse.getSectionsObservable(courseId, {
+            excludeContents: true,
+            readingStrategy: CoreSitesReadingStrategy.STALE_WHILE_REVALIDATE,
+            siteId,
+        }));
 
         const contexts: CoreFiltersGetAvailableInContextWSParamContext[] = [];
 
@@ -182,7 +193,7 @@ export class CoreFilterHelperProvider {
      * @param instanceId Instance ID related to the context.
      * @param options Options for format text.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the filters.
+     * @returns Promise resolved with the filters.
      */
     async getFilters(
         contextLevel: string,
@@ -208,6 +219,7 @@ export class CoreFilterHelperProvider {
                 return CoreFilterDelegate.getEnabledFilters(contextLevel, instanceId);
             }
 
+            const courseId = options.courseId;
             let hasFilters = true;
 
             if (contextLevel == 'system' || (contextLevel == 'course' && instanceId == site.getSiteHomeId())) {
@@ -223,20 +235,20 @@ export class CoreFilterHelperProvider {
 
             options.filter = true;
 
-            if (contextLevel == 'module' && options.courseId) {
+            if (contextLevel == 'module' && courseId) {
                 // Get all the modules filters with a single call to decrease the number of WS calls.
-                const getFilters = this.getCourseModulesContexts.bind(this, options.courseId, siteId);
+                const getFilters = () => this.getCourseModulesContexts(courseId, siteId);
 
                 return this.getCacheableFilters(contextLevel, instanceId, getFilters, options, site);
 
             } else if (contextLevel == 'course') {
                 // If enrolled, get all enrolled courses filters with a single call to decrease number of WS calls.
-                const getFilters = this.getCourseContexts.bind(this, instanceId, siteId);
+                const getFilters = () => this.getCourseContexts(instanceId, siteId);
 
                 return this.getCacheableFilters(contextLevel, instanceId, getFilters, options, site);
-            } else if (contextLevel == 'block' && options.courseId && CoreCourse.canGetCourseBlocks(site)) {
+            } else if (contextLevel == 'block' && courseId && CoreCourse.canGetCourseBlocks(site)) {
                 // Get all the course blocks filters with a single call to decrease number of WS calls.
-                const getFilters = this.getBlocksContexts.bind(this, options.courseId, siteId);
+                const getFilters = () => this.getBlocksContexts(courseId, siteId);
 
                 return this.getCacheableFilters(contextLevel, instanceId, getFilters, options, site);
             }
@@ -257,7 +269,7 @@ export class CoreFilterHelperProvider {
      * @param instanceId Instance ID related to the context.
      * @param options Options for format text.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the formatted text and the filters.
+     * @returns Promise resolved with the formatted text and the filters.
      */
     async getFiltersAndFormatText(
         text: string,
@@ -281,7 +293,7 @@ export class CoreFilterHelperProvider {
      * @param contextLevel Context level.
      * @param instanceId Instance ID.
      * @param site Site.
-     * @return The filters, undefined if not found.
+     * @returns The filters, undefined if not found.
      */
     protected getFromMemoryCache(
         courseId: number,
@@ -299,7 +311,7 @@ export class CoreFilterHelperProvider {
 
         const cachedData = this.moduleContextsCache[siteId][courseId][contextLevel];
 
-        if (!CoreApp.isOnline() || Date.now() <= cachedData.time + site.getExpirationDelay(CoreSite.FREQUENCY_RARELY)) {
+        if (!CoreNetwork.isOnline() || Date.now() <= cachedData.time + site.getExpirationDelay(CoreSite.FREQUENCY_RARELY)) {
             // We can use cache, return the filters if found.
             return cachedData.contexts[contextLevel] && cachedData.contexts[contextLevel][instanceId];
         }
@@ -310,7 +322,7 @@ export class CoreFilterHelperProvider {
      *
      * @param options Options passed to the filters.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: whether it has filters to treat.
+     * @returns Promise resolved with boolean: whether it has filters to treat.
      */
     async siteHasFiltersToTreat(options?: CoreFilterFormatTextOptions, siteId?: string): Promise<boolean> {
         options = options || {};
@@ -326,7 +338,9 @@ export class CoreFilterHelperProvider {
     /**
      * Store filters in the memory cache.
      *
-     * @param contexts Filters to store, classified by contextlevel and instanceid
+     * @param courseId Course the module belongs to.
+     * @param contextLevel Context level.
+     * @param contexts Contexts.
      * @param siteId Site ID.
      */
     protected storeInMemoryCache(

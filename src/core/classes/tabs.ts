@@ -29,7 +29,7 @@ import { IonSlides } from '@ionic/angular';
 import { BackButtonEvent } from '@ionic/core';
 import { Subscription } from 'rxjs';
 
-import { Platform, Translate } from '@singletons';
+import { Translate } from '@singletons';
 import { CoreSettingsHelper } from '@features/settings/services/settings-helper';
 import { CoreAriaRoleTab, CoreAriaRoleTabFindable } from './aria-role-tab';
 import { CoreEventObserver } from '@singletons/events';
@@ -39,6 +39,7 @@ import { CoreError } from './errors/error';
 import { CorePromisedValue } from './promised-value';
 import { AsyncComponent } from './async-component';
 import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Class to abstract some common code for tabs.
@@ -94,7 +95,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
     tabAction: CoreTabsRoleTab<T>;
 
     constructor(element: ElementRef) {
-        this.backButtonFunction = this.backButtonClicked.bind(this);
+        this.backButtonFunction = (event) => this.backButtonClicked(event);
 
         this.tabAction = new CoreTabsRoleTab(this);
 
@@ -105,12 +106,12 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
      * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
-        this.direction = Platform.isRTL ? 'rtl' : 'ltr';
+        this.direction = CorePlatform.isRTL ? 'rtl' : 'ltr';
 
         // Change the side when the language changes.
         this.subscriptions.push(Translate.onLangChange.subscribe(() => {
             setTimeout(() => {
-                this.direction = Platform.isRTL ? 'rtl' : 'ltr';
+                this.direction = CorePlatform.isRTL ? 'rtl' : 'ltr';
             });
         }));
     }
@@ -215,7 +216,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
      * Get the tab on a index.
      *
      * @param tabId Tab ID.
-     * @return Selected tab.
+     * @returns Selected tab.
      */
     protected getTabIndex(tabId: string): number {
         return this.tabs.findIndex((tab) => tabId == tab.id);
@@ -224,7 +225,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
     /**
      * Get the current selected tab.
      *
-     * @return Selected tab.
+     * @returns Selected tab.
      */
     getSelected(): T | undefined {
         const index = this.selected && this.getTabIndex(this.selected);
@@ -313,7 +314,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
     /**
      * Calculate the initial tab to load.
      *
-     * @return Initial tab, undefined if no valid tab found.
+     * @returns Initial tab, undefined if no valid tab found.
      */
     protected calculateInitialTab(): T | undefined {
         const selectedTab: T | undefined = this.tabs[this.selectedIndex || 0] || undefined;
@@ -478,7 +479,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
      *
      * @param tabId Tab ID.
      * @param e Event.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async selectTab(tabId: string, e?: Event): Promise<void> {
         const index = this.tabs.findIndex((tab) => tabId == tab.id);
@@ -494,7 +495,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
      *
      * @param index Index to select.
      * @param e Event.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async selectByIndex(index: number, e?: Event): Promise<void> {
         e?.preventDefault();
@@ -556,7 +557,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
      * Load the tab.
      *
      * @param tabToSelect Tab to load.
-     * @return Promise resolved with true if tab is successfully loaded.
+     * @returns Promise resolved with true if tab is successfully loaded.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     protected async loadTab(tabToSelect: T): Promise<boolean> {
@@ -568,7 +569,7 @@ export class CoreTabsBaseComponent<T extends CoreTabBase> implements OnInit, Aft
      * @inheritdoc
      */
     async ready(): Promise<void> {
-        return await this.onReadyPromise;
+        return this.onReadyPromise;
     }
 
     /**

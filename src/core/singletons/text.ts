@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { CorePath } from './path';
+
 /**
  * Singleton with helper functions for text manipulation.
  */
@@ -26,7 +28,7 @@ export class CoreText {
      * Add starting slash to a string if needed.
      *
      * @param text Text to treat.
-     * @return Treated text.
+     * @returns Treated text.
      */
     static addStartingSlash(text = ''): string {
         if (text[0] === '/') {
@@ -40,7 +42,7 @@ export class CoreText {
      * Remove ending slash from a path or URL.
      *
      * @param text Text to treat.
-     * @return Treated text.
+     * @returns Treated text.
      */
     static removeEndingSlash(text?: string): string {
         if (!text) {
@@ -55,29 +57,29 @@ export class CoreText {
     }
 
     /**
+     * Remove starting slash from a string if needed.
+     *
+     * @param text Text to treat.
+     * @returns Treated text.
+     */
+    static removeStartingSlash(text = ''): string {
+        if (text[0] !== '/') {
+            return text;
+        }
+
+        return text.substring(1);
+    }
+
+    /**
      * Concatenate two paths, adding a slash between them if needed.
      *
      * @param leftPath Left path.
      * @param rightPath Right path.
-     * @return Concatenated path.
+     * @returns Concatenated path.
+     * @deprecated since 4.1.0. Please use CorePath.concatenatePaths instead.
      */
     static concatenatePaths(leftPath: string, rightPath: string): string {
-        if (!leftPath) {
-            return rightPath;
-        } else if (!rightPath) {
-            return leftPath;
-        }
-
-        const lastCharLeft = leftPath.slice(-1);
-        const firstCharRight = rightPath.charAt(0);
-
-        if (lastCharLeft === '/' && firstCharRight === '/') {
-            return leftPath + rightPath.substring(1);
-        } else if (lastCharLeft !== '/' && firstCharRight !== '/') {
-            return leftPath + '/' + rightPath;
-        } else {
-            return leftPath + rightPath;
-        }
+        return CorePath.concatenatePaths(leftPath, rightPath);
     }
 
 }

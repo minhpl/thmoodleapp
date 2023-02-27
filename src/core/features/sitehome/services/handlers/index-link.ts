@@ -31,7 +31,7 @@ export class CoreSiteHomeIndexLinkHandlerService extends CoreContentLinksHandler
 
     name = 'CoreSiteHomeIndexLinkHandler';
     featureName = 'CoreMainMenuDelegate_CoreSiteHome';
-    pattern = /(\/course\/view\.php.*([?&]id=\d+)|\/index\.php(\?redirect=0)?)/;
+    pattern = /(\/course\/view\.php.*([?&]id=\d+)|\/index\.php(\?redirect=0)?|\/?\?redirect=0)/;
 
     /**
      * @inheritdoc
@@ -53,10 +53,11 @@ export class CoreSiteHomeIndexLinkHandlerService extends CoreContentLinksHandler
     /**
      * @inheritdoc
      */
-    async isEnabled(siteId: string, url: string, params: Record<string, string>, courseId?: number): Promise<boolean> {
-        courseId = parseInt(params.id, 10);
+    async isEnabled(siteId: string, url: string, params: Record<string, string>): Promise<boolean> {
+        const courseId = parseInt(params.id, 10);
+
         if (!courseId) {
-            return url.includes('index.php');
+            return url.includes('index.php') || url.includes('?redirect=0');
         }
 
         const site = await CoreSites.getSite(siteId);

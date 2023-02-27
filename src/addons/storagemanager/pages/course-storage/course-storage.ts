@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { CoreConstants } from '@/core/constants';
-import { Component, ElementRef, OnDestroy, OnInit } from '@angular/core';
+import { ChangeDetectionStrategy, ChangeDetectorRef, Component, ElementRef, OnDestroy, OnInit } from '@angular/core';
 import { CoreCourse, CoreCourseProvider } from '@features/course/services/course';
 import {
     CoreCourseHelper,
@@ -41,6 +41,7 @@ import { CoreEventObserver, CoreEvents } from '@singletons/events';
     selector: 'page-addon-storagemanager-course-storage',
     templateUrl: 'course-storage.html',
     styleUrls: ['course-storage.scss'],
+    changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
 
@@ -71,7 +72,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
     protected isDestroyed = false;
     protected isGuest = false;
 
-    constructor(protected elementRef: ElementRef) {
+    constructor(protected elementRef: ElementRef, protected changeDetectorRef: ChangeDetectorRef) {
         // Refresh the enabled flags if site is updated.
         this.siteUpdatedObserver = CoreEvents.on(CoreEvents.SITE_UPDATED, () => {
             this.downloadCourseEnabled = !CoreCourses.isDownloadCourseDisabledInSite();
@@ -79,6 +80,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
 
             this.initCoursePrefetch();
             this.initModulePrefetch();
+            this.changeDetectorRef.markForCheck();
         }, CoreSites.getCurrentSiteId());
     }
 
@@ -134,12 +136,13 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
             this.initCoursePrefetch(),
             this.initModulePrefetch(),
         ]);
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
      * Init course prefetch information.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async initCoursePrefetch(): Promise<void> {
         if (!this.downloadCourseEnabled || this.courseStatusObserver) {
@@ -180,7 +183,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
     /**
      * Init module prefetch information.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async initModulePrefetch(): Promise<void> {
         if (!this.downloadEnabled || this.sectionStatusObserver) {
@@ -297,7 +300,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
      *
      * @param modules Modules.
      * @param section Section the modules belong to.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async updateModulesSizes(
         modules: AddonStorageManagerModule[],
@@ -311,11 +314,13 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
             }
 
             module.calculatingSize = true;
+            this.changeDetectorRef.markForCheck();
 
             if (!section) {
                 section = this.sections.find((section) => section.modules.some((mod) => mod.id === module.id));
                 if (section) {
                     section.calculatingSize = true;
+                    this.changeDetectorRef.markForCheck();
                 }
             }
 
@@ -333,6 +338,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
                 // Ignore errors, it shouldn't happen.
             } finally {
                 module.calculatingSize = false;
+                this.changeDetectorRef.markForCheck();
             }
         }));
 
@@ -340,14 +346,20 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
         if (section) {
             section.calculatingSize = false;
         }
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
      * The user has requested a delete for the whole course data.
      *
      * (This works by deleting data for each module on the course that has data.)
+     *
+     * @param event Event object.
      */
-    async deleteForCourse(): Promise<void> {
+    async deleteForCourse(event: Event): Promise<void> {
+        event.stopPropagation();
+        event.preventDefault();
+
         try {
             await CoreDomUtils.showDeleteConfirm(
                 'addon.storagemanager.confirmdeletedatafrom',
@@ -378,9 +390,13 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
      *
      * (This works by deleting data for each module in the section that has data.)
      *
+     * @param event Event object.
      * @param section Section object with information about section and modules
      */
-    async deleteForSection(section: AddonStorageManagerCourseSection): Promise<void> {
+    async deleteForSection(event: Event, section: AddonStorageManagerCourseSection): Promise<void> {
+        event.stopPropagation();
+        event.preventDefault();
+
         try {
             await CoreDomUtils.showDeleteConfirm(
                 'addon.storagemanager.confirmdeletedatafrom',
@@ -407,10 +423,18 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
     /**
      * The user has requested a delete for a module's data
      *
+     * @param event Event object.
      * @param module Module details
      * @param section Section the module belongs to.
      */
-    async deleteForModule(module: AddonStorageManagerModule, section: AddonStorageManagerCourseSection): Promise<void> {
+    async deleteForModule(
+        event: Event,
+        module: AddonStorageManagerModule,
+        section: AddonStorageManagerCourseSection,
+    ): Promise<void> {
+        event.stopPropagation();
+        event.preventDefault();
+
         if (module.totalSize === 0) {
             return;
         }
@@ -436,7 +460,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
      *
      * @param modules Modules to delete
      * @param section Section the modules belong to.
-     * @return Promise<void> Once deleting has finished
+     * @returns Promise<void> Once deleting has finished
      */
     protected async deleteModules(modules: AddonStorageManagerModule[], section?: AddonStorageManagerCourseSection): Promise<void> {
         const modal = await CoreDomUtils.showModalLoading('core.deleting', true);
@@ -468,6 +492,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
 
             await this.updateModulesSizes(modules, section);
             CoreCourseHelper.calculateSectionsStatus(this.sections, this.courseId, false, false);
+            this.changeDetectorRef.markForCheck();
         }
     }
 
@@ -475,9 +500,9 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
      * Mark course as not downloaded.
      */
     protected markCourseAsNotDownloaded(): void {
-        // @TODO This is a workaround that should be more specific solving MOBILE-3305.
-        // Also should take into account all modules are not downloaded.
-        // Check after MOBILE-3188 is integrated.
+        // @TODO In order to correctly check the status of the course we should check all module statuses.
+        // We are currently marking as not downloaded if size is 0 but we should take into account that
+        // resources without files can be downloaded and cached.
 
         CoreCourse.setCourseStatus(this.courseId, CoreConstants.NOT_DOWNLOADED);
     }
@@ -499,11 +524,10 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
      * Confirm and prefetch a section. If the section is "all sections", prefetch all the sections.
      *
      * @param section Section to download.
-     * @param refresh Refresh clicked (not used).
      */
     async prefecthSection(section: AddonStorageManagerCourseSection): Promise<void> {
         section.isCalculating = true;
-
+        this.changeDetectorRef.markForCheck();
         try {
             await CoreCourseHelper.confirmDownloadSizeSection(this.courseId, section, this.sections);
 
@@ -516,16 +540,19 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
                 }
             } finally {
                 await this.updateModulesSizes(section.modules, section);
+                this.changeDetectorRef.markForCheck();
             }
         } catch (error) {
             // User cancelled or there was an error calculating the size.
             if (!this.isDestroyed && error) {
                 CoreDomUtils.showErrorModal(error);
+                this.changeDetectorRef.markForCheck();
 
                 return;
             }
         } finally {
             section.isCalculating = false;
+            this.changeDetectorRef.markForCheck();
         }
     }
 
@@ -534,7 +561,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
      *
      * @param module Module to prefetch.
      * @param refresh Whether it's refreshing.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async prefetchModule(
         module: AddonStorageManagerModule,
@@ -549,6 +576,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
 
         try {
             // Get download size to ask for confirm if it's high.
+
             const size = await module.prefetchHandler.getDownloadSize(module, module.course, true);
 
             await CoreCourseHelper.prefetchModule(module.prefetchHandler, module, size, module.course, refresh);
@@ -562,6 +590,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
             module.spinner = false;
 
             await this.updateModulesSizes([module]);
+
         }
     }
 
@@ -580,13 +609,14 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
         module.downloadStatus = status;
 
         module.handlerData?.updateStatus?.(status);
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
      * Calculate and show module status.
      *
      * @param module Module to update.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async calculateModuleStatus(module: AddonStorageManagerModule): Promise<void> {
         if (!module) {
@@ -601,7 +631,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
     /**
      * Determines the prefetch icon of the course.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async determineCoursePrefetchIcon(): Promise<void> {
         this.prefetchCourseData = await CoreCourseHelper.getCourseStatusIconAndTitle(this.courseId);
@@ -619,12 +649,18 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
         this.prefetchCourseData.icon = statusData.icon;
         this.prefetchCourseData.statusTranslatable = statusData.statusTranslatable;
         this.prefetchCourseData.loading = statusData.loading;
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
      * Prefetch the whole course.
+     *
+     * @param event Event object.
      */
-    async prefetchCourse(): Promise<void> {
+    async prefetchCourse(event: Event): Promise<void> {
+        event.stopPropagation();
+        event.preventDefault();
+
         const courses = await CoreCourses.getUserCourses(true);
         let course = courses.find((course) => course.id == this.courseId);
         if (!course) {
@@ -635,6 +671,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
         }
 
         try {
+            this.changeDetectorRef.markForCheck();
             await CoreCourseHelper.confirmAndPrefetchCourse(
                 this.prefetchCourseData,
                 course,
@@ -643,6 +680,7 @@ export class AddonStorageManagerCourseStoragePage implements OnInit, OnDestroy {
                     isGuest: this.isGuest,
                 },
             );
+            this.changeDetectorRef.markForCheck();
         } catch (error) {
             if (this.isDestroyed) {
                 return;

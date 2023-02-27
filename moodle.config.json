@@ -1,16 +1,16 @@
 {
     "app_id": "vn.edu.aum.tnu",
     "appname": "TNU-e",
-    "versioncode": 40200,
-    "versionname": "4.0.2",
+    "versioncode": 41001,
+    "versionname": "4.1.0",
     "cache_update_frequency_usually": 420000,
     "cache_update_frequency_often": 1200000,
     "cache_update_frequency_sometimes": 3600000,
     "cache_update_frequency_rarely": 43200000,
-    "default_lang": "en",
-    "languages": {        
-        "en": "English",        
-        "vi": "Vietnamese",
+    "default_lang": "vi",
+    "languages": {
+        "en": "English",
+        "vi": "Vietnamese"
     },
     "wsservice": "moodle_mobile_app",
     "demo_sites": {
@@ -25,14 +25,15 @@
             "password": "moodle"
         }
     },
+    "defaultZoomLevel": "none",
     "zoomlevels": {
-        "normal": 100,
-        "low": 110,
+        "none": 100,
+        "medium": 110,
         "high": 120
     },
     "customurlscheme": "moodlemobile",
     "siteurl": "http://tnu.aum.edu.vn",
-    "sitename": "",
+    "sitename": "TNU e-Learning",
     "multisitesdisplay": "",
     "sitefindersettings": {},
     "onlyallowlistedsites": false,
@@ -46,10 +47,16 @@
     "forceLoginLogo": false,
     "ioswebviewscheme": "moodleappfs",
     "appstores": {
-        "android": "vn.edu.aum.tnu",
+        "android": "com.moodle.moodlemobile",
         "ios": "id633359593"
     },
     "wsrequestqueuelimit": 10,
     "wsrequestqueuedelay": 100,
-    "calendarreminderdefaultvalue": 3600
+    "calendarreminderdefaultvalue": 3600,
+    "toastDurations": {
+        "short": 2000,
+        "long": 3500,
+        "sticky": 0
+    },
+    "disableTokenFile": false
 }

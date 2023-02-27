@@ -12,13 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-export type CoreObjectWithoutEmpty<T> = {
-    [k in keyof T]: T[k] extends undefined | null ? never : T[k];
-};
+import { Pretty } from '@/core/utils/types';
 
-export type CoreObjectWithoutUndefined<T> = {
-    [k in keyof T]: T[k] extends undefined ? never : T[k];
-};
+type ValueWithoutEmpty<T> = T extends null | undefined ? never : T;
+type ValueWithoutUndefined<T> = T extends undefined ? never : T;
+
+export type CoreObjectWithoutEmpty<T> = Pretty<{
+    [k in keyof T]: ValueWithoutEmpty<T[k]>;
+}>;
+
+export type CoreObjectWithoutUndefined<T> = Pretty<{
+    [k in keyof T]: ValueWithoutUndefined<T[k]>;
+}>;
 
 /**
  * Singleton with helper functions for objects.
@@ -30,7 +35,7 @@ export class CoreObject {
      *
      * @param a First object.
      * @param b Second object.
-     * @return Whether objects are equal.
+     * @returns Whether objects are equal.
      */
     static deepEquals<T=unknown>(a: T, b: T): boolean {
         return JSON.stringify(a) === JSON.stringify(b);
@@ -40,7 +45,7 @@ export class CoreObject {
      * Get all the properties names of an object, including the inherited ones except the ones from Object.prototype.
      *
      * @param object Object to get its properties.
-     * @return Set of property names.
+     * @returns Set of property names.
      */
     static getAllPropertyNames(object: unknown): Set<string> {
         if (typeof object !== 'object' || object === null || object === Object.prototype) {
@@ -59,10 +64,39 @@ export class CoreObject {
      * Check whether the given object is empty.
      *
      * @param object Object.
-     * @return Whether the given object is empty.
+     * @returns Whether the given object is empty.
      */
     static isEmpty(object: Record<string, unknown>): boolean {
         return Object.keys(object).length === 0;
+    }
+
+    /**
+     * Return an object including only certain keys.
+     *
+     * @param obj Object.
+     * @param keysOrRegex If array is supplied, keys to include. Otherwise, regular expression used to filter keys.
+     * @returns New object with only the specified keys.
+     */
+    static only<T, K extends keyof T>(obj: T, keys: K[]): Pick<T, K>;
+    static only<T>(obj: T, regex: RegExp): Partial<T>;
+    static only<T, K extends keyof T>(obj: T, keysOrRegex: K[] | RegExp): Pick<T, K> | Partial<T> {
+        const newObject: Partial<T> = {};
+
+        if (Array.isArray(keysOrRegex)) {
+            for (const key of keysOrRegex) {
+                newObject[key] = obj[key];
+            }
+        } else {
+            const originalKeys = Object.keys(obj);
+
+            for (const key of originalKeys) {
+                if (key.match(keysOrRegex)) {
+                    newObject[key] = obj[key];
+                }
+            }
+        }
+
+        return newObject;
     }
 
     /**
@@ -70,7 +104,7 @@ export class CoreObject {
      *
      * @param obj Object.
      * @param keys Keys to remove from the new object.
-     * @return New object without the specified keys.
+     * @returns New object without the specified keys.
      */
     static without<T, K extends keyof T>(obj: T, keys: K[]): Omit<T, K> {
         const newObject: T = { ...obj };
@@ -86,7 +120,7 @@ export class CoreObject {
      * Create a new object without empty values (null or undefined).
      *
      * @param obj Objet.
-     * @return New object without empty values.
+     * @returns New object without empty values.
      */
     static withoutEmpty<T>(obj: T): CoreObjectWithoutEmpty<T> {
         const cleanObj = {};
@@ -106,7 +140,7 @@ export class CoreObject {
      * Create a new object without undefined values.
      *
      * @param obj Objet.
-     * @return New object without undefined values.
+     * @returns New object without undefined values.
      */
     static withoutUndefined<T>(obj: T): CoreObjectWithoutUndefined<T> {
         const cleanObj = {};

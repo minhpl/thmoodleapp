@@ -4,11 +4,10 @@
     --toobar-background: var(--white);
     --button-color: var(--ion-text-color);
     --button-active-color: var(--gray-300);
-    --background: var(--ion-item-background);
+    --background: var(--rte-editor-background);
 }
 
-:host-context(body.dark) {
-    --background: var(--medium);
+:host-context(html.dark) {
     --color: var(--white);
     --button-color: var(--gray-200);
     --button-active-color: var(--gray-500);

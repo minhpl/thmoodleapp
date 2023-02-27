@@ -34,6 +34,8 @@ import { CoreError } from '@classes/errors/error';
 import { CoreSite } from '@classes/site';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
 import { CoreConstants } from '../constants';
+import { CoreNetwork } from '@services/network';
+import { Translate } from '@singletons';
 
 /**
  * Directive to handle external content.
@@ -189,7 +191,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      * @param targetAttr Attribute to modify.
      * @param url Original URL to treat.
      * @param siteId Site ID.
-     * @return Promise resolved if the element is successfully treated.
+     * @returns Promise resolved if the element is successfully treated.
      */
     protected async handleExternalContent(targetAttr: string, url: string, siteId?: string): Promise<void> {
 
@@ -208,6 +210,9 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
             if (tagName === 'SOURCE') {
                 // Restoring original src.
                 this.addSource(url);
+            } else if (url && !this.element.getAttribute(targetAttr)) {
+                // By default, Angular inputs aren't added as DOM attributes. Add it now.
+                this.element.setAttribute(targetAttr, url);
             }
 
             throw new CoreError('Non-downloadable URL');
@@ -216,7 +221,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
         if (!site.canDownloadFiles() && isSiteFile) {
             this.element.parentElement?.removeChild(this.element); // Remove element since it'll be broken.
 
-            throw new CoreError('Site doesn\'t allow downloading files.');
+            throw new CoreError(Translate.instant('core.cannotdownloadfiles'));
         }
 
         const finalUrl = await this.getUrlToUse(targetAttr, url, site);
@@ -248,7 +253,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      * Handle inline styles, trying to download referenced files.
      *
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async handleInlineStyles(siteId?: string): Promise<void> {
         if (!siteId) {
@@ -322,7 +327,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      * @param targetAttr Attribute to modify.
      * @param url Original URL to treat.
      * @param site Site.
-     * @return Promise resolved with the URL.
+     * @returns Promise resolved with the URL.
      */
     protected async getUrlToUse(targetAttr: string, url: string, site: CoreSite): Promise<string> {
         const tagName = this.element.tagName;
@@ -377,7 +382,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      * @param targetAttr Attribute to modify.
      * @param url Original URL to treat.
      * @param site Site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async setListeners(targetAttr: string, url: string, site: CoreSite): Promise<void> {
         if (this.fileEventObserver) {
@@ -427,7 +432,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
             clickableEl.addEventListener(eventName, () => {
                 // User played media or opened a downloadable link.
                 // Download the file if in wifi and it hasn't been downloaded already (for big files).
-                if (state !== CoreConstants.DOWNLOADED && state !== CoreConstants.DOWNLOADING && CoreApp.isWifi()) {
+                if (state !== CoreConstants.DOWNLOADED && state !== CoreConstants.DOWNLOADING && CoreNetwork.isWifi()) {
                     // We aren't using the result, so it doesn't matter which of the 2 functions we call.
                     CoreFilepool.getUrlByUrl(site.getId(), url, this.component, this.componentId, 0, false);
                 }

@@ -57,9 +57,13 @@ export class CoreIframeComponent implements OnChanges, OnDestroy {
     protected style?: HTMLStyleElement;
     protected orientationObs?: CoreEventObserver;
     protected navSubscription?: Subscription;
+    protected messageListenerFunction: (event: MessageEvent) => Promise<void>;
 
     constructor(protected elementRef: ElementRef<HTMLElement>) {
         this.loaded = new EventEmitter<HTMLIFrameElement>();
+
+        // Listen for messages from the iframe.
+        window.addEventListener('message', this.messageListenerFunction = (event) => this.onIframeMessage(event));
     }
 
     /**
@@ -138,7 +142,7 @@ export class CoreIframeComponent implements OnChanges, OnDestroy {
     /**
      * Check if the element is in a hidden page.
      *
-     * @return Whether the element is in a hidden page.
+     * @returns Whether the element is in a hidden page.
      */
     protected isInHiddenPage(): boolean {
         // If we can't find the parent ion-page, consider it to be hidden too.
@@ -177,12 +181,13 @@ export class CoreIframeComponent implements OnChanges, OnDestroy {
     ngOnDestroy(): void {
         this.orientationObs?.off();
         this.navSubscription?.unsubscribe();
+        window.removeEventListener('message', this.messageListenerFunction);
     }
 
     /**
      * Toggle fullscreen mode.
      */
-    toggleFullscreen(enable?: boolean): void {
+    toggleFullscreen(enable?: boolean, notifyIframe = true): void {
         if (enable !== undefined) {
             this.fullscreen = enable;
         } else {
@@ -195,11 +200,32 @@ export class CoreIframeComponent implements OnChanges, OnDestroy {
             // Done this way because of the shadow DOM.
             this.style.textContent = this.fullscreen
                 ? '@media screen and (orientation: landscape) {\
-                    .toolbar-container { flex-direction: column-reverse !important; height: 100%; } }'
+                    .core-iframe-fullscreen .toolbar-container { flex-direction: column-reverse !important; height: 100%; } }'
                 : '';
         }
 
         document.body.classList.toggle('core-iframe-fullscreen', this.fullscreen);
+
+        if (notifyIframe && this.iframe?.nativeElement) {
+            (<HTMLIFrameElement> this.iframe.nativeElement).contentWindow?.postMessage(
+                this.fullscreen ? 'enterFullScreen' : 'exitFullScreen',
+                '*',
+            );
+        }
+    }
+
+    /**
+     * Treat an iframe message event.
+     *
+     * @param event Event.
+     * @returns Promise resolved when done.
+     */
+    protected async onIframeMessage(event: MessageEvent): Promise<void> {
+        if (event.data == 'enterFullScreen' && this.showFullscreenOnToolbar && !this.fullscreen) {
+            this.toggleFullscreen(true, false);
+        } else if (event.data == 'exitFullScreen' && this.fullscreen) {
+            this.toggleFullscreen(false, false);
+        }
     }
 
 }
