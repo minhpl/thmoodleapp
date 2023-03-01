@@ -17,16 +17,16 @@ import { MediaObject } from '@ionic-native/media/ngx';
 import { FileEntry } from '@ionic-native/file/ngx';
 import { MediaFile } from '@ionic-native/media-capture/ngx';
 
-import { CoreApp } from '@services/app';
 import { CoreFile, CoreFileProvider } from '@services/file';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreMimetypeUtils } from '@services/utils/mimetype';
 import { CoreTimeUtils } from '@services/utils/time';
-import { Platform, ModalController, Media, Translate } from '@singletons';
+import { ModalController, Media, Translate } from '@singletons';
 import { CoreError } from '@classes/errors/error';
 import { CoreCaptureError } from '@classes/errors/captureerror';
 import { CoreCanceledError } from '@classes/errors/cancelederror';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Page to capture media in browser, or to capture audio in mobile devices.
@@ -80,7 +80,7 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
     ) {}
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         this.initVariables();
@@ -116,10 +116,10 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
             this.title = 'core.captureimage';
         }
 
-        this.isCordovaAudioCapture = CoreApp.isMobile() && this.isAudio;
+        this.isCordovaAudioCapture = CorePlatform.isMobile() && this.isAudio;
 
         if (this.isCordovaAudioCapture) {
-            this.extension = Platform.is('ios') ? 'wav' : 'aac';
+            this.extension = CorePlatform.is('ios') ? 'wav' : 'aac';
             this.returnDataUrl = false;
         }
     }
@@ -127,7 +127,7 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
     /**
      * Init recording with Cordova media plugin.
      *
-     * @return Promise resolved when ready.
+     * @returns Promise resolved when ready.
      */
     protected async initCordovaMediaPlugin(): Promise<void> {
 
@@ -151,9 +151,9 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
         this.fileEntry = await CoreFile.createFile(this.filePath);
 
         // Now create the media instance.
-        let absolutePath = CoreText.concatenatePaths(CoreFile.getBasePathInstant(), this.filePath);
+        let absolutePath = CorePath.concatenatePaths(CoreFile.getBasePathInstant(), this.filePath);
 
-        if (Platform.is('ios')) {
+        if (CorePlatform.is('ios')) {
             // In iOS we need to remove the file:// part.
             absolutePath = absolutePath.replace(/^file:\/\//, '');
         }
@@ -179,7 +179,7 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
      * Init HTML recorder for browser
      * .
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async initHtmlCapture(): Promise<void> {
         const constraints = {
@@ -457,7 +457,6 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
     /**
      * Close the modal, returning an error.
      *
-     * @param code Error code. Will not be used if it's a Camera capture.
      * @param message Error message.
      * @param cameraMessage A specific message to use if it's a Camera capture. If not set, message will be used.
      */
@@ -552,12 +551,12 @@ export class CoreEmulatorCaptureMediaComponent implements OnInit, OnDestroy {
     /**
      * Get path to the file where the media will be stored.
      *
-     * @return Path.
+     * @returns Path.
      */
     protected getFilePath(): string {
         const fileName = this.type + '_' + CoreTimeUtils.readableTimestamp() + '.' + this.extension;
 
-        return CoreText.concatenatePaths(CoreFileProvider.TMPFOLDER, 'media/' + fileName);
+        return CorePath.concatenatePaths(CoreFileProvider.TMPFOLDER, 'media/' + fileName);
     }
 
     /**

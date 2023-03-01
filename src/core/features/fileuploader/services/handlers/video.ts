@@ -15,6 +15,7 @@
 import { Injectable } from '@angular/core';
 
 import { CoreApp } from '@services/app';
+import { CorePlatform } from '@services/platform';
 import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton } from '@singletons';
 import { CoreFileUploaderHandler, CoreFileUploaderHandlerData, CoreFileUploaderHandlerResult } from '../fileuploader-delegate';
@@ -31,17 +32,17 @@ export class CoreFileUploaderVideoHandlerService implements CoreFileUploaderHand
     /**
      * Whether or not the handler is enabled on a site level.
      *
-     * @return Promise resolved with true if enabled.
+     * @returns Promise resolved with true if enabled.
      */
     async isEnabled(): Promise<boolean> {
-        return CoreApp.isMobile() || (CoreApp.canGetUserMedia() && CoreApp.canRecordMedia());
+        return CorePlatform.isMobile() || (CoreApp.canGetUserMedia() && CoreApp.canRecordMedia());
     }
 
     /**
      * Given a list of mimetypes, return the ones that are supported by the handler.
      *
      * @param mimetypes List of mimetypes.
-     * @return Supported mimetypes.
+     * @returns Supported mimetypes.
      */
     getSupportedMimetypes(mimetypes: string[]): string[] {
         if (CoreApp.isIOS()) {
@@ -67,7 +68,7 @@ export class CoreFileUploaderVideoHandlerService implements CoreFileUploaderHand
     /**
      * Get the data to display the handler.
      *
-     * @return Data.
+     * @returns Data.
      */
     getData(): CoreFileUploaderHandlerData {
         return {

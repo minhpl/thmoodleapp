@@ -43,7 +43,7 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
     onlineEntries: AddonModGlossaryEntry[] = [];
     offlineEntries: AddonModGlossaryOfflineEntry[] = [];
 
-    protected fetchFunction?: (options?: AddonModGlossaryGetEntriesOptions) => AddonModGlossaryGetEntriesWSResponse;
+    protected fetchFunction?: (options?: AddonModGlossaryGetEntriesOptions) => Promise<AddonModGlossaryGetEntriesWSResponse>;
     protected fetchInvalidate?: () => Promise<void>;
 
     constructor(courseId: number, cmId: number, glossaryPathPrefix: string) {
@@ -58,7 +58,7 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
      * Type guard to infer NewEntryForm objects.
      *
      * @param entry Item to check.
-     * @return Whether the item is a new entry form.
+     * @returns Whether the item is a new entry form.
      */
     isNewEntryForm(entry: AddonModGlossaryEntryItem): entry is AddonModGlossaryNewEntryForm {
         return 'newEntry' in entry;
@@ -68,7 +68,7 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
      * Type guard to infer entry objects.
      *
      * @param entry Item to check.
-     * @return Whether the item is an offline entry.
+     * @returns Whether the item is an offline entry.
      */
     isOnlineEntry(entry: AddonModGlossaryEntryItem): entry is AddonModGlossaryEntry {
         return 'id' in entry;
@@ -78,7 +78,7 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
      * Type guard to infer entry objects.
      *
      * @param entry Item to check.
-     * @return Whether the item is an offline entry.
+     * @returns Whether the item is an offline entry.
      */
     isOfflineEntry(entry: AddonModGlossaryEntryItem): entry is AddonModGlossaryOfflineEntry {
         return !this.isNewEntryForm(entry) && !this.isOnlineEntry(entry);
@@ -162,17 +162,18 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
             return;
         }
 
-        this.fetchFunction = AddonModGlossary.getEntriesBySearch.bind(
-            AddonModGlossary.instance,
-            this.glossary.id,
+        const glossaryId = this.glossary.id;
+
+        this.fetchFunction = (options) => AddonModGlossary.getEntriesBySearch(
+            glossaryId,
             query,
             true,
             'CONCEPT',
             'ASC',
+            options,
         );
-        this.fetchInvalidate = AddonModGlossary.invalidateEntriesBySearch.bind(
-            AddonModGlossary.instance,
-            this.glossary.id,
+        this.fetchInvalidate = () => AddonModGlossary.invalidateEntriesBySearch(
+            glossaryId,
             query,
             true,
             'CONCEPT',
@@ -210,6 +211,7 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
             throw new Error('Can\'t switch entries mode without a glossary!');
         }
 
+        const glossaryId = this.glossary.id;
         this.fetchMode = mode;
         this.isSearch = false;
         this.setDirty(true);
@@ -218,16 +220,15 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
             case 'author_all':
                 // Browse by author.
                 this.viewMode = 'author';
-                this.fetchFunction = AddonModGlossary.getEntriesByAuthor.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchFunction = (options) => AddonModGlossary.getEntriesByAuthor(
+                    glossaryId,
                     'ALL',
                     'LASTNAME',
                     'ASC',
+                    options,
                 );
-                this.fetchInvalidate = AddonModGlossary.invalidateEntriesByAuthor.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchInvalidate = () => AddonModGlossary.invalidateEntriesByAuthor(
+                    glossaryId,
                     'ALL',
                     'LASTNAME',
                     'ASC',
@@ -237,14 +238,13 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
             case 'cat_all':
                 // Browse by category.
                 this.viewMode = 'cat';
-                this.fetchFunction = AddonModGlossary.getEntriesByCategory.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchFunction = (options) => AddonModGlossary.getEntriesByCategory(
+                    glossaryId,
                     AddonModGlossaryProvider.SHOW_ALL_CATEGORIES,
+                    options,
                 );
-                this.fetchInvalidate = AddonModGlossary.invalidateEntriesByCategory.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchInvalidate = () => AddonModGlossary.invalidateEntriesByCategory(
+                    glossaryId,
                     AddonModGlossaryProvider.SHOW_ALL_CATEGORIES,
                 );
                 break;
@@ -252,15 +252,14 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
             case 'newest_first':
                 // Newest first.
                 this.viewMode = 'date';
-                this.fetchFunction = AddonModGlossary.getEntriesByDate.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchFunction = (options) => AddonModGlossary.getEntriesByDate(
+                    glossaryId,
                     'CREATION',
                     'DESC',
+                    options,
                 );
-                this.fetchInvalidate = AddonModGlossary.invalidateEntriesByDate.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchInvalidate = () => AddonModGlossary.invalidateEntriesByDate(
+                    glossaryId,
                     'CREATION',
                     'DESC',
                 );
@@ -269,15 +268,14 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
             case 'recently_updated':
                 // Recently updated.
                 this.viewMode = 'date';
-                this.fetchFunction = AddonModGlossary.getEntriesByDate.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchFunction = (options) => AddonModGlossary.getEntriesByDate(
+                    glossaryId,
                     'UPDATE',
                     'DESC',
+                    options,
                 );
-                this.fetchInvalidate = AddonModGlossary.invalidateEntriesByDate.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchInvalidate = () => AddonModGlossary.invalidateEntriesByDate(
+                    glossaryId,
                     'UPDATE',
                     'DESC',
                 );
@@ -288,14 +286,13 @@ export class AddonModGlossaryEntriesSource extends CoreRoutedItemsManagerSource<
                 // Consider it is 'letter_all'.
                 this.viewMode = 'letter';
                 this.fetchMode = 'letter_all';
-                this.fetchFunction = AddonModGlossary.getEntriesByLetter.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchFunction = (options) => AddonModGlossary.getEntriesByLetter(
+                    glossaryId,
                     'ALL',
+                    options,
                 );
-                this.fetchInvalidate = AddonModGlossary.invalidateEntriesByLetter.bind(
-                    AddonModGlossary.instance,
-                    this.glossary.id,
+                this.fetchInvalidate = () => AddonModGlossary.invalidateEntriesByLetter(
+                    glossaryId,
                     'ALL',
                 );
                 break;

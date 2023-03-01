@@ -37,13 +37,13 @@ export class CoreFormatDatePipe implements PipeTransform {
      * @param format Format to use. It should be a string code to handle i18n (e.g. core.strftimetime).
      *               Defaults to strftimedaydatetime.
      * @param convert If true, convert the format from PHP to Moment. Set it to false for Moment formats.
-     * @return Formatted date.
+     * @returns Formatted date.
      */
     transform(timestamp: string | number, format?: string, convert?: boolean): string {
         timestamp = timestamp || Date.now();
         format = format || 'strftimedaydatetime';
 
-        if (typeof timestamp == 'string') {
+        if (typeof timestamp === 'string') {
             // Convert the value to a number.
             const numberTimestamp = parseInt(timestamp, 10);
             if (isNaN(numberTimestamp)) {
@@ -55,7 +55,7 @@ export class CoreFormatDatePipe implements PipeTransform {
         }
 
         // Add "core." if needed.
-        if (format.indexOf('strf') == 0 || format.indexOf('df') == 0) {
+        if (format.indexOf('strf') === 0 || format.indexOf('df') === 0) {
             format = 'core.' + format;
         }
 

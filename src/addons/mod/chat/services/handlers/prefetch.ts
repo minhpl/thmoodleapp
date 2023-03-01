@@ -58,7 +58,7 @@ export class AddonModChatPrefetchHandlerService extends CoreCourseActivityPrefet
      * @inheritdoc
      */
     prefetch(module: CoreCourseAnyModuleData, courseId: number): Promise<void> {
-        return this.prefetchPackage(module, courseId, this.prefetchChat.bind(this, module, courseId));
+        return this.prefetchPackage(module, courseId, (siteId) => this.prefetchChat(module, courseId, siteId));
     }
 
     /**
@@ -67,7 +67,7 @@ export class AddonModChatPrefetchHandlerService extends CoreCourseActivityPrefet
      * @param module The module object returned by WS.
      * @param courseId Course ID the module belongs to.
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchChat(module: CoreCourseAnyModuleData, courseId: number, siteId: string): Promise<void> {
         const options = {
@@ -111,7 +111,7 @@ export class AddonModChatPrefetchHandlerService extends CoreCourseActivityPrefet
      * @param courseId Course ID.
      * @param showAll Whether to include incomplete sessions or not.
      * @param modOptions Other options.
-     * @return Promise resolved with the list of sessions.
+     * @returns Promise resolved with the list of sessions.
      */
     protected async prefetchSessions(
         chatId: number,
@@ -145,7 +145,7 @@ export class AddonModChatPrefetchHandlerService extends CoreCourseActivityPrefet
      * @param groupId Group ID.
      * @param courseId Course ID the module belongs to.
      * @param modOptions Other options.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchSession(
         chatId: number,

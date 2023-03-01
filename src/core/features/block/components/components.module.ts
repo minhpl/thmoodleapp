@@ -20,6 +20,7 @@ import { CoreSharedModule } from '@/core/shared.module';
 import { CoreBlockSideBlocksComponent } from './side-blocks/side-blocks';
 import { CoreBlockSideBlocksButtonComponent } from './side-blocks-button/side-blocks-button';
 import { CoreBlockSideBlocksTourComponent } from './side-blocks-tour/side-blocks-tour';
+import { AddonBlockCourseStatusComponent } from './pre-course-status-block/pre-rendered-block';
 
 @NgModule({
     declarations: [
@@ -29,6 +30,8 @@ import { CoreBlockSideBlocksTourComponent } from './side-blocks-tour/side-blocks
         CoreBlockSideBlocksComponent,
         CoreBlockSideBlocksButtonComponent,
         CoreBlockSideBlocksTourComponent,
+        AddonBlockCourseStatusComponent
+
     ],
     imports: [
         CoreSharedModule,
@@ -40,6 +43,7 @@ import { CoreBlockSideBlocksTourComponent } from './side-blocks-tour/side-blocks
         CoreBlockSideBlocksComponent,
         CoreBlockSideBlocksButtonComponent,
         CoreBlockSideBlocksTourComponent,
+        AddonBlockCourseStatusComponent
     ],
 })
 export class CoreBlockComponentsModule {}

@@ -16,9 +16,9 @@ import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
 import { CoreCourseActivityPrefetchHandlerBase } from '@features/course/classes/activity-prefetch-handler';
 import { CoreCourse, CoreCourseAnyModuleData, CoreCourseCommonModWSOptions } from '@features/course/services/course';
-import { CoreApp } from '@services/app';
 import { CoreFile } from '@services/file';
 import { CoreFilepool } from '@services/filepool';
+import { CorePlatform } from '@services/platform';
 import { CoreFileSizeSum } from '@services/plugin-file-delegate';
 import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
@@ -50,7 +50,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
         return this.prefetchPackage(
             module,
             courseId,
-            this.downloadOrPrefetchScorm.bind(this, module, courseId, true, false, onProgress),
+            (siteId) => this.downloadOrPrefetchScorm(module, courseId, true, false, onProgress, siteId),
         );
     }
 
@@ -63,7 +63,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
      * @param prefetch True to prefetch, false to download right away.
      * @param onProgress Function to call on progress.
      * @param siteId Site ID.
-     * @return Promise resolved with the "extra" data to store: the hash of the file.
+     * @returns Promise resolved with the "extra" data to store: the hash of the file.
      */
     protected async downloadOrPrefetchScorm(
         module: CoreCourseAnyModuleData,
@@ -89,7 +89,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
         ]);
 
         // Success, return the hash.
-        return scorm.sha1hash!;
+        return scorm.sha1hash ?? '';
     }
 
     /**
@@ -99,7 +99,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
      * @param prefetch True if prefetch, false otherwise.
      * @param onProgress Function to call on progress.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the file is downloaded and unzipped.
+     * @returns Promise resolved when the file is downloaded and unzipped.
      */
     protected async downloadOrPrefetchMainFile(
         scorm: AddonModScormScorm,
@@ -112,7 +112,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
         const packageUrl = AddonModScorm.getPackageUrl(scorm);
 
         // Get the folder where the unzipped files will be.
-        const dirPath = await AddonModScorm.getScormFolder(scorm.moduleurl!);
+        const dirPath = await AddonModScorm.getScormFolder(scorm.moduleurl ?? '');
 
         // Notify that the download is starting.
         onProgress && onProgress({ message: 'core.downloading' });
@@ -126,7 +126,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
                 scorm.coursemodule,
                 undefined,
                 undefined,
-                this.downloadProgress.bind(this, true, onProgress),
+                (event: ProgressEvent<EventTarget>) => this.downloadProgress(true, onProgress, event),
             );
         } else {
             await CoreFilepool.downloadUrl(
@@ -136,7 +136,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
                 this.component,
                 scorm.coursemodule,
                 undefined,
-                this.downloadProgress.bind(this, true, onProgress),
+                (event: ProgressEvent<EventTarget>) => this.downloadProgress(true, onProgress, event),
             );
         }
 
@@ -147,7 +147,11 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
         onProgress && onProgress({ message: 'core.unzipping' });
 
         // Unzip and delete the zip when finished.
-        await CoreFile.unzipFile(zipPath, dirPath, this.downloadProgress.bind(this, false, onProgress));
+        await CoreFile.unzipFile(
+            zipPath,
+            dirPath,
+            (event: ProgressEvent<EventTarget>) => this.downloadProgress(false, onProgress, event),
+        );
 
         await CoreUtils.ignoreErrors(CoreFilepool.removeFileByUrl(siteId, packageUrl));
     }
@@ -159,7 +163,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
      * @param prefetch True if prefetch, false otherwise.
      * @param onProgress Function to call on progress.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the file is downloaded and unzipped.
+     * @returns Promise resolved when the file is downloaded and unzipped.
      */
     protected async downloadOrPrefetchMainFileIfNeeded(
         scorm: AddonModScormScorm,
@@ -203,7 +207,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
      *
      * @param scorm SCORM object.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is prefetched.
+     * @returns Promise resolved when the data is prefetched.
      */
     async fetchWSData(scorm: AddonModScormScorm, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -282,18 +286,13 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
         const scorm = await this.getScorm(module, courseId);
 
         // Get the folder where SCORM should be unzipped.
-        const path = await AddonModScorm.getScormFolder(scorm.moduleurl!);
+        const path = await AddonModScorm.getScormFolder(scorm.moduleurl ?? '');
 
         return CoreFile.getDirectorySize(path);
     }
 
     /**
-     * Get list of files. If not defined, we'll assume they're in module.contents.
-     *
-     * @param module Module.
-     * @param courseId Course ID the module belongs to.
-     * @param single True if we're downloading a single module, false if we're downloading a whole section.
-     * @return Promise resolved with the list of files.
+     * @inheritdoc
      */
     async getFiles(module: CoreCourseAnyModuleData, courseId: number): Promise<CoreWSFile[]> {
         try {
@@ -371,7 +370,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
         return this.prefetchPackage(
             module,
             courseId,
-            this.downloadOrPrefetchScorm.bind(this, module, courseId, single, true, onProgress),
+            (siteId) => this.downloadOrPrefetchScorm(module, courseId, !!single, true, onProgress, siteId),
         );
     }
 
@@ -380,7 +379,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
      *
      * @param module Module.
      * @param courseId Course ID the module belongs to.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async removeFiles(module: CoreCourseAnyModuleData, courseId: number): Promise<void> {
         const siteId = CoreSites.getCurrentSiteId();
@@ -388,13 +387,13 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
         const scorm = await this.getScorm(module, courseId, siteId);
 
         // Get the folder where SCORM should be unzipped.
-        const path = await AddonModScorm.getScormFolder(scorm.moduleurl!);
+        const path = await AddonModScorm.getScormFolder(scorm.moduleurl ?? '');
 
         const promises: Promise<unknown>[] = [];
 
         // Remove the unzipped folder.
         promises.push(CoreFile.removeDir(path).catch((error) => {
-            if (error && (error.code == 1 || !CoreApp.isMobile())) {
+            if (error && (error.code == 1 || !CorePlatform.isMobile())) {
                 // Not found, ignore error.
             } else {
                 throw error;
@@ -413,7 +412,7 @@ export class AddonModScormPrefetchHandlerService extends CoreCourseActivityPrefe
      * @param module Module.
      * @param courseId Course ID the module belongs to
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async sync(module: CoreCourseAnyModuleData, courseId: number, siteId?: string): Promise<unknown> {
         const scorm = await this.getScorm(module, courseId, siteId);

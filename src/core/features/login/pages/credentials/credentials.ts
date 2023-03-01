@@ -18,6 +18,7 @@ import { Subscription } from 'rxjs';
 import { debounceTime } from 'rxjs/operators';
 
 import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
@@ -27,6 +28,10 @@ import { CoreSiteIdentityProvider, CoreSitePublicConfigResponse } from '@classes
 import { CoreEvents } from '@singletons/events';
 import { CoreNavigator } from '@services/navigator';
 import { CoreForms } from '@singletons/form';
+import { CoreUserSupport } from '@features/user/services/support';
+import { CoreUserSupportConfig } from '@features/user/classes/support/support-config';
+import { CoreUserGuestSupportConfig } from '@features/user/classes/support/guest-support-config';
+import { SafeHtml } from '@angular/platform-browser';
 
 /**
  * Page to enter the user credentials.
@@ -53,6 +58,9 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
     isFixedUrlSet = false;
     showForgottenPassword = true;
     showScanQR = false;
+    loginAttempts = 0;
+    supportConfig?: CoreUserSupportConfig;
+    exceededAttemptsHTML?: SafeHtml | string | null;
 
     protected siteConfig?: CoreSitePublicConfigResponse;
     protected eventThrown = false;
@@ -66,16 +74,16 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
     ) {}
 
     /**
-     * Initialize the component.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         try {
             this.siteUrl = CoreNavigator.getRequiredRouteParam<string>('siteUrl');
-
             this.siteName = CoreNavigator.getRouteParam('siteName');
             this.logoUrl = !CoreConstants.CONFIG.forceLoginLogo && CoreNavigator.getRouteParam('logoUrl') || undefined;
-            this.siteConfig = CoreNavigator.getRouteParam('siteConfig');
+            this.siteConfig = CoreNavigator.getRouteParam<CoreSitePublicConfigResponse>('siteConfig');
             this.urlToOpen = CoreNavigator.getRouteParam('urlToOpen');
+            this.supportConfig = this.siteConfig && new CoreUserGuestSupportConfig(this.siteConfig);
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
 
@@ -124,12 +132,23 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
     }
 
     /**
+     * Show help modal.
+     */
+    showHelp(): void {
+        CoreUserSupport.showHelp(
+            Translate.instant('core.login.credentialshelp'),
+            Translate.instant('core.login.credentialssupportsubject'),
+            this.supportConfig,
+        );
+    }
+
+    /**
      * Get site config and check if it requires SSO login.
      * This should be used only if a fixed URL is set, otherwise this check is already performed in CoreLoginSitePage.
      *
      * @param siteUrl Site URL to check.
      * @param onInit Whether the check site is done when initializing the page.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async checkSite(siteUrl: string, onInit = false): Promise<void> {
         this.pageLoaded = false;
@@ -190,6 +209,10 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
             this.canSignup = this.siteConfig.registerauth == 'email' &&
                     !CoreLoginHelper.isEmailSignupDisabled(this.siteConfig, disabledFeatures);
             this.showForgottenPassword = !CoreLoginHelper.isForgottenPasswordDisabled(this.siteConfig, disabledFeatures);
+            this.exceededAttemptsHTML = CoreLoginHelper.buildExceededAttemptsHTML(
+                !!this.supportConfig?.canContactSupport(),
+                this.showForgottenPassword,
+            );
 
             if (!this.eventThrown && !this.viewLeft) {
                 this.eventThrown = true;
@@ -206,7 +229,7 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
      * Tries to authenticate the user.
      *
      * @param e Event.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async login(e?: Event): Promise<void> {
         if (e) {
@@ -225,7 +248,7 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
             // Site wasn't checked (it failed) or a previous check determined it was SSO. Let's check again.
             await this.checkSite(siteUrl);
 
-            if (!this.isBrowserSSO) {
+            if (!this.isBrowserSSO && this.siteChecked) {
                 // Site doesn't use browser SSO, throw app's login again.
                 return this.login();
             }
@@ -244,7 +267,7 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
             return;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal('core.networkerrormsg', true);
 
             return;
@@ -273,12 +296,29 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
             } else if (error.errorcode == 'forcepasswordchangenotice') {
                 // Reset password field.
                 this.credForm.controls.password.reset();
+            } else if (error.errorcode === 'invalidlogin') {
+                this.loginAttempts++;
             }
         } finally {
             modal.dismiss();
 
             CoreForms.triggerFormSubmittedEvent(this.formElement, true);
         }
+    }
+
+    /**
+     * Exceeded attempts message clicked.
+     *
+     * @param event Click event.
+     */
+    exceededAttemptsClicked(event: Event): void {
+        event.preventDefault();
+
+        if (!(event.target instanceof HTMLAnchorElement)) {
+            return;
+        }
+
+        this.forgottenPassword();
     }
 
     /**
@@ -302,7 +342,7 @@ export class CoreLoginCredentialsPage implements OnInit, OnDestroy {
     /**
      * Show instructions and scan QR code.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async showInstructionsAndScanQR(): Promise<void> {
         try {

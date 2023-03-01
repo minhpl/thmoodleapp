@@ -16,10 +16,11 @@ import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 
 import { AppRoutingModule } from '@/app/app-routing.module';
-import { CoreLoginHelperProvider } from './services/login-helper';
+import { CoreLoginHelper, CoreLoginHelperProvider } from './services/login-helper';
 import { CoreRedirectGuard } from '@guards/redirect';
 import { CoreLoginCronHandler } from './services/handlers/cron';
 import { CoreCronDelegate } from '@services/cron';
+import { CoreEvents } from '@singletons/events';
 
 export const CORE_LOGIN_SERVICES = [
     CoreLoginHelperProvider,
@@ -42,8 +43,22 @@ const appRoutes: Routes = [
         {
             provide: APP_INITIALIZER,
             multi: true,
-            useValue: () => {
+            useValue: async () => {
                 CoreCronDelegate.register(CoreLoginCronHandler.instance);
+
+                CoreEvents.on(CoreEvents.SESSION_EXPIRED, (data) => {
+                    CoreLoginHelper.sessionExpired(data);
+                });
+
+                CoreEvents.on(CoreEvents.PASSWORD_CHANGE_FORCED, (data) => {
+                    CoreLoginHelper.passwordChangeForced(data.siteId);
+                });
+
+                CoreEvents.on(CoreEvents.SITE_POLICY_NOT_AGREED, (data) => {
+                    CoreLoginHelper.sitePolicyNotAgreed(data.siteId);
+                });
+
+                await CoreLoginHelper.initialize();
             },
         },
     ],

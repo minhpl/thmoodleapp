@@ -16,7 +16,7 @@ import { ContextLevel } from '@/core/constants';
 import { Injectable } from '@angular/core';
 import { CoreSyncBaseProvider } from '@classes/base-sync';
 import { CoreNetworkError } from '@classes/errors/network-error';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreUtils } from '@services/utils/utils';
@@ -49,7 +49,7 @@ export class CoreRatingSyncProvider extends CoreSyncBaseProvider<CoreRatingSyncI
      * @param itemSetId Item set id.
      * @param force Wether to force sync not depending on last execution.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     async syncRatings(
         component: string,
@@ -114,7 +114,7 @@ export class CoreRatingSyncProvider extends CoreSyncBaseProvider<CoreRatingSyncI
      * @param instanceId Context instance id.
      * @param itemSetId Item set id. Example: forum discussion id.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when ratings are synced or if it doesn't need to be synced.
+     * @returns Promise resolved when ratings are synced or if it doesn't need to be synced.
      */
     protected async syncItemSetIfNeeded(
         component: string,
@@ -144,7 +144,7 @@ export class CoreRatingSyncProvider extends CoreSyncBaseProvider<CoreRatingSyncI
      * @param instanceId Context instance id.
      * @param itemSetId Item set id. Example: forum discussion id.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     protected syncItemSet(
         component: string,
@@ -181,7 +181,7 @@ export class CoreRatingSyncProvider extends CoreSyncBaseProvider<CoreRatingSyncI
      * @param instanceId Context instance id.
      * @param itemSetId Item set id. Example: forum discussion id.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     protected async performSyncItemSet(
         component: string,
@@ -202,7 +202,7 @@ export class CoreRatingSyncProvider extends CoreSyncBaseProvider<CoreRatingSyncI
             // Nothing to sync.
             return result;
         }
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // Cannot sync in offline.
             throw new CoreNetworkError();
         }
@@ -273,7 +273,7 @@ export class CoreRatingSyncProvider extends CoreSyncBaseProvider<CoreRatingSyncI
      * @param contextLevel Context level: course, module, user, etc.
      * @param instanceId Context instance id.
      * @param itemSetId Item set id. Example: forum discussion id.
-     * @return Sync id.
+     * @returns Sync id.
      */
     protected getItemSetSyncId(
         component: string,
