@@ -68,7 +68,7 @@ export class AddonModSurveyPrefetchHandlerService extends CoreCourseActivityPref
      * @inheritdoc
      */
     prefetch(module: CoreCourseAnyModuleData, courseId: number): Promise<void> {
-        return this.prefetchPackage(module, courseId, this.prefetchSurvey.bind(this, module, courseId));
+        return this.prefetchPackage(module, courseId, (siteId) => this.prefetchSurvey(module, courseId, siteId));
     }
 
     /**
@@ -77,7 +77,7 @@ export class AddonModSurveyPrefetchHandlerService extends CoreCourseActivityPref
      * @param module Module.
      * @param courseId Course ID the module belongs to.
      * @param siteId SiteId or current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchSurvey(module: CoreCourseAnyModuleData, courseId: number, siteId: string): Promise<void> {
         const survey = await AddonModSurvey.getSurvey(courseId, module.id, {

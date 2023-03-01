@@ -39,7 +39,7 @@ export class AddonNotificationsPushClickHandlerService implements CorePushNotifi
      * Check if a notification click is handled by this handler.
      *
      * @param notification The notification to check.
-     * @return Whether the notification click is handled by this handler
+     * @returns Whether the notification click is handled by this handler
      */
     async handles(notification: AddonNotificationsNotificationData): Promise<boolean> {
         if (!notification.moodlecomponent) {
@@ -61,7 +61,7 @@ export class AddonNotificationsPushClickHandlerService implements CorePushNotifi
      * Mark the notification as read.
      *
      * @param notification Notification to mark.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async markAsRead(notification: AddonNotificationsNotificationData): Promise<void> {
         await CoreUtils.ignoreErrors(AddonNotificationsHelper.markNotificationAsRead(notification));
@@ -71,7 +71,7 @@ export class AddonNotificationsPushClickHandlerService implements CorePushNotifi
      * Handle the notification click.
      *
      * @param notification The notification to check.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async handleClick(notification: AddonNotificationsNotificationData): Promise<void> {
 
@@ -141,4 +141,5 @@ export type AddonNotificationsNotificationData = CorePushNotificationsNotificati
     contexturl?: string; // URL related to the notification.
     savedmessageid?: number; // Notification ID (optional).
     id?: number; // Notification ID (optional).
+    date?: string | number; // Notification date (timestamp). E.g. "1669204700".
 };

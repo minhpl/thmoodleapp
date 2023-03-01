@@ -83,7 +83,6 @@ export class AddonBlogEntriesPage implements OnInit {
         if (userId) {
             this.filter.userid = userId;
         }
-        this.showMyEntriesToggle = !userId;
 
         if (courseId) {
             this.filter.courseid = courseId;
@@ -104,6 +103,8 @@ export class AddonBlogEntriesPage implements OnInit {
         if (tagId) {
             this.filter.tagid = tagId;
         }
+
+        this.showMyEntriesToggle = !userId && !this.filter.entryid;
 
         // Calculate the context level.
         if (userId && !courseId && !cmId) {
@@ -130,7 +131,7 @@ export class AddonBlogEntriesPage implements OnInit {
      * Fetch blog entries.
      *
      * @param refresh Empty events array first.
-     * @return Promise with the entries.
+     * @returns Promise with the entries.
      */
     protected async fetchEntries(refresh: boolean = false): Promise<void> {
         this.loadMoreError = false;
@@ -239,7 +240,7 @@ export class AddonBlogEntriesPage implements OnInit {
      * Function to load more entries.
      *
      * @param infiniteComplete Infinite scroll complete function. Only used from core-infinite-loading.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     loadMore(infiniteComplete?: () => void): Promise<void> {
         return this.fetchEntries().finally(() => {

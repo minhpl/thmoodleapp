@@ -15,16 +15,21 @@
 import { AfterViewInit, Component, OnDestroy, ViewChild } from '@angular/core';
 import { IonRefresher } from '@ionic/angular';
 
-import { CoreSettingsHandlerToDisplay } from '../../services/settings-delegate';
+import { CoreSettingsHandlerToDisplay, CoreSettingsPageHandlerToDisplay } from '../../services/settings-delegate';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
 import { CoreSites } from '@services/sites';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSplitViewComponent } from '@components/split-view/split-view';
 import { CoreListItemsManager } from '@classes/items-management/list-items-manager';
 import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/routed-items-manager-sources-tracker';
-import { CoreSettingsHandlersSource } from '@features/settings/classes/settings-handlers-source';
 import { CoreSettingsHelper } from '@features/settings/services/settings-helper';
 import { CoreDomUtils } from '@services/utils/dom';
+import { CoreNetwork } from '@services/network';
+import { Subscription } from 'rxjs';
+import { NgZone } from '@singletons';
+import { CoreConstants } from '@/core/constants';
+import { CoreConfig } from '@services/config';
+import { CoreSettingsHandlersSource } from '@features/settings/classes/settings-handlers-source';
 
 /**
  * Page that displays the list of site settings pages.
@@ -37,11 +42,20 @@ export class CoreSitePreferencesPage implements AfterViewInit, OnDestroy {
 
     @ViewChild(CoreSplitViewComponent) splitView!: CoreSplitViewComponent;
 
-    handlers: CoreListItemsManager<CoreSettingsHandlerToDisplay>;
+    handlers: CoreListItemsManager<CoreSettingsPageHandlerToDisplay, CoreSettingsHandlersSource>;
+
+    dataSaver = false;
+    limitedConnection = false;
+    isOnline = true;
 
     protected siteId: string;
     protected sitesObserver: CoreEventObserver;
+    protected networkObserver: Subscription;
     protected isDestroyed = false;
+
+    get handlerItems(): CoreSettingsHandlerToDisplay[] {
+        return this.handlers.getSource().handlers;
+    }
 
     constructor() {
         this.siteId = CoreSites.getCurrentSiteId();
@@ -53,12 +67,25 @@ export class CoreSitePreferencesPage implements AfterViewInit, OnDestroy {
         this.sitesObserver = CoreEvents.on(CoreEvents.SITE_UPDATED, () => {
             this.refreshData();
         }, this.siteId);
+
+        this.isOnline = CoreNetwork.isOnline();
+        this.limitedConnection = this.isOnline && CoreNetwork.isNetworkAccessLimited();
+
+        this.networkObserver = CoreNetwork.onChange().subscribe(() => {
+            // Execute the callback in the Angular zone, so change detection doesn't stop working.
+            NgZone.run(() => {
+                this.isOnline = CoreNetwork.isOnline();
+                this.limitedConnection = this.isOnline && CoreNetwork.isNetworkAccessLimited();
+            });
+        });
     }
 
     /**
-     * View loaded.
+     * @inheritdoc
      */
     async ngAfterViewInit(): Promise<void> {
+        this.dataSaver = await CoreConfig.get(CoreConstants.SETTINGS_SYNC_ONLY_ON_WIFI, true);
+
         const pageToOpen = CoreNavigator.getRouteParam('page');
 
         try {
@@ -94,7 +121,7 @@ export class CoreSitePreferencesPage implements AfterViewInit, OnDestroy {
             if (this.isDestroyed) {
                 return;
             }
-            CoreDomUtils.showErrorModalDefault(error, 'core.settings.errorsyncsite', true);
+            CoreDomUtils.showErrorModalDefault(error, 'core.settings.sitesyncfailed', true);
         }
 
     }
@@ -102,7 +129,7 @@ export class CoreSitePreferencesPage implements AfterViewInit, OnDestroy {
     /**
      * Returns true if site is beeing synchronized.
      *
-     * @return True if site is beeing synchronized, false otherwise.
+     * @returns True if site is beeing synchronized, false otherwise.
      */
     isSynchronizing(): boolean {
         return !!CoreSettingsHelper.getSiteSyncPromise(this.siteId);
@@ -121,11 +148,12 @@ export class CoreSitePreferencesPage implements AfterViewInit, OnDestroy {
     }
 
     /**
-     * Page destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.isDestroyed = true;
-        this.sitesObserver?.off();
+        this.sitesObserver.off();
+        this.networkObserver.unsubscribe();
         this.handlers.destroy();
     }
 

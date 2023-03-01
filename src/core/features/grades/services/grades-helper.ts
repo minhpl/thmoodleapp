@@ -25,6 +25,7 @@ import {
     CoreGradesTable,
     CoreGradesTableColumn,
     CoreGradesTableItemNameColumn,
+    CoreGradesTableLeaderColumn,
     CoreGradesTableRow,
 } from '@features/grades/services/grades';
 import { CoreTextUtils } from '@services/utils/text';
@@ -35,6 +36,7 @@ import { CoreNavigator } from '@services/navigator';
 import { makeSingleton, Translate } from '@singletons';
 import { CoreError } from '@classes/errors/error';
 import { CoreCourseHelper } from '@features/course/services/course-helper';
+import { CoreAppProvider } from '@services/app';
 
 export const GRADES_PAGE_NAME = 'grades';
 
@@ -54,7 +56,7 @@ export class CoreGradesHelperProvider {
      * Formats a row from the grades table te be rendered in a page.
      *
      * @param tableRow JSON object representing row of grades table data.
-     * @return Formatted row object.
+     * @returns Formatted row object.
      * @deprecated since app 4.0
      */
     protected async formatGradeRow(tableRow: CoreGradesTableRow): Promise<CoreGradesFormattedRow> {
@@ -71,7 +73,8 @@ export class CoreGradesHelperProvider {
             let content = String(column.content);
 
             if (name == 'itemname') {
-                await this.setRowIcon(row, content);
+                this.setRowIconAndType(row, content);
+
                 row.link = this.getModuleLink(content);
                 row.rowclass += column.class.indexOf('hidden') >= 0 ? ' hidden' : '';
                 row.rowclass += column.class.indexOf('dimmed_text') >= 0 ? ' dimmed_text' : '';
@@ -96,10 +99,23 @@ export class CoreGradesHelperProvider {
      * Formats a row from the grades table to be rendered in one table.
      *
      * @param tableRow JSON object representing row of grades table data.
-     * @return Formatted row object.
+     * @param useLegacyLayout Whether to use the layout before 4.1.
+     * @returns Formatted row object.
      */
-    protected async formatGradeRowForTable(tableRow: CoreGradesTableRow): Promise<CoreGradesFormattedTableRow> {
+    protected formatGradeRowForTable(tableRow: CoreGradesTableRow, useLegacyLayout: boolean): CoreGradesFormattedTableRow {
         const row: CoreGradesFormattedTableRow = {};
+
+        if (!useLegacyLayout && 'leader' in tableRow) {
+            const row = {
+                itemtype: 'leader',
+                rowspan: tableRow.leader?.rowspan,
+            };
+
+            this.setRowStyleClasses(row, (tableRow.leader as CoreGradesTableLeaderColumn).class);
+
+            return row;
+        }
+
         for (let name in tableRow) {
             const column: CoreGradesTableColumn = tableRow[name];
 
@@ -116,13 +132,18 @@ export class CoreGradesHelperProvider {
                 row.colspan = itemNameColumn.colspan;
                 row.rowspan = tableRow.leader?.rowspan || 1;
 
-                await this.setRowIcon(row, content);
-                row.rowclass = itemNameColumn.class.indexOf('leveleven') < 0 ? 'odd' : 'even';
+                this.setRowIconAndType(row, content);
+                this.setRowStyleClasses(row, itemNameColumn.class);
                 row.rowclass += itemNameColumn.class.indexOf('hidden') >= 0 ? ' hidden' : '';
                 row.rowclass += itemNameColumn.class.indexOf('dimmed_text') >= 0 ? ' dimmed_text' : '';
 
+                if (!useLegacyLayout && !CoreAppProvider.isAutomated()) {
+                    // Activity name is only included in the webservice response from the latest version when behat is not running.
+                    content = content.replace(/<span[^>]+>.+?<\/span>/i, '');
+                }
+
                 content = content.replace(/<\/span>/gi, '\n');
-                content = CoreTextUtils.cleanTags(content);
+                content = CoreTextUtils.cleanTags(content, { trim: true });
                 name = 'gradeitem';
             } else if (name === 'grade') {
                 // Add the pass/fail class if present.
@@ -163,7 +184,7 @@ export class CoreGradesHelperProvider {
      * Removes suffix formatted to compatibilize data from table and items.
      *
      * @param item Grade item to format.
-     * @return Grade item formatted.
+     * @returns Grade item formatted.
      */
     protected formatGradeItem(item: CoreGradesGradeItem): CoreGradesFormattedItem {
         for (const name in item) {
@@ -180,9 +201,9 @@ export class CoreGradesHelperProvider {
      * Formats the response of gradereport_user_get_grades_table to be rendered.
      *
      * @param table JSON object representing a table with data.
-     * @return Formatted HTML table.
+     * @returns Formatted HTML table.
      */
-    async formatGradesTable(table: CoreGradesTable): Promise<CoreGradesFormattedTable> {
+    formatGradesTable(table: CoreGradesTable): CoreGradesFormattedTable {
         const maxDepth = table.maxdepth;
         const formatted: CoreGradesFormattedTable = {
             columns: [],
@@ -202,7 +223,7 @@ export class CoreGradesHelperProvider {
             feedback: false,
             contributiontocoursetotal: false,
         };
-        formatted.rows = await Promise.all(table.tabledata.map(row => this.formatGradeRowForTable(row)));
+        formatted.rows = this.formatGradesTableRows(table.tabledata);
 
         // Get a row with some info.
         let normalRow = formatted.rows.find(
@@ -235,10 +256,37 @@ export class CoreGradesHelperProvider {
     }
 
     /**
+     * Format table rows.
+     *
+     * @param rows Unformatted rows.
+     * @returns Formatted rows.
+     */
+    protected formatGradesTableRows(rows: CoreGradesTableRow[]): CoreGradesFormattedTableRow[] {
+        const useLegacyLayout = !CoreSites.getRequiredCurrentSite().isVersionGreaterEqualThan('4.1');
+        const formattedRows = rows.map(row => this.formatGradeRowForTable(row, useLegacyLayout));
+
+        if (!useLegacyLayout) {
+            for (let index = 0; index < formattedRows.length - 1; index++) {
+                const row = formattedRows[index];
+                const previousRow = formattedRows[index - 1] ?? null;
+
+                if (row.itemtype !== 'leader') {
+                    continue;
+                }
+
+                row.colspan = previousRow.colspan;
+                previousRow.rowclass = `${previousRow.rowclass ?? ''} ion-no-border`.trim();
+            }
+        }
+
+        return formattedRows;
+    }
+
+    /**
      * Get course data for grades since they only have courseid.
      *
      * @param grades Grades to get the data for.
-     * @return Promise always resolved. Resolve param is the formatted grades.
+     * @returns Promise always resolved. Resolve param is the formatted grades.
      */
     async getGradesCourseData(grades: CoreGradesGradeOverview[]): Promise<CoreGradesGradeOverviewWithCourseData[]> {
         // Obtain courses from cache to prevent network requests.
@@ -273,7 +321,7 @@ export class CoreGradesHelperProvider {
      *
      * @param grades Array of grades to populate.
      * @param courses HashMap of courses to read data from.
-     * @return Boolean indicating if some courses were not found.
+     * @returns Boolean indicating if some courses were not found.
      */
     protected addCourseData(
         grades: CoreGradesGradeOverview[],
@@ -302,7 +350,7 @@ export class CoreGradesHelperProvider {
      * @param userId ID of the user to get the grades from. If not defined use site's current user.
      * @param siteId Site ID. If not defined, current site.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
-     * @return Promise to be resolved when the grades are retrieved.
+     * @returns Promise to be resolved when the grades are retrieved.
      * @deprecated since app 4.0
      */
     async getGradeItem(
@@ -326,7 +374,7 @@ export class CoreGradesHelperProvider {
      *
      * @param grades Array with objects with value and label.
      * @param selectedGrade Selected grade value.
-     * @return Selected grade label.
+     * @returns Selected grade label.
      */
     getGradeLabelFromValue(grades: CoreGradesMenuItem[], selectedGrade?: number): string {
         selectedGrade = Number(selectedGrade);
@@ -349,7 +397,7 @@ export class CoreGradesHelperProvider {
      * @param groupId ID of the group to get the grades from. Not used for old gradebook table.
      * @param siteId Site ID. If not defined, current site.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
-     * @return Promise to be resolved when the grades are retrieved.
+     * @returns Promise to be resolved when the grades are retrieved.
      */
     async getGradeModuleItems(
         courseId: number,
@@ -369,7 +417,7 @@ export class CoreGradesHelperProvider {
      *
      * @param grades Array with objects with value and label.
      * @param selectedGrade Selected grade label.
-     * @return Selected grade value.
+     * @returns Selected grade value.
      */
     getGradeValueFromLabel(grades: CoreMenuItem[], selectedGrade?: string): number {
         if (!grades || !selectedGrade) {
@@ -387,7 +435,7 @@ export class CoreGradesHelperProvider {
      * Gets the link to the module for the selected grade.
      *
      * @param text HTML where the link is present.
-     * @return URL linking to the module.
+     * @returns URL linking to the module.
      */
     protected getModuleLink(text: string): string | false {
         const el = CoreDomUtils.toDom(text)[0];
@@ -405,7 +453,7 @@ export class CoreGradesHelperProvider {
      *
      * @param table JSON object representing a table with data.
      * @param gradeId Grade Object identifier.
-     * @return Formatted HTML table.
+     * @returns Formatted HTML table.
      * @deprecated since app 4.0
      */
     async getGradesTableRow(table: CoreGradesTable, gradeId: number): Promise<CoreGradesFormattedRow | null> {
@@ -431,7 +479,7 @@ export class CoreGradesHelperProvider {
      *
      * @param table JSON object representing a table with data.
      * @param moduleId Grade Object identifier.
-     * @return Formatted HTML table.
+     * @returns Formatted HTML table.
      * @deprecated since app 4.0
      */
     async getModuleGradesTableRows(table: CoreGradesTable, moduleId: number): Promise<CoreGradesFormattedRow[]> {
@@ -442,7 +490,7 @@ export class CoreGradesHelperProvider {
         // Find href containing "/mod/xxx/xxx.php".
         const regex = /href="([^"]*\/mod\/[^"|^/]*\/[^"|^.]*\.php[^"]*)/;
 
-        return await Promise.all(table.tabledata.filter((row) => {
+        return Promise.all(table.tabledata.filter((row) => {
             if (row.itemname && row.itemname.content) {
                 const matches = row.itemname.content.match(regex);
 
@@ -462,7 +510,7 @@ export class CoreGradesHelperProvider {
      *
      * @param courseId Course Id.
      * @param moduleId Module Id.
-     * @return Formatted table rows.
+     * @returns Formatted table rows.
      */
     async getModuleGrades(courseId: number, moduleId: number): Promise<CoreGradesFormattedTableRow[] > {
         const table = await CoreGrades.getCourseGradesTable(courseId);
@@ -474,7 +522,7 @@ export class CoreGradesHelperProvider {
         // Find href containing "/mod/xxx/xxx.php".
         const regex = /href="([^"]*\/mod\/[^"|^/]*\/[^"|^.]*\.php[^"]*)/;
 
-        return await Promise.all(table.tabledata.filter((row) => {
+        return this.formatGradesTableRows(table.tabledata.filter((row) => {
             if (row.itemname && row.itemname.content) {
                 const matches = row.itemname.content.match(regex);
 
@@ -486,7 +534,7 @@ export class CoreGradesHelperProvider {
             }
 
             return false;
-        }).map((row) => this.formatGradeRowForTable(row)));
+        }));
     }
 
     /**
@@ -496,7 +544,7 @@ export class CoreGradesHelperProvider {
      * @param userId User to view. If not defined, current user.
      * @param moduleId Module to view. If not defined, view all course grades.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async goToGrades(
         courseId: number,
@@ -571,7 +619,7 @@ export class CoreGradesHelperProvider {
      * @param userId ID of the user to invalidate. If not defined use site's current user.
      * @param groupId ID of the group to invalidate. Not used for old gradebook table.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise to be resolved when the grades are invalidated.
+     * @returns Promise to be resolved when the grades are invalidated.
      */
     async invalidateGradeModuleItems(courseId: number, userId?: number, groupId?: number, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -583,13 +631,28 @@ export class CoreGradesHelperProvider {
     }
 
     /**
+     * Set row style classes.
+     *
+     * @param row Row.
+     * @param classes Unformatted classes.
+     */
+    protected setRowStyleClasses(row: CoreGradesFormattedTableRow, classes: string): void {
+        const level = parseInt(classes.match(/(?:^|\s)level(\d+)(?:$|\s)/)?.[1] ?? '0');
+
+        row.rowclass = `${row.rowclass ?? ''} ${level % 2 === 0 ? 'even' : 'odd'}`.trim();
+
+        if (classes.match(/(^|\s)(category|bagg(b|t))($|\s)/)) {
+            row.rowclass += ' core-bold';
+        }
+    }
+
+    /**
      * Parses the image and sets it to the row.
      *
-     * @param row Formatted grade row object.
-     * @param text HTML where the image will be rendered.
-     * @return Row object with the image.
+     * @param row Row.
+     * @param text Row content.
      */
-    protected async setRowIcon<T extends CoreGradesFormattedRowCommonData>(row: T, text: string): Promise<T> {
+    protected setRowIconAndType(row: CoreGradesFormattedRowCommonData, text: string): void {
         text = text.replace('%2F', '/').replace('%2f', '/');
         if (text.indexOf('/agg_mean') > -1) {
             row.itemtype = 'agg_mean';
@@ -603,7 +666,7 @@ export class CoreGradesHelperProvider {
             row.itemtype = 'outcome';
             row.icon = 'fas-tasks';
             row.iconAlt = Translate.instant('core.grades.outcome');
-        } else if (text.indexOf('i/folder') > -1 || text.indexOf('fa-folder') > -1) {
+        } else if (text.indexOf('i/folder') > -1 || text.indexOf('fa-folder') > -1 || text.indexOf('category-content') > -1) {
             row.itemtype = 'category';
             row.icon = 'fas-folder';
             row.iconAlt = Translate.instant('core.grades.category');
@@ -621,7 +684,7 @@ export class CoreGradesHelperProvider {
                 row.itemtype = 'mod';
                 row.itemmodule = module[1];
                 row.iconAlt = CoreCourse.translateModuleName(row.itemmodule) || '';
-                row.image = await CoreCourse.getModuleIconSrc(
+                row.image = CoreCourse.getModuleIconSrc(
                     module[1],
                     CoreDomUtils.convertToElement(text).querySelector('img')?.getAttribute('src') ?? undefined,
                 );
@@ -643,8 +706,6 @@ export class CoreGradesHelperProvider {
                 row.iconAlt = Translate.instant('core.unknown');
             }
         }
-
-        return row;
     }
 
     /**
@@ -659,7 +720,7 @@ export class CoreGradesHelperProvider {
      * @param defaultLabel Element that will become default option, if not defined, it won't be added.
      * @param defaultValue Element that will become default option value. Default ''.
      * @param scale Scale csv list String. If not provided, it will take it from the module grade info.
-     * @return Array with objects with value and label to create a propper HTML select.
+     * @returns Array with objects with value and label to create a propper HTML select.
      */
     async makeGradesMenu(
         gradingType?: number,
@@ -715,7 +776,7 @@ export class CoreGradesHelperProvider {
      * Type guard to check if the param is a CoreGradesGradeItem.
      *
      * @param item Param to check.
-     * @return Whether the param is a CoreGradesGradeItem.
+     * @returns Whether the param is a CoreGradesGradeItem.
      */
     isGradeItem(item: CoreGradesGradeItem | CoreGradesFormattedRow): item is CoreGradesGradeItem {
         return 'outcomeid' in item;

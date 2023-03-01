@@ -46,6 +46,12 @@
           },
           "configurations": {
             "production": {
+              "fileReplacements": [
+                {
+                  "replace": "src/testing/testing.module.ts",
+                  "with": "src/testing/testing.module.prod.ts"
+                }
+              ],
               "optimization": {
                 "scripts": false,
                 "styles": true
@@ -146,7 +152,7 @@
   },
   "cli": {
     "defaultCollection": "@ionic/angular-toolkit",
-    "analytics": "fb3577f0-32d7-4e0b-99a2-123c7b42d3ed"
+    "analytics": "1e589f0a-baf5-40fa-94a0-191eb08302a7"
   },
   "schematics": {
     "@ionic/angular-toolkit:component": {

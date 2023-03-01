@@ -40,7 +40,7 @@ export class AddonBlockSiteMainMenuComponent extends CoreBlockBaseComponent impl
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         this.siteHomeId = CoreSites.getCurrentSiteHomeId();
@@ -51,9 +51,9 @@ export class AddonBlockSiteMainMenuComponent extends CoreBlockBaseComponent impl
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
-    protected async invalidateContent(): Promise<void> {
+    async invalidateContent(): Promise<void> {
         const promises: Promise<void>[] = [];
 
         promises.push(CoreCourse.invalidateSections(this.siteHomeId));
@@ -70,7 +70,7 @@ export class AddonBlockSiteMainMenuComponent extends CoreBlockBaseComponent impl
     /**
      * Fetch the data to render the block.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchContent(): Promise<void> {
         const sections = await CoreCourse.getSections(this.siteHomeId, false, true);

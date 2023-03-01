@@ -72,7 +72,7 @@ import { AddonBlockCourseStatusModule } from './coursestatus/html.module';
         AddonBlockStarredCoursesModule,
         AddonBlockTagsModule,
         AddonBlockTimelineModule,
-        AddonBlockCourseStatusModule,
+        AddonBlockCourseStatusModule
     ],
 })
 export class AddonBlockModule { }

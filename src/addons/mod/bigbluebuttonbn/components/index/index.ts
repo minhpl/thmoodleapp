@@ -13,14 +13,19 @@
 // limitations under the License.
 
 import { Component, OnInit, Optional } from '@angular/core';
+import { CoreError } from '@classes/errors/error';
 import { CoreCourseModuleMainActivityComponent } from '@features/course/classes/main-activity-component';
 import { CoreCourseContentsPage } from '@features/course/pages/contents/contents';
 import { IonContent } from '@ionic/angular';
+import { CoreApp } from '@services/app';
 import { CoreGroupInfo, CoreGroups } from '@services/groups';
+import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
+import { CoreTextUtils } from '@services/utils/text';
+import { CoreTimeUtils } from '@services/utils/time';
 import { CoreUtils } from '@services/utils/utils';
 import { Translate } from '@singletons';
-import { AddonModBBB, AddonModBBBData, AddonModBBBMeetingInfoWSResponse, AddonModBBBService } from '../../services/bigbluebuttonbn';
+import { AddonModBBB, AddonModBBBData, AddonModBBBMeetingInfo, AddonModBBBService } from '../../services/bigbluebuttonbn';
 
 /**
  * Component that displays a Big Blue Button activity.
@@ -37,7 +42,8 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
     bbb?: AddonModBBBData;
     groupInfo?: CoreGroupInfo;
     groupId = 0;
-    meetingInfo?: AddonModBBBMeetingInfoWSResponse;
+    meetingInfo?: AddonModBBBMeetingInfo;
+    recordings?: RecordingData[];
 
     constructor(
         protected content?: IonContent,
@@ -55,6 +61,14 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
         await this.loadContent();
     }
 
+    get showRoom(): boolean {
+        return !!this.meetingInfo && (!this.meetingInfo.features || this.meetingInfo.features.showroom);
+    }
+
+    get showRecordings(): boolean {
+        return !!this.meetingInfo && (!this.meetingInfo.features || this.meetingInfo.features.showrecordings);
+    }
+
     /**
      * @inheritdoc
      */
@@ -68,15 +82,22 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
 
         this.groupId = CoreGroups.validateGroupId(this.groupId, this.groupInfo);
 
+        if (this.groupInfo.separateGroups && !this.groupInfo.groups.length) {
+            throw new CoreError(Translate.instant('addon.mod_bigbluebuttonbn.view_nojoin'));
+        }
+
         await this.fetchMeetingInfo();
+
+        await this.fetchRecordings();
     }
 
     /**
      * Get meeting info.
      *
-     * @return Promise resolved when done.
+     * @param updateCache Whether to update info cached data (in server).
+     * @returns Promise resolved when done.
      */
-    async fetchMeetingInfo(): Promise<void> {
+    async fetchMeetingInfo(updateCache?: boolean): Promise<void> {
         if (!this.bbb) {
             return;
         }
@@ -84,6 +105,7 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
         try {
             this.meetingInfo = await AddonModBBB.getMeetingInfo(this.bbb.id, this.groupId, {
                 cmId: this.module.id,
+                updateCache,
             });
 
             if (this.meetingInfo.statusrunning && this.meetingInfo.userlimit > 0) {
@@ -102,6 +124,72 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
     }
 
     /**
+     * Get recordings.
+     *
+     * @returns Promise resolved when done.
+     */
+    async fetchRecordings(): Promise<void> {
+        if (!this.bbb || !this.showRecordings) {
+            return;
+        }
+
+        const recordingsTable = await AddonModBBB.getRecordings(this.bbb.id, this.groupId, {
+            cmId: this.module.id,
+        });
+        const columns = CoreUtils.arrayToObject(recordingsTable.columns, 'key');
+
+        this.recordings = recordingsTable.parsedData.map(recordingData => {
+            const playbackEl = CoreDomUtils.convertToElement(String(recordingData.playback));
+            const playbackAnchor = playbackEl.querySelector('a');
+            const details: RecordingDetailData[] = [];
+
+            Object.entries(recordingData).forEach(([key, value]) => {
+                const columnData = columns[key];
+                if (!columnData || value === '' || key === 'actionbar') {
+                    return;
+                }
+
+                if (columnData.formatter === 'customDate' && !isNaN(Number(value))) {
+                    value = CoreTimeUtils.userDate(Number(value), 'core.strftimedaydate');
+                } else if (columnData.allowHTML && typeof value === 'string') {
+                    // If the HTML is empty, don't display it.
+                    const valueElement = CoreDomUtils.convertToElement(value);
+                    if (!valueElement.querySelector('img') && (valueElement.textContent ?? '').trim() === '') {
+                        return;
+                    }
+
+                    if (key === 'playback') {
+                        // Remove HTML, we're only interested in the text.
+                        value = (valueElement.textContent ?? '').trim();
+                    } else {
+                        // Treat "quick edit" buttons, they aren't supported in the app.
+                        const quickEditLink = valueElement.querySelector('.quickeditlink');
+                        if (quickEditLink) {
+                            // The first span in quick edit link contains the actual HTML, use it.
+                            value = (quickEditLink.querySelector('span')?.innerHTML ?? '').trim();
+                        }
+                    }
+                }
+
+                details.push({
+                    label: columnData.label,
+                    value: String(value),
+                    allowHTML: !!columnData.allowHTML,
+                });
+            });
+
+            return {
+                type: playbackAnchor?.innerText ??
+                    Translate.instant('addon.mod_bigbluebuttonbn.view_recording_format_presentation'),
+                name: CoreTextUtils.cleanTags(String(recordingData.recording), { singleLine: true }),
+                url: playbackAnchor?.href ?? '',
+                details,
+                expanded: false,
+            };
+        });
+    }
+
+    /**
      * @inheritdoc
      */
     protected async logActivity(): Promise<void> {
@@ -115,9 +203,10 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
     /**
      * Update meeting info.
      *
-     * @return Promise resolved when done.
+     * @param updateCache Whether to update info cached data (in server).
+     * @returns Promise resolved when done.
      */
-    async updateMeetingInfo(): Promise<void> {
+    async updateMeetingInfo(updateCache?: boolean): Promise<void> {
         if (!this.bbb) {
             return;
         }
@@ -127,7 +216,7 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
         try {
             await AddonModBBB.invalidateAllGroupsMeetingInfo(this.bbb.id);
 
-            await this.fetchMeetingInfo();
+            await this.fetchMeetingInfo(updateCache);
         } finally {
             this.showLoading = false;
         }
@@ -144,6 +233,7 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
 
         if (this.bbb) {
             promises.push(AddonModBBB.invalidateAllGroupsMeetingInfo(this.bbb.id));
+            promises.push(AddonModBBB.invalidateAllGroupsRecordings(this.bbb.id));
         }
 
         await Promise.all(promises);
@@ -152,13 +242,15 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
     /**
      * Group changed, reload some data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async groupChanged(): Promise<void> {
         this.showLoading = true;
 
         try {
             await this.fetchMeetingInfo();
+
+            await this.fetchRecordings();
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
         } finally {
@@ -169,7 +261,7 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
     /**
      * Join the room.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async joinRoom(): Promise<void> {
         const modal = await CoreDomUtils.showModalLoading();
@@ -177,11 +269,14 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
         try {
             const joinUrl = await AddonModBBB.getJoinUrl(this.module.id, this.groupId);
 
-            CoreUtils.openInBrowser(joinUrl, {
+            await CoreUtils.openInBrowser(joinUrl, {
                 showBrowserWarning: false,
             });
 
-            this.updateMeetingInfo();
+            // Leave some time for the room to load.
+            await CoreApp.waitForResume(10000);
+
+            this.updateMeetingInfo(true);
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
         } finally {
@@ -192,7 +287,7 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
     /**
      * End the meeting.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async endMeeting(): Promise<void> {
         if (!this.bbb) {
@@ -223,4 +318,46 @@ export class AddonModBBBIndexComponent extends CoreCourseModuleMainActivityCompo
         }
     }
 
+    /**
+     * Toogle the visibility of a recording (expand/collapse).
+     *
+     * @param recording Recording.
+     */
+    toggle(recording: RecordingData): void {
+        recording.expanded = !recording.expanded;
+    }
+
+    /**
+     * Play a recording.
+     *
+     * @param event Click event.
+     * @param recording Recording.
+     */
+    playRecording(event: MouseEvent, recording: RecordingData): void {
+        event.preventDefault();
+        event.stopPropagation();
+
+        CoreSites.getCurrentSite()?.openInBrowserWithAutoLogin(recording.url);
+    }
+
 }
+
+/**
+ * Recording data.
+ */
+type RecordingData = {
+    type: string;
+    name: string;
+    url: string;
+    expanded: boolean;
+    details: RecordingDetailData[];
+};
+
+/**
+ * Recording detail data.
+ */
+type RecordingDetailData = {
+    label: string;
+    value: string;
+    allowHTML: boolean;
+};

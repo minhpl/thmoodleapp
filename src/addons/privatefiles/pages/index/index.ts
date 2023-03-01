@@ -16,7 +16,7 @@ import { Component, OnDestroy, OnInit } from '@angular/core';
 import { IonRefresher } from '@ionic/angular';
 import { Md5 } from 'ts-md5/dist/md5';
 
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreTextUtils } from '@services/utils/text';
@@ -66,7 +66,7 @@ export class AddonPrivateFilesIndexPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         try {
@@ -127,9 +127,9 @@ export class AddonPrivateFilesIndexPage implements OnInit, OnDestroy {
      *
      * @param refresher Refresher.
      */
-    refreshData(event?: IonRefresher): void {
+    refreshData(refresher?: IonRefresher): void {
         this.refreshFiles().finally(() => {
-            event?.complete();
+            refresher?.complete();
         });
     }
 
@@ -154,7 +154,7 @@ export class AddonPrivateFilesIndexPage implements OnInit, OnDestroy {
      * Upload a new file.
      */
     async uploadFile(): Promise<void> {
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal('core.fileuploader.errormustbeonlinetoupload', true);
 
             return;
@@ -177,7 +177,7 @@ export class AddonPrivateFilesIndexPage implements OnInit, OnDestroy {
     /**
      * Fetch the files.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchFiles(): Promise<void> {
         try {
@@ -220,7 +220,7 @@ export class AddonPrivateFilesIndexPage implements OnInit, OnDestroy {
     /**
      * Refresh the displayed files.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshFiles(): Promise<void> {
         try {
