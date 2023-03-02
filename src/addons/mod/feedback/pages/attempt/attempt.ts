@@ -66,9 +66,9 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
     /**
      * @inheritdoc
      */
-    ngOnInit(): void {
+    async ngOnInit(): Promise<void> {
         try {
-            this.attempts.start();
+            await this.attempts.start();
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
 
@@ -90,7 +90,7 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
     /**
      * Fetch all the data required for the view.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchData(): Promise<void> {
         try {
@@ -143,6 +143,7 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
      * Check if an attempt is anonymous or not.
      *
      * @param attempt Attempt to check.
+     * @returns If attempt is anonymous.
      */
     isAnonAttempt(attempt: AddonModFeedbackWSAttempt | AddonModFeedbackWSAnonAttempt): attempt is AddonModFeedbackWSAnonAttempt {
         return !('fullname' in attempt);

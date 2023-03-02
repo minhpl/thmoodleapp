@@ -18,6 +18,8 @@ import { CoreSite, CoreSiteInfo } from '@classes/site';
 import { CoreFilter } from '@features/filter/services/filter';
 import { CoreLoginSitesComponent } from '@features/login/components/sites/sites';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
+import { CoreUserAuthenticatedSupportConfig } from '@features/user/classes/support/authenticated-support-config';
+import { CoreUserSupport } from '@features/user/services/support';
 import { CoreUser, CoreUserProfile } from '@features/user/services/user';
 import {
     CoreUserProfileHandlerData,
@@ -51,6 +53,7 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
     handlersLoaded = false;
     user?: CoreUserProfile;
     displaySwitchAccount = true;
+    displayContactSupport = false;
     removeAccountOnLogout = false;
 
     protected subscription!: Subscription;
@@ -65,13 +68,21 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         this.siteName = currentSite.getSiteName();
         this.siteUrl = currentSite.getURL();
         this.displaySwitchAccount = !currentSite.isFeatureDisabled('NoDelegate_SwitchAccount');
+        this.displayContactSupport = new CoreUserAuthenticatedSupportConfig(currentSite).canContactSupport();
         this.removeAccountOnLogout = !!CoreConstants.CONFIG.removeaccountonlogout;
 
         this.loadSiteLogo(currentSite);
 
         // Load the handlers.
         if (this.siteInfo) {
-            this.user = await CoreUser.getProfile(this.siteInfo.userid);
+            try {
+                this.user = await CoreUser.getProfile(this.siteInfo.userid);
+            } catch {
+                this.user = {
+                    id: this.siteInfo.userid,
+                    fullname: this.siteInfo.fullname,
+                };
+            }
 
             this.subscription = CoreUserDelegate.getProfileHandlersFor(this.user, CoreUserDelegateContext.USER_MENU)
                 .subscribe((handlers) => {
@@ -99,7 +110,7 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
      * Load site logo from current site public config.
      *
      * @param currentSite Current site object.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSiteLogo(currentSite: CoreSite): Promise<void> {
         if (CoreConstants.CONFIG.forceLoginLogo) {
@@ -164,6 +175,16 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         await this.close(event);
 
         handler.action(event, this.user, CoreUserDelegateContext.USER_MENU);
+    }
+
+    /**
+     * Contact site support.
+     *
+     * @param event Click event.
+     */
+    async contactSupport(event: Event): Promise<void> {
+        await this.close(event);
+        await CoreUserSupport.contact();
     }
 
     /**

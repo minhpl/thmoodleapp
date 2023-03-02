@@ -70,7 +70,10 @@ export class AddonModResourceModuleHandlerService extends CoreModuleHandlerBase 
         sectionId?: number,
         forCoursePage?: boolean,
     ): Promise<CoreCourseModuleHandlerData> {
-        const updateStatus = (status: string): void => {
+        const openWithPicker = CoreFileHelper.defaultIsOpenWithPicker();
+
+        const handlerData = await super.getData(module, courseId, sectionId, forCoursePage);
+        handlerData.updateStatus = (status) => {
             if (!handlerData.buttons) {
                 return;
             }
@@ -78,10 +81,6 @@ export class AddonModResourceModuleHandlerService extends CoreModuleHandlerBase 
             handlerData.buttons[0].hidden = status !== CoreConstants.DOWNLOADED ||
                 AddonModResourceHelper.isDisplayedInIframe(module);
         };
-        const openWithPicker = CoreFileHelper.defaultIsOpenWithPicker();
-
-        const handlerData = await super.getData(module, courseId, sectionId, forCoursePage);
-        handlerData.updateStatus = updateStatus.bind(this);
         handlerData.buttons = [{
             hidden: true,
             icon: openWithPicker ? 'fas-share-square' : 'fas-file',
@@ -104,13 +103,11 @@ export class AddonModResourceModuleHandlerService extends CoreModuleHandlerBase 
             // Ignore errors.
         });
 
-        this.getIconSrc(module).then((icon) => {
-            handlerData.icon = icon;
-
-            return;
-        }).catch(() => {
+        try {
+            handlerData.icon = this.getIconSrc(module);
+        } catch {
             // Ignore errors.
-        });
+        }
 
         return handlerData;
     }
@@ -119,7 +116,7 @@ export class AddonModResourceModuleHandlerService extends CoreModuleHandlerBase 
      * Returns if contents are loaded to show open button.
      *
      * @param module The module object.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async hideOpenButton(module: CoreCourseModuleData): Promise<boolean> {
         if (!module.contentsinfo) { // Not informed before 3.7.6.
@@ -136,7 +133,7 @@ export class AddonModResourceModuleHandlerService extends CoreModuleHandlerBase 
      *
      * @param module The module object.
      * @param courseId The course ID.
-     * @return Resource data.
+     * @returns Resource data.
      */
     protected async getResourceData(
         module: CoreCourseModuleData,
@@ -227,13 +224,13 @@ export class AddonModResourceModuleHandlerService extends CoreModuleHandlerBase 
     /**
      * @inheritdoc
      */
-    async getIconSrc(module?: CoreCourseModuleData): Promise<string | undefined> {
+    getIconSrc(module?: CoreCourseModuleData): string | undefined {
         if (!module) {
             return;
         }
 
         if (CoreSites.getCurrentSite()?.isVersionGreaterEqualThan('4.0')) {
-            return await CoreCourse.getModuleIconSrc(module.modname, module.modicon);
+            return CoreCourse.getModuleIconSrc(module.modname, module.modicon);
         }
         let mimetypeIcon = '';
 
@@ -251,7 +248,7 @@ export class AddonModResourceModuleHandlerService extends CoreModuleHandlerBase 
             mimetypeIcon = CoreMimetypeUtils.getFileIcon(file.filename || '');
         }
 
-        return await CoreCourse.getModuleIconSrc(module.modname, module.modicon, mimetypeIcon);
+        return CoreCourse.getModuleIconSrc(module.modname, module.modicon, mimetypeIcon);
     }
 
     /**

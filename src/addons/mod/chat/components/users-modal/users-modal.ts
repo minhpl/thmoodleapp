@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import { Component, Input, OnDestroy, OnInit } from '@angular/core';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
-import { ModalController, Network, NgZone } from '@singletons';
+import { ModalController, NgZone } from '@singletons';
 import { Subscription } from 'rxjs';
 import { AddonModChat, AddonModChatUser } from '../../services/chat';
 
@@ -40,12 +40,12 @@ export class AddonModChatUsersModalComponent implements OnInit, OnDestroy {
     protected onlineSubscription: Subscription;
 
     constructor() {
-        this.isOnline = CoreApp.isOnline();
+        this.isOnline = CoreNetwork.isOnline();
         this.currentUserId = CoreSites.getCurrentSiteUserId();
-        this.onlineSubscription = Network.onChange().subscribe(() => {
+        this.onlineSubscription = CoreNetwork.onChange().subscribe(() => {
             // Execute the callback in the Angular zone, so change detection doesn't stop working.
             NgZone.run(() => {
-                this.isOnline = CoreApp.isOnline();
+                this.isOnline = CoreNetwork.isOnline();
             });
         });
     }

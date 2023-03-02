@@ -19,25 +19,20 @@ import { CoreSharedModule } from '@/core/shared.module';
 import { AddonCalendarCalendarComponent } from './calendar/calendar';
 import { AddonCalendarUpcomingEventsComponent } from './upcoming-events/upcoming-events';
 import { AddonCalendarFilterComponent } from './filter/filter';
-import { AddonCalendarReminderTimeModalComponent } from './reminder-time-modal/reminder-time-modal';
 
 @NgModule({
     declarations: [
         AddonCalendarCalendarComponent,
         AddonCalendarUpcomingEventsComponent,
         AddonCalendarFilterComponent,
-        AddonCalendarReminderTimeModalComponent,
     ],
     imports: [
         CoreSharedModule,
-    ],
-    providers: [
     ],
     exports: [
         AddonCalendarCalendarComponent,
         AddonCalendarUpcomingEventsComponent,
         AddonCalendarFilterComponent,
-        AddonCalendarReminderTimeModalComponent,
     ],
 })
 export class AddonCalendarComponentsModule {}

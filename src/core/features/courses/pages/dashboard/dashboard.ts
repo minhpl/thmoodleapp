@@ -36,6 +36,7 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
 
     @ViewChildren(CoreBlockComponent) blocksComponents?: QueryList<CoreBlockComponent>;
 
+    hasMainBlocks = false;
     hasSideBlocks = false;
     searchEnabled = false;
     downloadCourseEnabled = false;
@@ -70,7 +71,7 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
     /**
      * Convenience function to fetch the dashboard data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadContent(): Promise<void> {
         const available = await CoreCoursesDashboard.isAvailable();
@@ -84,6 +85,7 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
 
                 this.blocks = blocks.mainBlocks;
 
+                this.hasMainBlocks = CoreBlockDelegate.hasSupportedBlock(blocks.mainBlocks);
                 this.hasSideBlocks = CoreBlockDelegate.hasSupportedBlock(blocks.sideBlocks);
             } catch (error) {
                 CoreDomUtils.showErrorModal(error);
@@ -116,6 +118,8 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
                 visible: true,
             },
         ];
+
+        this.hasMainBlocks = CoreBlockDelegate.isBlockSupported('myoverview') || CoreBlockDelegate.isBlockSupported('timeline');
     }
 
     /**
@@ -150,7 +154,7 @@ export class CoreCoursesDashboardPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.updateSiteObserver.off();

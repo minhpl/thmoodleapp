@@ -18,13 +18,12 @@ import { CoreCourseActivitySyncBaseProvider } from '@features/course/classes/act
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreFileUploader } from '@features/fileuploader/services/fileuploader';
 import { CoreRatingSync } from '@features/rating/services/rating-sync';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreGroups } from '@services/groups';
 import { CoreSites } from '@services/sites';
 import { CoreSync } from '@services/sync';
 import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton, Translate } from '@singletons';
-import { CoreArray } from '@singletons/array';
 import { CoreEvents } from '@singletons/events';
 import {
     AddonModForum,
@@ -69,10 +68,10 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      *
      * @param siteId Site ID to sync. If not defined, sync all sites.
      * @param force Wether to force sync not depending on last execution.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     async syncAllForums(siteId?: string, force?: boolean): Promise<void> {
-        await this.syncOnSites('all forums', this.syncAllForumsFunc.bind(this, !!force), siteId);
+        await this.syncOnSites('all forums', (siteId) => this.syncAllForumsFunc(!!force, siteId), siteId);
     }
 
     /**
@@ -80,7 +79,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      *
      * @param force Wether to force sync not depending on last execution.
      * @param siteId Site ID to sync.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     protected async syncAllForumsFunc(force: boolean, siteId: string): Promise<void> {
         const sitePromises: Promise<unknown>[] = [];
@@ -90,7 +89,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
             // Do not sync same forum twice.
             const syncedForumIds: number[] = [];
             const promises = discussions.map(async discussion => {
-                if (CoreArray.contains(syncedForumIds, discussion.forumid)) {
+                if (syncedForumIds.includes(discussion.forumid)) {
                     return;
                 }
 
@@ -123,9 +122,11 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
             // Do not sync same discussion twice.
             const syncedDiscussionIds: number[] = [];
             const promises = replies.map(async reply => {
-                if (CoreArray.contains(syncedDiscussionIds, reply.discussionid)) {
+                if (syncedDiscussionIds.includes(reply.discussionid)) {
                     return;
                 }
+
+                syncedDiscussionIds.push(reply.discussionid);
 
                 const result = force
                     ? await this.syncDiscussionReplies(reply.discussionid, reply.userid, siteId)
@@ -163,7 +164,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param forumId Forum ID.
      * @param userId User the discussion belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the forum is synced or if it doesn't need to be synced.
+     * @returns Promise resolved when the forum is synced or if it doesn't need to be synced.
      */
     async syncForumDiscussionsIfNeeded(
         forumId: number,
@@ -187,7 +188,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param forumId Forum ID to be synced.
      * @param userId User the discussions belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     async syncForumDiscussions(
         forumId: number,
@@ -231,7 +232,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
                 [] as AddonModForumOfflineDiscussion[],
             );
 
-            if (discussions.length !== 0 && !CoreApp.isOnline()) {
+            if (discussions.length !== 0 && !CoreNetwork.isOnline()) {
                 throw new Error('cannot sync in offline');
             }
 
@@ -314,7 +315,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param discussionId Discussion id to be synced. If not defined, sync all discussions.
      * @param force Wether to force sync not depending on last execution.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     async syncRatings(cmId?: number, discussionId?: number, force?: boolean, siteId?: string): Promise<AddonModForumSyncResult> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -358,7 +359,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param forumId Forum ID to be synced.
      * @param userId User the discussions belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     async syncForumReplies(forumId: number, userId?: number, siteId?: string): Promise<AddonModForumSyncResult> {
         // Get offline forum replies to be sent.
@@ -370,7 +371,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
         if (!replies.length) {
             // Nothing to sync.
             return { warnings: [], updated: false };
-        } else if (!CoreApp.isOnline()) {
+        } else if (!CoreNetwork.isOnline()) {
             // Cannot sync in offline.
             return Promise.reject(null);
         }
@@ -399,7 +400,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param discussionId Discussion ID to be synced.
      * @param userId User the posts belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the forum discussion is synced or if it doesn't need to be synced.
+     * @returns Promise resolved when the forum discussion is synced or if it doesn't need to be synced.
      */
     async syncDiscussionRepliesIfNeeded(
         discussionId: number,
@@ -423,7 +424,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param discussionId Discussion ID to be synced.
      * @param userId User the posts belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     async syncDiscussionReplies(discussionId: number, userId?: number, siteId?: string): Promise<AddonModForumSyncResult> {
         userId = userId || CoreSites.getCurrentSiteUserId();
@@ -459,7 +460,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
                 [] as AddonModForumOfflineReply[],
             );
 
-            if (replies.length !== 0 && !CoreApp.isOnline()) {
+            if (replies.length !== 0 && !CoreNetwork.isOnline()) {
                 throw new Error('Cannot sync in offline');
             }
 
@@ -531,7 +532,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param timecreated The timecreated of the discussion.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User the discussion belongs to. If not defined, current user in site.
-     * @return Promise resolved when deleted.
+     * @returns Promise resolved when deleted.
      */
     protected async deleteNewDiscussion(forumId: number, timecreated: number, siteId?: string, userId?: number): Promise<void> {
         await Promise.all([
@@ -549,7 +550,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param postId ID of the post being replied.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User the discussion belongs to. If not defined, current user in site.
-     * @return Promise resolved when deleted.
+     * @returns Promise resolved when deleted.
      */
     protected async deleteReply(forumId: number, postId: number, siteId?: string, userId?: number): Promise<void> {
         await Promise.all([
@@ -566,7 +567,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      * @param isDiscussion True if it's a new discussion, false if it's a reply.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User the reply belongs to. If not defined, current user in site.
-     * @return Promise resolved with draftid if uploaded, resolved with undefined if nothing to upload.
+     * @returns Promise resolved with draftid if uploaded, resolved with undefined if nothing to upload.
      */
     protected async uploadAttachments(
         forumId: number,
@@ -614,7 +615,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      *
      * @param forumId Forum ID.
      * @param userId User the responses belong to.. If not defined, current user.
-     * @return Sync ID.
+     * @returns Sync ID.
      */
     getForumSyncId(forumId: number, userId?: number): string {
         userId = userId || CoreSites.getCurrentSiteUserId();
@@ -627,7 +628,7 @@ export class AddonModForumSyncProvider extends CoreCourseActivitySyncBaseProvide
      *
      * @param discussionId Discussion ID.
      * @param userId User the responses belong to.. If not defined, current user.
-     * @return Sync ID.
+     * @returns Sync ID.
      */
     getDiscussionSyncId(discussionId: number, userId?: number): string {
         userId = userId || CoreSites.getCurrentSiteUserId();

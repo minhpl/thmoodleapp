@@ -77,7 +77,7 @@ export class AddonModH5PActivityPrefetchHandlerService extends CoreCourseActivit
      * @inheritdoc
      */
     prefetch(module: CoreCourseAnyModuleData, courseId: number): Promise<void> {
-        return this.prefetchPackage(module, courseId, this.prefetchActivity.bind(this, module, courseId));
+        return this.prefetchPackage(module, courseId, (siteId) => this.prefetchActivity(module, courseId, siteId));
     }
 
     /**
@@ -86,7 +86,7 @@ export class AddonModH5PActivityPrefetchHandlerService extends CoreCourseActivit
      * @param module Module.
      * @param courseId Course ID the module belongs to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchActivity(
         module: CoreCourseAnyModuleData,
@@ -113,7 +113,7 @@ export class AddonModH5PActivityPrefetchHandlerService extends CoreCourseActivit
      * @param module Module.
      * @param h5pActivity Activity instance.
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchMainFile(
         module: CoreCourseAnyModuleData,
@@ -137,7 +137,7 @@ export class AddonModH5PActivityPrefetchHandlerService extends CoreCourseActivit
      *
      * @param h5pActivity Activity instance.
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchWSData(h5pActivity: AddonModH5PActivityData, siteId: string): Promise<void> {
 

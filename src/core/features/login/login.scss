@@ -101,9 +101,16 @@
             --loading-spinner: #{$core-login-loading-color};
         }
     }
+
+    @if ($core-login-hide-qrcode) {
+        .core-login-site-qrcode,
+        .core-login-site-qrcode-separator {
+            display: none;
+        }
+    }
 }
 
-:host-context(body.dark) {
+:host-context(html.dark) {
     @if ($core-login-button-outline-dark) {
         form ion-button {
             --background: white;

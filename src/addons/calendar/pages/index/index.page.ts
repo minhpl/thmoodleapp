@@ -14,7 +14,7 @@
 
 import { Component, OnInit, OnDestroy, ViewChild } from '@angular/core';
 import { IonRefresher } from '@ionic/angular';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -23,7 +23,7 @@ import { AddonCalendar, AddonCalendarProvider } from '../../services/calendar';
 import { AddonCalendarOffline } from '../../services/calendar-offline';
 import { AddonCalendarSync, AddonCalendarSyncProvider } from '../../services/calendar-sync';
 import { AddonCalendarFilter, AddonCalendarHelper } from '../../services/calendar-helper';
-import { Network, NgZone } from '@singletons';
+import { NgZone } from '@singletons';
 import { Subscription } from 'rxjs';
 import { CoreEnrolledCourseData } from '@features/courses/services/courses';
 import { ActivatedRoute, Params } from '@angular/router';
@@ -31,7 +31,6 @@ import { AddonCalendarCalendarComponent } from '../../components/calendar/calend
 import { AddonCalendarUpcomingEventsComponent } from '../../components/upcoming-events/upcoming-events';
 import { AddonCalendarFilterComponent } from '../../components/filter/filter';
 import { CoreNavigator } from '@services/navigator';
-import { CoreLocalNotifications } from '@services/local-notifications';
 import { CoreConstants } from '@/core/constants';
 import { CoreMainMenuDeepLinkManager } from '@features/mainmenu/classes/deep-link-manager';
 
@@ -64,7 +63,6 @@ export class AddonCalendarIndexPage implements OnInit, OnDestroy {
     month?: number;
     canCreate = false;
     courses: Partial<CoreEnrolledCourseData>[] = [];
-    notificationsEnabled = false;
     loaded = false;
     hasOffline = false;
     isOnline = false;
@@ -153,10 +151,10 @@ export class AddonCalendarIndexPage implements OnInit, OnDestroy {
         );
 
         // Refresh online status when changes.
-        this.onlineObserver = Network.onChange().subscribe(() => {
+        this.onlineObserver = CoreNetwork.onChange().subscribe(() => {
             // Execute the callback in the Angular zone, so change detection doesn't stop working.
             NgZone.run(() => {
-                this.isOnline = CoreApp.isOnline();
+                this.isOnline = CoreNetwork.isOnline();
             });
         });
     }
@@ -165,8 +163,6 @@ export class AddonCalendarIndexPage implements OnInit, OnDestroy {
      * View loaded.
      */
     ngOnInit(): void {
-        this.notificationsEnabled = CoreLocalNotifications.isAvailable();
-
         this.loadUpcoming = !!CoreNavigator.getRouteBooleanParam('upcoming');
         this.showCalendar = !this.loadUpcoming;
 
@@ -177,6 +173,10 @@ export class AddonCalendarIndexPage implements OnInit, OnDestroy {
             this.filter.filtered = !!this.filter.courseId;
 
             this.fetchData(true, false);
+
+            if (this.year !== undefined && this.month !== undefined && this.calendarComponent) {
+                this.calendarComponent.viewMonth(this.month, this.year);
+            }
         });
 
         const deepLinkManager = new CoreMainMenuDeepLinkManager();
@@ -188,12 +188,12 @@ export class AddonCalendarIndexPage implements OnInit, OnDestroy {
      *
      * @param sync Whether it should try to synchronize offline events.
      * @param showErrors Whether to show sync errors to the user.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async fetchData(sync?: boolean, showErrors?: boolean): Promise<void> {
 
         this.syncIcon = CoreConstants.ICON_LOADING;
-        this.isOnline = CoreApp.isOnline();
+        this.isOnline = CoreNetwork.isOnline();
 
         if (sync) {
             // Try to synchronize offline events.
@@ -261,7 +261,7 @@ export class AddonCalendarIndexPage implements OnInit, OnDestroy {
      * @param refresher Refresher.
      * @param done Function to call when done.
      * @param showErrors Whether to show sync errors to the user.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async doRefresh(refresher?: IonRefresher, done?: () => void, showErrors?: boolean): Promise<void> {
         if (!this.loaded) {
@@ -280,7 +280,7 @@ export class AddonCalendarIndexPage implements OnInit, OnDestroy {
      * @param sync Whether it should try to synchronize offline events.
      * @param showErrors Whether to show sync errors to the user.
      * @param afterChange Whether the refresh is done after an event has changed or has been synced.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async refreshData(sync = false, showErrors = false, afterChange = false): Promise<void> {
         this.syncIcon = CoreConstants.ICON_LOADING;
