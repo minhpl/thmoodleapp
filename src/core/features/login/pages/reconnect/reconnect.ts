@@ -16,6 +16,7 @@ import { Component, OnInit, OnDestroy, ViewChild, ElementRef } from '@angular/co
 import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
@@ -25,6 +26,11 @@ import { CoreEvents } from '@singletons/events';
 import { CoreError } from '@classes/errors/error';
 import { CoreNavigator, CoreRedirectPayload } from '@services/navigator';
 import { CoreForms } from '@singletons/form';
+import { CoreUserSupport } from '@features/user/services/support';
+import { CoreUserSupportConfig } from '@features/user/classes/support/support-config';
+import { CoreUserAuthenticatedSupportConfig } from '@features/user/classes/support/authenticated-support-config';
+import { Translate } from '@singletons';
+import { SafeHtml } from '@angular/platform-browser';
 
 /**
  * Page to enter the user password to reconnect to a site.
@@ -48,10 +54,15 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
     identityProviders?: CoreSiteIdentityProvider[];
     showForgottenPassword = true;
     showSiteAvatar = false;
+    isBrowserSSO = false;
     isOAuth = false;
     isLoggedOut: boolean;
     siteId!: string;
     showScanQR = false;
+    showLoading = true;
+    reconnectAttempts = 0;
+    supportConfig?: CoreUserSupportConfig;
+    exceededAttemptsHTML?: SafeHtml | string | null;
 
     protected siteConfig?: CoreSitePublicConfigResponse;
     protected viewLeft = false;
@@ -71,7 +82,7 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Initialize the component.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         try {
@@ -98,6 +109,7 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
             this.userAvatar = site.infos.userpictureurl;
             this.siteUrl = site.infos.siteurl;
             this.siteName = site.getSiteName();
+            this.supportConfig = new CoreUserAuthenticatedSupportConfig(site);
 
             // If login was OAuth we should only reach this page if the OAuth method ID has changed.
             this.isOAuth = site.isOAuth();
@@ -106,6 +118,8 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
             this.showSiteAvatar = !!this.userAvatar && !CoreLoginHelper.getFixedSites();
 
             this.checkSiteConfig(site);
+
+            this.showLoading = false;
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
 
@@ -129,6 +143,17 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
     }
 
     /**
+     * Show help modal.
+     */
+    showHelp(): void {
+        CoreUserSupport.showHelp(
+            Translate.instant('core.login.reconnecthelp'),
+            Translate.instant('core.login.reconnectsupportsubject'),
+            this.supportConfig,
+        );
+    }
+
+    /**
      * Get some data (like identity providers) from the site config.
      */
     protected async checkSiteConfig(site: CoreSite): Promise<void> {
@@ -144,12 +169,17 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
 
         this.identityProviders = CoreLoginHelper.getValidIdentityProviders(this.siteConfig, disabledFeatures);
         this.showForgottenPassword = !CoreLoginHelper.isForgottenPasswordDisabled(this.siteConfig);
+        this.exceededAttemptsHTML = CoreLoginHelper.buildExceededAttemptsHTML(
+            !!this.supportConfig?.canContactSupport(),
+            this.showForgottenPassword,
+        );
 
         if (!this.eventThrown && !this.viewLeft) {
             this.eventThrown = true;
             CoreEvents.trigger(CoreEvents.LOGIN_SITE_CHECKED, { config: this.siteConfig });
         }
 
+        this.isBrowserSSO = !this.isOAuth && CoreLoginHelper.isSSOLoginNeeded(this.siteConfig.typeoflogin);
         this.showScanQR = CoreLoginHelper.displayQRInSiteScreen() ||
             CoreLoginHelper.displayQRInCredentialsScreen(this.siteConfig.tool_mobile_qrcodetype);
 
@@ -201,7 +231,7 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
             return;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal('core.networkerrormsg', true);
 
             return;
@@ -237,6 +267,8 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
             } else if (error.errorcode == 'forcepasswordchangenotice') {
                 // Reset password field.
                 this.credForm.controls.password.reset();
+            } else if (error.errorcode == 'invalidlogin') {
+                this.reconnectAttempts++;
             }
         } finally {
             modal.dismiss();
@@ -244,10 +276,42 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
     }
 
     /**
+     * Exceeded attempts message clicked.
+     *
+     * @param event Click event.
+     */
+    exceededAttemptsClicked(event: Event): void {
+        event.preventDefault();
+
+        if (!(event.target instanceof HTMLAnchorElement)) {
+            return;
+        }
+
+        this.forgottenPassword();
+    }
+
+    /**
      * Forgotten password button clicked.
      */
     forgottenPassword(): void {
         CoreLoginHelper.forgottenPasswordClicked(this.siteUrl, this.username, this.siteConfig);
+    }
+
+    /**
+     * Open browser for SSO login.
+     */
+    openBrowserSSO(): void {
+        if (!this.siteConfig) {
+            return;
+        }
+
+        CoreLoginHelper.confirmAndOpenBrowserForSSOLogin(
+            this.siteUrl,
+            this.siteConfig.typeoflogin,
+            undefined,
+            this.siteConfig.launchurl,
+            this.redirectData,
+        );
     }
 
     /**
@@ -271,7 +335,7 @@ export class CoreLoginReconnectPage implements OnInit, OnDestroy {
     /**
      * Show instructions and scan QR code.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async showInstructionsAndScanQR(): Promise<void> {
         try {

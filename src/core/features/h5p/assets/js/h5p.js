@@ -22,6 +22,11 @@ H5P.$window = H5P.jQuery(window);
  */
 H5P.instances = [];
 
+function isIOS() {
+  return ['iPad Simulator', 'iPhone Simulator', 'iPod Simulator', 'iPad', 'iPhone', 'iPod'].includes(navigator.platform)
+    || (navigator.userAgent.includes("Mac") && "ontouchend" in document);
+}
+
 // Detect if we support fullscreen, and what prefix to use.
 if (document.documentElement.requestFullScreen) {
   /**
@@ -35,7 +40,6 @@ else if (document.documentElement.webkitRequestFullScreen) {
   // This code has been changed to allow full screen in Moodle app.
   H5P.fullScreenBrowserPrefix = 'webkit';
   H5P.safariBrowser = 0;
-
   // H5P.safariBrowser = navigator.userAgent.match(/version\/([.\d]+)/i);
   // H5P.safariBrowser = (H5P.safariBrowser === null ? 0 : parseInt(H5P.safariBrowser[1]));
 
@@ -49,6 +53,10 @@ else if (document.documentElement.mozRequestFullScreen) {
 }
 else if (document.documentElement.msRequestFullscreen) {
   H5P.fullScreenBrowserPrefix = 'ms';
+} else if (isIOS()) {
+  // This code has been added to allow a "fake" full screen in Moodle app.
+  H5P.fullScreenBrowserPrefix = 'webkit';
+  H5P.safariBrowser = 0;
 }
 
 /**
@@ -165,6 +173,17 @@ H5P.init = function (target) {
           }
         })
       ;
+
+      if (isIOS()) {
+        // Register message listener to enter fullscreen.
+        window.addEventListener('message', function receiveMessage(event) {
+          if (event.data == 'enterFullScreen') {
+            H5P.fullScreen($container, instance);
+          } else if (event.data == 'exitFullScreen') {
+            H5P.exitFullScreen();
+          }
+        }, false);
+      }
     }
 
     /**
@@ -587,7 +606,7 @@ H5P.fullScreen = function ($element, instance, exitCallback, body, forceSemiFull
   };
 
   H5P.isFullscreen = true;
-  if (H5P.fullScreenBrowserPrefix === undefined || forceSemiFullScreen === true) {
+  if (forceSemiFullScreen === true) {
     // Create semi fullscreen.
 
     if (H5P.isFramed) {
@@ -666,7 +685,13 @@ H5P.fullScreen = function ($element, instance, exitCallback, body, forceSemiFull
     else {
       var method = (H5P.fullScreenBrowserPrefix === 'ms' ? 'msRequestFullscreen' : H5P.fullScreenBrowserPrefix + 'RequestFullScreen');
       var params = (H5P.fullScreenBrowserPrefix === 'webkit' && H5P.safariBrowser === 0 ? Element.ALLOW_KEYBOARD_INPUT : undefined);
-      $element[0][method](params);
+
+      if (isIOS()) {
+        before('h5p-fullscreen-ios');
+        window.parent.postMessage('enterFullScreen', '*');
+      } else {
+        $element[0][method](params);
+      }
     }
 
     // Allows everone to exit
@@ -678,11 +703,27 @@ H5P.fullScreen = function ($element, instance, exitCallback, body, forceSemiFull
         document.mozCancelFullScreen();
       }
       else {
-        document[H5P.fullScreenBrowserPrefix + 'ExitFullscreen']();
+        done('h5p-fullscreen');
+        document[H5P.fullScreenBrowserPrefix + 'ExitFullscreen'] && document[H5P.fullScreenBrowserPrefix + 'ExitFullscreen']();
+        if (isIOS()) {
+          done('h5p-fullscreen-ios');
+          window.parent.postMessage('exitFullScreen', '*');
+        }
       }
     };
   }
 };
+
+if (isIOS()) {
+  // Pass fullscreen messages to child iframes.
+  window.addEventListener('message', function receiveMessage(event) {
+    if (event.data === 'enterFullScreen' || event.data === 'exitFullScreen') {
+      Array.from(document.querySelectorAll('iframe')).forEach(function (iframe) {
+        iframe.contentWindow && iframe.contentWindow.postMessage(event.data, '*');
+      });
+    }
+  }, false);
+}
 
 (function () {
   /**
@@ -691,7 +732,7 @@ H5P.fullScreen = function ($element, instance, exitCallback, body, forceSemiFull
    *
    * @param {string} path
    * @param {string} parameter
-   * @return {string}
+   * @returns {string}
    */
   H5P.addQueryParameter = function (path, parameter) {
     let newPath, secondSplit;
@@ -748,7 +789,7 @@ H5P.fullScreen = function ($element, instance, exitCallback, body, forceSemiFull
    *
    * @private
    * @param {string} path
-   * @return {string}
+   * @returns {string}
    */
   var hasProtocol = function (path) {
     return path.match(/^[a-z0-9]+:\/\//i);
@@ -1503,7 +1544,7 @@ H5P.attachToastTo = function (element, message, config) {
    * @param {boolean} [position.noOverflowBottom=false] True to prevent overflow bottom.
    * @param {boolean} [position.noOverflowX=false] True to prevent overflow left and right.
    * @param {boolean} [position.noOverflowY=false] True to prevent overflow top and bottom.
-   * @return {object}
+   * @returns {object}
    */
   const getToastCoordinates = function (element, toast, position) {
     position = position || {};
@@ -2521,7 +2562,7 @@ H5P.createTitle = function (rawTitle, maxLength) {
    * Function for getting content for a certain ID
    *
    * @param {number} contentId
-   * @return {Object}
+   * @returns {Object}
    */
   H5P.getContentForInstance = function (contentId) {
     var key = 'cid-' + contentId;
@@ -2602,7 +2643,7 @@ H5P.createTitle = function (rawTitle, maxLength) {
   /**
    * Retrieve parsed clipboard data.
    *
-   * @return {Object}
+   * @returns {Object}
    */
   H5P.getClipboard = function () {
     return parseClipboard();
@@ -2624,7 +2665,7 @@ H5P.createTitle = function (rawTitle, maxLength) {
    * Get config for a library
    *
    * @param string machineName
-   * @return Object
+   * @returns Object
    */
   H5P.getLibraryConfig = function (machineName) {
     var hasConfig = H5PIntegration.libraryConfig && H5PIntegration.libraryConfig[machineName];
@@ -2635,7 +2676,7 @@ H5P.createTitle = function (rawTitle, maxLength) {
    * Get item from the H5P Clipboard.
    *
    * @private
-   * @return {Object}
+   * @returns {Object}
    */
   var parseClipboard = function () {
     var clipboardData = localStorage.getItem('h5pClipboard');

@@ -79,7 +79,7 @@ export class AddonBlockRecentlyAccessedCoursesComponent extends CoreBlockBaseCom
     /**
      * @inheritdoc
      */
-    protected async invalidateContent(): Promise<void> {
+    async invalidateContent(): Promise<void> {
         const courseIds = this.courses.map((course) => course.id);
 
         await this.invalidateCourses(courseIds);
@@ -88,7 +88,7 @@ export class AddonBlockRecentlyAccessedCoursesComponent extends CoreBlockBaseCom
     /**
      * Invalidate list of courses.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async invalidateCourseList(): Promise<void> {
         return this.site.isVersionGreaterEqualThan('3.8')
@@ -100,7 +100,7 @@ export class AddonBlockRecentlyAccessedCoursesComponent extends CoreBlockBaseCom
      * Helper function to invalidate only selected courses.
      *
      * @param courseIds Course Id array.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async invalidateCourses(courseIds: number[]): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -166,12 +166,12 @@ export class AddonBlockRecentlyAccessedCoursesComponent extends CoreBlockBaseCom
      * Refresh course list based on a EVENT_MY_COURSES_UPDATED event.
      *
      * @param data Event data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshCourseList(data: CoreCoursesMyCoursesUpdatedEventData): Promise<void> {
         if (data.action == CoreCoursesProvider.ACTION_ENROL) {
             // Always update if user enrolled in a course.
-            return await this.refreshContent();
+            return this.refreshContent();
         }
 
         const courseIndex = this.courses.findIndex((course) => course.id == data.courseId);
@@ -179,7 +179,7 @@ export class AddonBlockRecentlyAccessedCoursesComponent extends CoreBlockBaseCom
         if (data.action == CoreCoursesProvider.ACTION_VIEW && data.courseId != CoreSites.getCurrentSiteHomeId()) {
             if (!course) {
                 // Not found, use WS update.
-                return await this.refreshContent();
+                return this.refreshContent();
             }
 
             // Place at the begining.

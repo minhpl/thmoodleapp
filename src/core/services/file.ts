@@ -24,9 +24,11 @@ import { CoreConstants } from '@/core/constants';
 import { CoreError } from '@classes/errors/error';
 
 import { CoreLogger } from '@singletons/logger';
-import { makeSingleton, File, Zip, Platform, WebView } from '@singletons';
+import { makeSingleton, File, Zip, WebView } from '@singletons';
 import { CoreFileEntry } from '@services/file-helper';
 import { CoreText } from '@singletons/text';
+import { CorePlatform } from '@services/platform';
+import { CorePath } from '@singletons/path';
 
 /**
  * Progress event used when writing a file data into a file.
@@ -120,7 +122,7 @@ export class CoreFileProvider {
     /**
      * Checks if we're using HTML API.
      *
-     * @return True if uses HTML API, false otherwise.
+     * @returns True if uses HTML API, false otherwise.
      */
     usesHTMLAPI(): boolean {
         return this.isHTMLAPI;
@@ -129,14 +131,14 @@ export class CoreFileProvider {
     /**
      * Initialize basePath based on the OS if it's not initialized already.
      *
-     * @return Promise to be resolved when the initialization is finished.
+     * @returns Promise to be resolved when the initialization is finished.
      */
     async init(): Promise<void> {
         if (this.initialized) {
             return;
         }
 
-        await Platform.ready();
+        await CorePlatform.ready();
 
         if (CoreApp.isAndroid()) {
             this.basePath = File.externalApplicationStorageDirectory || this.basePath;
@@ -155,7 +157,7 @@ export class CoreFileProvider {
     /**
      * Check if the plugin is available.
      *
-     * @return Whether the plugin is available.
+     * @returns Whether the plugin is available.
      */
     isAvailable(): boolean {
         return window.resolveLocalFileSystemURL !== undefined;
@@ -165,7 +167,7 @@ export class CoreFileProvider {
      * Get a file.
      *
      * @param path Relative path to the file.
-     * @return Promise resolved when the file is retrieved.
+     * @returns Promise resolved when the file is retrieved.
      */
     getFile(path: string): Promise<FileEntry> {
         return this.init().then(() => {
@@ -179,7 +181,7 @@ export class CoreFileProvider {
      * Get a directory.
      *
      * @param path Relative path to the directory.
-     * @return Promise resolved when the directory is retrieved.
+     * @returns Promise resolved when the directory is retrieved.
      */
     getDir(path: string): Promise<DirectoryEntry> {
         return this.init().then(() => {
@@ -193,7 +195,7 @@ export class CoreFileProvider {
      * Get site folder path.
      *
      * @param siteId Site ID.
-     * @return Site folder path.
+     * @returns Site folder path.
      */
     getSiteFolder(siteId: string): string {
         return CoreFileProvider.SITESFOLDER + '/' + siteId;
@@ -206,7 +208,7 @@ export class CoreFileProvider {
      * @param path Relative path to the dir/file.
      * @param failIfExists True if it should fail if the dir/file exists, false otherwise.
      * @param base Base path to create the dir/file in. If not set, use basePath.
-     * @return Promise to be resolved when the dir/file is created.
+     * @returns Promise to be resolved when the dir/file is created.
      */
     protected async create(
         isDirectory: boolean,
@@ -216,8 +218,7 @@ export class CoreFileProvider {
     ): Promise<FileEntry | DirectoryEntry> {
         await this.init();
 
-        // Remove basePath if it's in the path.
-        path = this.removeStartingSlash(path.replace(this.basePath, ''));
+        path = this.removeBasePath(path);
         base = base || this.basePath;
 
         if (path.indexOf('/') == -1) {
@@ -249,7 +250,7 @@ export class CoreFileProvider {
      *
      * @param path Relative path to the directory.
      * @param failIfExists True if it should fail if the directory exists, false otherwise.
-     * @return Promise to be resolved when the directory is created.
+     * @returns Promise to be resolved when the directory is created.
      */
     async createDir(path: string, failIfExists?: boolean): Promise<DirectoryEntry> {
         const entry = <DirectoryEntry> await this.create(true, path, failIfExists);
@@ -262,7 +263,7 @@ export class CoreFileProvider {
      *
      * @param path Relative path to the file.
      * @param failIfExists True if it should fail if the file exists, false otherwise..
-     * @return Promise to be resolved when the file is created.
+     * @returns Promise to be resolved when the file is created.
      */
     async createFile(path: string, failIfExists?: boolean): Promise<FileEntry> {
         const entry = <FileEntry> await this.create(false, path, failIfExists);
@@ -274,13 +275,12 @@ export class CoreFileProvider {
      * Removes a directory and all its contents.
      *
      * @param path Relative path to the directory.
-     * @return Promise to be resolved when the directory is deleted.
+     * @returns Promise to be resolved when the directory is deleted.
      */
     async removeDir(path: string): Promise<void> {
         await this.init();
 
-        // Remove basePath if it's in the path.
-        path = this.removeStartingSlash(path.replace(this.basePath, ''));
+        path = this.removeBasePath(path);
         this.logger.debug('Remove directory: ' + path);
 
         await File.removeRecursively(this.basePath, path);
@@ -290,13 +290,12 @@ export class CoreFileProvider {
      * Removes a file and all its contents.
      *
      * @param path Relative path to the file.
-     * @return Promise to be resolved when the file is deleted.
+     * @returns Promise to be resolved when the file is deleted.
      */
     async removeFile(path: string): Promise<void> {
         await this.init();
 
-        // Remove basePath if it's in the path.
-        path = this.removeStartingSlash(path.replace(this.basePath, ''));
+        path = this.removeBasePath(path);
         this.logger.debug('Remove file: ' + path);
 
         try {
@@ -316,8 +315,8 @@ export class CoreFileProvider {
     /**
      * Removes a file given its FileEntry.
      *
-     * @param fileEntry File Entry.
-     * @return Promise resolved when the file is deleted.
+     * @param entry File Entry.
+     * @returns Promise resolved when the file is deleted.
      */
     removeFileByFileEntry(entry: Entry): Promise<void> {
         return new Promise((resolve, reject) => entry.remove(resolve, reject));
@@ -327,13 +326,12 @@ export class CoreFileProvider {
      * Retrieve the contents of a directory (not subdirectories).
      *
      * @param path Relative path to the directory.
-     * @return Promise to be resolved when the contents are retrieved.
+     * @returns Promise to be resolved when the contents are retrieved.
      */
     async getDirectoryContents(path: string): Promise<(FileEntry | DirectoryEntry)[]> {
         await this.init();
 
-        // Remove basePath if it's in the path.
-        path = this.removeStartingSlash(path.replace(this.basePath, ''));
+        path = this.removeBasePath(path);
         this.logger.debug('Get contents of dir: ' + path);
 
         const result = await File.listDir(this.basePath, path);
@@ -345,7 +343,7 @@ export class CoreFileProvider {
      * Type guard to check if the param is a DirectoryEntry.
      *
      * @param entry Param to check.
-     * @return Whether the param is a DirectoryEntry.
+     * @returns Whether the param is a DirectoryEntry.
      */
     protected isDirectoryEntry(entry: FileEntry | DirectoryEntry): entry is DirectoryEntry {
         return entry.isDirectory === true;
@@ -355,7 +353,7 @@ export class CoreFileProvider {
      * Calculate the size of a directory or a file.
      *
      * @param entry Directory or file.
-     * @return Promise to be resolved when the size is calculated.
+     * @returns Promise to be resolved when the size is calculated.
      */
     protected getSize(entry: DirectoryEntry | FileEntry): Promise<number> {
         return new Promise<number>((resolve, reject) => {
@@ -398,11 +396,10 @@ export class CoreFileProvider {
      * Calculate the size of a directory.
      *
      * @param path Relative path to the directory.
-     * @return Promise to be resolved when the size is calculated.
+     * @returns Promise to be resolved when the size is calculated.
      */
     getDirectorySize(path: string): Promise<number> {
-        // Remove basePath if it's in the path.
-        path = this.removeStartingSlash(path.replace(this.basePath, ''));
+        path = this.removeBasePath(path);
 
         this.logger.debug('Get size of dir: ' + path);
 
@@ -413,11 +410,10 @@ export class CoreFileProvider {
      * Calculate the size of a file.
      *
      * @param path Relative path to the file.
-     * @return Promise to be resolved when the size is calculated.
+     * @returns Promise to be resolved when the size is calculated.
      */
     getFileSize(path: string): Promise<number> {
-        // Remove basePath if it's in the path.
-        path = this.removeStartingSlash(path.replace(this.basePath, ''));
+        path = this.removeBasePath(path);
 
         this.logger.debug('Get size of file: ' + path);
 
@@ -427,8 +423,8 @@ export class CoreFileProvider {
     /**
      * Get file object from a FileEntry.
      *
-     * @param path Relative path to the file.
-     * @return Promise to be resolved when the file is retrieved.
+     * @param entry Relative path to the file.
+     * @returns Promise to be resolved when the file is retrieved.
      */
     getFileObjectFromFileEntry(entry: FileEntry): Promise<IFile> {
         return new Promise((resolve, reject): void => {
@@ -441,7 +437,7 @@ export class CoreFileProvider {
      * Calculate the free space in the disk.
      * Please notice that this function isn't reliable and it's not documented in the Cordova File plugin.
      *
-     * @return Promise resolved with the estimated free space in bytes.
+     * @returns Promise resolved with the estimated free space in bytes.
      */
     calculateFreeSpace(): Promise<number> {
         return File.getFreeDiskSpace().then((size) => {
@@ -459,7 +455,7 @@ export class CoreFileProvider {
      * Normalize a filename that usually comes URL encoded.
      *
      * @param filename The file name.
-     * @return The file name normalized.
+     * @returns The file name normalized.
      */
     normalizeFileName(filename: string): string {
         filename = CoreTextUtils.decodeURIComponent(filename);
@@ -473,7 +469,7 @@ export class CoreFileProvider {
      * @param path Relative path to the file.
      * @param format Format to read the file.
      * @param folder Absolute path to the folder where the file is. Use it to read files outside of the app's data folder.
-     * @return Promise to be resolved when the file is read.
+     * @returns Promise to be resolved when the file is read.
      */
     readFile(
         path: string,
@@ -490,8 +486,7 @@ export class CoreFileProvider {
         if (!folder) {
             folder = this.basePath;
 
-            // Remove basePath if it's in the path.
-            path = this.removeStartingSlash(path.replace(this.basePath, ''));
+            path = this.removeBasePath(path);
         }
 
         this.logger.debug(`Read file ${path} with format ${format} in folder ${folder}`);
@@ -523,7 +518,7 @@ export class CoreFileProvider {
      *
      * @param fileData File's data.
      * @param format Format to read the file.
-     * @return Promise to be resolved when the file is read.
+     * @returns Promise to be resolved when the file is read.
      */
     readFileData(fileData: IFile, format: CoreFileFormat = CoreFileFormat.FORMATTEXT): Promise<string | ArrayBuffer | unknown> {
         format = format || CoreFileFormat.FORMATTEXT;
@@ -587,13 +582,12 @@ export class CoreFileProvider {
      * @param path Relative path to the file.
      * @param data Data to write.
      * @param append Whether to append the data to the end of the file.
-     * @return Promise to be resolved when the file is written.
+     * @returns Promise to be resolved when the file is written.
      */
     async writeFile(path: string, data: string | Blob, append?: boolean): Promise<FileEntry> {
         await this.init();
 
-        // Remove basePath if it's in the path.
-        path = this.removeStartingSlash(path.replace(this.basePath, ''));
+        path = this.removeBasePath(path);
         this.logger.debug('Write file: ' + path);
 
         // Create file (and parent folders) to prevent errors.
@@ -621,7 +615,7 @@ export class CoreFileProvider {
      * @param onProgress Function to call on progress.
      * @param offset Offset where to start reading from.
      * @param append Whether to append the data to the end of the file.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async writeFileDataInFile(
         file: Blob,
@@ -667,7 +661,7 @@ export class CoreFileProvider {
      * Gets a file that might be outside the app's folder.
      *
      * @param fullPath Absolute path to the file.
-     * @return Promise to be resolved when the file is retrieved.
+     * @returns Promise to be resolved when the file is retrieved.
      */
     getExternalFile(fullPath: string): Promise<FileEntry> {
         return File.resolveLocalFilesystemUrl(fullPath).then((entry) => <FileEntry> entry);
@@ -677,7 +671,7 @@ export class CoreFileProvider {
      * Calculate the size of a file.
      *
      * @param path Absolute path to the file.
-     * @return Promise to be resolved when the size is calculated.
+     * @returns Promise to be resolved when the size is calculated.
      */
     async getExternalFileSize(path: string): Promise<number> {
         const fileEntry = await this.getExternalFile(path);
@@ -689,7 +683,7 @@ export class CoreFileProvider {
      * Removes a file that might be outside the app's folder.
      *
      * @param fullPath Absolute path to the file.
-     * @return Promise to be resolved when the file is removed.
+     * @returns Promise to be resolved when the file is removed.
      */
     async removeExternalFile(fullPath: string): Promise<void> {
         const directory = fullPath.substring(0, fullPath.lastIndexOf('/'));
@@ -701,7 +695,7 @@ export class CoreFileProvider {
     /**
      * Get the base path where the application files are stored.
      *
-     * @return Promise to be resolved when the base path is retrieved.
+     * @returns Promise to be resolved when the base path is retrieved.
      */
     getBasePath(): Promise<string> {
         return this.init().then(() => {
@@ -718,7 +712,7 @@ export class CoreFileProvider {
      * iOS: Internal URL (cdvfile://).
      * Others: basePath (file://)
      *
-     * @return Promise to be resolved when the base path is retrieved.
+     * @returns Promise to be resolved when the base path is retrieved.
      */
     async getBasePathToDownload(): Promise<string> {
         await this.init();
@@ -737,7 +731,7 @@ export class CoreFileProvider {
     /**
      * Get the base path where the application files are stored. Returns the value instantly, without waiting for it to be ready.
      *
-     * @return Base path. If the service hasn't been initialized it will return an invalid value.
+     * @returns Base path. If the service hasn't been initialized it will return an invalid value.
      */
     getBasePathInstant(): string {
         if (!this.basePath) {
@@ -756,7 +750,7 @@ export class CoreFileProvider {
      * @param newPath New path of the dir.
      * @param destDirExists Set it to true if you know the directory where to put the dir exists. If false, the function will
      *                      try to create it (slower).
-     * @return Promise resolved when the entry is moved.
+     * @returns Promise resolved when the entry is moved.
      */
     async moveDir(originalPath: string, newPath: string, destDirExists?: boolean): Promise<DirectoryEntry> {
         const entry = await this.copyOrMoveFileOrDir(originalPath, newPath, true, false, destDirExists);
@@ -771,7 +765,7 @@ export class CoreFileProvider {
      * @param newPath New path of the file.
      * @param destDirExists Set it to true if you know the directory where to put the file exists. If false, the function will
      *                      try to create it (slower).
-     * @return Promise resolved when the entry is moved.
+     * @returns Promise resolved when the entry is moved.
      */
     async moveFile(originalPath: string, newPath: string, destDirExists?: boolean): Promise<FileEntry> {
         const entry = await this.copyOrMoveFileOrDir(originalPath, newPath, false, false, destDirExists);
@@ -786,7 +780,7 @@ export class CoreFileProvider {
      * @param to New path of the directory.
      * @param destDirExists Set it to true if you know the directory where to put the dir exists. If false, the function will
      *                      try to create it (slower).
-     * @return Promise resolved when the entry is copied.
+     * @returns Promise resolved when the entry is copied.
      */
     async copyDir(from: string, to: string, destDirExists?: boolean): Promise<DirectoryEntry> {
         const entry = await this.copyOrMoveFileOrDir(from, to, true, true, destDirExists);
@@ -801,7 +795,7 @@ export class CoreFileProvider {
      * @param to New path of the file.
      * @param destDirExists Set it to true if you know the directory where to put the file exists. If false, the function will
      *                      try to create it (slower).
-     * @return Promise resolved when the entry is copied.
+     * @returns Promise resolved when the entry is copied.
      */
     async copyFile(from: string, to: string, destDirExists?: boolean): Promise<FileEntry> {
         const entry = await this.copyOrMoveFileOrDir(from, to, false, true, destDirExists);
@@ -818,7 +812,7 @@ export class CoreFileProvider {
      * @param copy Whether to copy. If false, it will move the file.
      * @param destDirExists Set it to true if you know the directory where to put the file/dir exists. If false, the function will
      *                      try to create it (slower).
-     * @return Promise resolved when the entry is copied.
+     * @returns Promise resolved when the entry is copied.
      */
     protected async copyOrMoveFileOrDir(
         from: string,
@@ -833,15 +827,14 @@ export class CoreFileProvider {
             return this.copyOrMoveExternalFile(from, to, copy);
         }
 
-        const moveCopyFn: MoveCopyFunction = copy ?
-            (isDir ? File.copyDir.bind(File.instance) : File.copyFile.bind(File.instance)) :
-            (isDir ? File.moveDir.bind(File.instance) : File.moveFile.bind(File.instance));
+        const moveCopyFn: MoveCopyFunction = (...args) => copy ?
+            (isDir ? File.copyDir(...args) : File.copyFile(...args)) :
+            (isDir ? File.moveDir(...args) : File.moveFile(...args));
 
         await this.init();
 
-        // Paths cannot start with "/". Remove basePath if present.
-        from = this.removeStartingSlash(from.replace(this.basePath, ''));
-        to = this.removeStartingSlash(to.replace(this.basePath, ''));
+        from = this.removeBasePath(from);
+        to = this.removeBasePath(to);
 
         const toFileAndDir = this.getFileAndDirectoryFromPath(to);
 
@@ -853,14 +846,16 @@ export class CoreFileProvider {
         try {
             const entry = await moveCopyFn(this.basePath, from, this.basePath, to);
 
-            return entry;
+            return <FileEntry | DirectoryEntry> entry;
         } catch (error) {
             // The copy can fail if the path has encoded characters. Try again if that's the case.
             const decodedFrom = decodeURI(from);
             const decodedTo = decodeURI(to);
 
             if (from != decodedFrom || to != decodedTo) {
-                return moveCopyFn(this.basePath, decodedFrom, this.basePath, decodedTo);
+                const entry = await moveCopyFn(this.basePath, decodedFrom, this.basePath, decodedTo);
+
+                return <FileEntry | DirectoryEntry> entry;
             } else {
                 return Promise.reject(error);
             }
@@ -871,7 +866,7 @@ export class CoreFileProvider {
      * Extract the file name and directory from a given path.
      *
      * @param path Path to be extracted.
-     * @return Plain object containing the file name and directory.
+     * @returns Plain object containing the file name and directory.
      * @description
      * file.pdf         -> directory: '', name: 'file.pdf'
      * /file.pdf        -> directory: '', name: 'file.pdf'
@@ -896,7 +891,7 @@ export class CoreFileProvider {
      * Please notice that with WKWebView these URLs no longer work in mobile. Use fileEntry.toURL() along with convertFileSrc.
      *
      * @param fileEntry File Entry.
-     * @return Internal URL.
+     * @returns Internal URL.
      */
     getInternalURL(fileEntry: FileEntry): string {
         if (!fileEntry.toInternalURL) {
@@ -911,28 +906,24 @@ export class CoreFileProvider {
      * Adds the basePath to a path if it doesn't have it already.
      *
      * @param path Path to treat.
-     * @return Path with basePath added.
+     * @returns Path with basePath added.
      */
     addBasePathIfNeeded(path: string): string {
         if (path.indexOf(this.basePath) > -1) {
             return path;
         } else {
-            return CoreText.concatenatePaths(this.basePath, path);
+            return CorePath.concatenatePaths(this.basePath, path);
         }
     }
 
     /**
-     * Remove the base path from a path. If basePath isn't found, return false.
+     * Remove the base path from a path.
      *
      * @param path Path to treat.
-     * @return Path without basePath if basePath was found, undefined otherwise.
+     * @returns Path without basePath.
      */
     removeBasePath(path: string): string {
-        if (path.indexOf(this.basePath) > -1) {
-            return path.replace(this.basePath, '');
-        }
-
-        return path;
+        return CoreText.removeStartingSlash(path.replace(this.basePath, ''));
     }
 
     /**
@@ -943,7 +934,7 @@ export class CoreFileProvider {
      *                   same location and name as the ZIP file (without extension).
      * @param onProgress Function to call on progress.
      * @param recreateDir Delete the dest directory before unzipping. Defaults to true.
-     * @return Promise resolved when the file is unzipped.
+     * @returns Promise resolved when the file is unzipped.
      */
     async unzipFile(
         path: string,
@@ -978,7 +969,7 @@ export class CoreFileProvider {
      * @param path Path to the file.
      * @param search Value to search.
      * @param newValue New value.
-     * @return Promise resolved in success.
+     * @returns Promise resolved in success.
      */
     async replaceInFile(path: string, search: string | RegExp, newValue: string): Promise<void> {
         let content = <string> await this.readFile(path);
@@ -998,7 +989,7 @@ export class CoreFileProvider {
      * Get a file/dir metadata given the file's entry.
      *
      * @param fileEntry FileEntry retrieved from getFile or similar.
-     * @return Promise resolved with metadata.
+     * @returns Promise resolved with metadata.
      */
     getMetadata(fileEntry: Entry): Promise<Metadata> {
         if (!fileEntry || !fileEntry.getMetadata) {
@@ -1015,7 +1006,7 @@ export class CoreFileProvider {
      *
      * @param path Path to the file/dir.
      * @param isDir True if directory, false if file.
-     * @return Promise resolved with metadata.
+     * @returns Promise resolved with metadata.
      */
     getMetadataFromPath(path: string, isDir?: boolean): Promise<Metadata> {
         let promise;
@@ -1032,14 +1023,11 @@ export class CoreFileProvider {
      * Remove the starting slash of a path if it's there. E.g. '/sites/filepool' -> 'sites/filepool'.
      *
      * @param path Path.
-     * @return Path without a slash in the first position.
+     * @returns Path without a slash in the first position.
+     * @deprecated since 4.1. Use CoreText.removeStartingSlash instead.
      */
     removeStartingSlash(path: string): string {
-        if (path[0] == '/') {
-            return path.substring(1);
-        }
-
-        return path;
+        return CoreText.removeStartingSlash(path);
     }
 
     /**
@@ -1048,7 +1036,7 @@ export class CoreFileProvider {
      * @param from Absolute path to the file to copy/move.
      * @param to Relative new path of the file (inside the app folder).
      * @param copy True to copy, false to move.
-     * @return Promise resolved when the entry is copied/moved.
+     * @returns Promise resolved when the entry is copied/moved.
      */
     protected async copyOrMoveExternalFile(from: string, to: string, copy?: boolean): Promise<FileEntry> {
         // Get the file to copy/move.
@@ -1074,7 +1062,7 @@ export class CoreFileProvider {
      *
      * @param from Absolute path to the file to copy.
      * @param to Relative new path of the file (inside the app folder).
-     * @return Promise resolved when the entry is copied.
+     * @returns Promise resolved when the entry is copied.
      */
     copyExternalFile(from: string, to: string): Promise<FileEntry> {
         return this.copyOrMoveExternalFile(from, to, true);
@@ -1085,7 +1073,7 @@ export class CoreFileProvider {
      *
      * @param from Absolute path to the file to move.
      * @param to Relative new path of the file (inside the app folder).
-     * @return Promise resolved when the entry is moved.
+     * @returns Promise resolved when the entry is moved.
      */
     moveExternalFile(from: string, to: string): Promise<FileEntry> {
         return this.copyOrMoveExternalFile(from, to, false);
@@ -1097,7 +1085,7 @@ export class CoreFileProvider {
      * @param dirPath Path to the destination folder.
      * @param fileName File name that wants to be used.
      * @param defaultExt Default extension to use if no extension found in the file.
-     * @return Promise resolved with the unique file name.
+     * @returns Promise resolved with the unique file name.
      */
     async getUniqueNameInFolder(dirPath: string, fileName: string, defaultExt?: string): Promise<string> {
         // Get existing files in the folder.
@@ -1137,7 +1125,7 @@ export class CoreFileProvider {
      *
      * @param usedNames Object with names already used as keys.
      * @param name Name to check.
-     * @return Unique name.
+     * @returns Unique name.
      */
     calculateUniqueName(usedNames: Record<string, unknown>, name: string): string {
         if (usedNames[name.toLowerCase()] === undefined) {
@@ -1162,7 +1150,7 @@ export class CoreFileProvider {
     /**
      * Remove app temporary folder.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async clearTmpFolder(): Promise<void> {
         // Ignore errors because the folder might not exist.
@@ -1174,7 +1162,7 @@ export class CoreFileProvider {
      *
      * @param dirPath Folder path.
      * @param files List of used files.
-     * @return Promise resolved when done, rejected if failure.
+     * @returns Promise resolved when done, rejected if failure.
      */
     async removeUnusedFiles(dirPath: string, files: CoreFileEntry[]): Promise<void> {
         // Get the directory contents.
@@ -1204,7 +1192,7 @@ export class CoreFileProvider {
             });
 
             await Promise.all(promises);
-        } catch (error) {
+        } catch {
             // Ignore errors, maybe it doesn't exist.
         }
     }
@@ -1213,7 +1201,7 @@ export class CoreFileProvider {
      * Check if a file is inside the app's folder.
      *
      * @param path The absolute path of the file to check.
-     * @return Whether the file is in the app's folder.
+     * @returns Whether the file is in the app's folder.
      */
     isFileInAppFolder(path: string): boolean {
         return path.indexOf(this.basePath) != -1;
@@ -1222,7 +1210,7 @@ export class CoreFileProvider {
     /**
      * Get the path to the www folder at runtime based on the WebView URL.
      *
-     * @return Path.
+     * @returns Path.
      */
     getWWWPath(): string {
         // Use current URL, removing the path.
@@ -1242,11 +1230,11 @@ export class CoreFileProvider {
     /**
      * Get the full path to the www folder.
      *
-     * @return Path.
+     * @returns Path.
      */
     getWWWAbsolutePath(): string {
         if (window.cordova && cordova.file && cordova.file.applicationDirectory) {
-            return CoreText.concatenatePaths(cordova.file.applicationDirectory, 'www');
+            return CorePath.concatenatePaths(cordova.file.applicationDirectory, 'www');
         }
 
         // Cannot use Cordova to get it, use the WebView URL.
@@ -1258,20 +1246,20 @@ export class CoreFileProvider {
      * This is needed to make files work with the Ionic WebView plugin.
      *
      * @param src Source to convert.
-     * @return Converted src.
+     * @returns Converted src.
      */
     convertFileSrc(src: string): string {
-        return CoreApp.isMobile() ? WebView.convertFileSrc(src) : src;
+        return CorePlatform.isMobile() ? WebView.convertFileSrc(src) : src;
     }
 
     /**
      * Undo the conversion of convertFileSrc.
      *
      * @param src Source to unconvert.
-     * @return Unconverted src.
+     * @returns Unconverted src.
      */
     unconvertFileSrc(src: string): string {
-        if (!CoreApp.isMobile()) {
+        if (!CorePlatform.isMobile()) {
             return src;
         }
 
@@ -1286,7 +1274,7 @@ export class CoreFileProvider {
      * Check if a certain path is in the app's folder (basePath).
      *
      * @param path Path to check.
-     * @return Whether it's in the app folder.
+     * @returns Whether it's in the app folder.
      */
     protected isPathInAppFolder(path: string): boolean {
         return !path || !path.match(/^[a-z0-9]+:\/\//i) || path.indexOf(this.basePath) != -1;
@@ -1296,7 +1284,7 @@ export class CoreFileProvider {
      * Get the file's name.
      *
      * @param file The file.
-     * @return The file name.
+     * @returns The file name.
      */
     getFileName(file: CoreFileEntry): string | undefined {
         return CoreUtils.isFileEntry(file) ? file.name : file.filename;
@@ -1306,4 +1294,4 @@ export class CoreFileProvider {
 
 export const CoreFile = makeSingleton(CoreFileProvider);
 
-type MoveCopyFunction = (path: string, dirName: string, newPath: string, newDirName: string) => Promise<FileEntry | DirectoryEntry>;
+type MoveCopyFunction = (path: string, name: string, newPath: string, newName: string) => Promise<Entry>;

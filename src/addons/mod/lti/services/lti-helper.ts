@@ -16,9 +16,10 @@ import { Injectable } from '@angular/core';
 
 import { CoreCourse } from '@features/course/services/course';
 import { CoreCourseModuleData } from '@features/course/services/course-helper';
+import { CorePlatform } from '@services/platform';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
-import { makeSingleton, Platform } from '@singletons';
+import { makeSingleton } from '@singletons';
 import { CoreEvents } from '@singletons/events';
 import { AddonModLti, AddonModLtiLti } from './lti';
 
@@ -38,7 +39,7 @@ export class AddonModLtiHelperProvider {
     }
 
     watchPendingCompletions(): void {
-        Platform.resume.subscribe(() => {
+        CorePlatform.resume.subscribe(() => {
             // User went back to the app, check pending completions.
             for (const moduleId in this.pendingCheckCompletion) {
                 const data = this.pendingCheckCompletion[moduleId];
@@ -55,7 +56,7 @@ export class AddonModLtiHelperProvider {
      * @param module Module.
      * @param lti LTI instance. If not provided it will be obtained.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async getDataAndLaunch(courseId: number, module: CoreCourseModuleData, lti?: AddonModLtiLti, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -104,7 +105,7 @@ export class AddonModLtiHelperProvider {
      * @param ltiId LTI id.
      * @param name Name of the lti.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async logViewAndCheckCompletion(
         courseId: number,
@@ -117,7 +118,7 @@ export class AddonModLtiHelperProvider {
             await AddonModLti.logView(ltiId, name, siteId);
 
             CoreCourse.checkModuleCompletion(courseId, module.completiondata);
-        } catch (error) {
+        } catch {
             // Ignore errors.
         }
     }

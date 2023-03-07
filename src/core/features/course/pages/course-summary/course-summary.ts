@@ -30,15 +30,16 @@ import {
     CoreCourseOptionsMenuHandlerToDisplay,
 } from '@features/course/services/course-options-delegate';
 import { CoreCourseHelper } from '@features/course/services/course-helper';
-import { ActionSheetController, ModalController, NgZone, Platform, Translate } from '@singletons';
+import { ActionSheetController, ModalController, NgZone, Translate } from '@singletons';
 import { CoreCoursesSelfEnrolPasswordComponent } from '../../../courses/components/self-enrol-password/self-enrol-password';
 import { CoreNavigator } from '@services/navigator';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreCoursesHelper, CoreCourseWithImageAndColor } from '@features/courses/services/courses-helper';
 import { Subscription } from 'rxjs';
 import { CoreColors } from '@singletons/colors';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 import { CorePromisedValue } from '@classes/promised-value';
+import { CorePlatform } from '@services/platform';
 
 const ENROL_BROWSER_METHODS = ['fee', 'paypal'];
 
@@ -84,7 +85,7 @@ export class CoreCourseSummaryPage implements OnInit, OnDestroy {
 
     constructor() {
         // Refresh the view when the app is resumed.
-        this.appResumeSubscription = Platform.resume.subscribe(() => {
+        this.appResumeSubscription = CorePlatform.resume.subscribe(() => {
             if (!this.waitingForBrowserEnrol || !this.dataLoaded) {
                 return;
             }
@@ -121,8 +122,8 @@ export class CoreCourseSummaryPage implements OnInit, OnDestroy {
         }
 
         const currentSiteUrl = CoreSites.getRequiredCurrentSite().getURL();
-        this.enrolUrl = CoreText.concatenatePaths(currentSiteUrl, 'enrol/index.php?id=' + this.courseId);
-        this.courseUrl = CoreText.concatenatePaths(currentSiteUrl, 'course/view.php?id=' + this.courseId);
+        this.enrolUrl = CorePath.concatenatePaths(currentSiteUrl, 'enrol/index.php?id=' + this.courseId);
+        this.courseUrl = CorePath.concatenatePaths(currentSiteUrl, 'course/view.php?id=' + this.courseId);
 
         await this.getCourse();
     }
@@ -130,7 +131,7 @@ export class CoreCourseSummaryPage implements OnInit, OnDestroy {
     /**
      * Check if the user can access as guest.
      *
-     * @return Promise resolved if can access as guest, rejected otherwise. Resolve param indicates if
+     * @returns Promise resolved if can access as guest, rejected otherwise. Resolve param indicates if
      *         password is required for guest access.
      */
     protected async canAccessAsGuest(): Promise<boolean> {
@@ -271,7 +272,7 @@ export class CoreCourseSummaryPage implements OnInit, OnDestroy {
      * Load the course menu handlers.
      *
      * @param refresh If it's refreshing content.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadMenuHandlers(refresh?: boolean): Promise<void> {
         if (!this.course) {
@@ -342,7 +343,7 @@ export class CoreCourseSummaryPage implements OnInit, OnDestroy {
      *
      * @param instanceId The instance ID.
      * @param password Password to use.
-     * @return Promise resolved when self enrolled.
+     * @returns Promise resolved when self enrolled.
      */
     async selfEnrolInCourse(instanceId: number, password = ''): Promise<void> {
         const modal = await CoreDomUtils.showModalLoading('core.loading', true);
@@ -424,7 +425,7 @@ export class CoreCourseSummaryPage implements OnInit, OnDestroy {
      * Wait for the user to be enrolled in the course.
      *
      * @param first If it's the first call (true) or it's a recursive call (false).
-     * @return Promise resolved when enrolled or timeout.
+     * @returns Promise resolved when enrolled or timeout.
      */
     protected async waitForEnrolled(first?: boolean): Promise<void> {
         if (first) {

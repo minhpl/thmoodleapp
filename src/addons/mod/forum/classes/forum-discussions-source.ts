@@ -15,8 +15,11 @@
 import { Params } from '@angular/router';
 import { CoreRoutedItemsManagerSource } from '@classes/items-management/routed-items-manager-source';
 import { CoreUser } from '@features/user/services/user';
+import { CoreGroupInfo, CoreGroups } from '@services/groups';
+import { CoreUtils } from '@services/utils/utils';
 import {
     AddonModForum,
+    AddonModForumCanAddDiscussion,
     AddonModForumData,
     AddonModForumDiscussion,
     AddonModForumProvider,
@@ -35,7 +38,13 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
     forum?: AddonModForumData;
     trackPosts = false;
     usesGroups = false;
+    supportsChangeGroup = false;
     selectedSortOrder: AddonModForumSortOrder | null = null;
+    groupId = 0;
+    groupInfo?: CoreGroupInfo;
+    allPartsPermissions?: AddonModForumCanAddDiscussion;
+    canAddDiscussionToGroup = true;
+    errorLoadingDiscussions = false;
 
     constructor(courseId: number, cmId: number, discussionsPathPrefix: string) {
         super();
@@ -49,7 +58,7 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
      * Type guard to infer NewDiscussionForm objects.
      *
      * @param discussion Item to check.
-     * @return Whether the item is a new discussion form.
+     * @returns Whether the item is a new discussion form.
      */
     isNewDiscussionForm(discussion: AddonModForumDiscussionItem): discussion is AddonModForumNewDiscussionForm {
         return 'newDiscussion' in discussion;
@@ -59,7 +68,7 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
      * Type guard to infer AddonModForumDiscussion objects.
      *
      * @param discussion Item to check.
-     * @return Whether the item is an online discussion.
+     * @returns Whether the item is an online discussion.
      */
     isOfflineDiscussion(discussion: AddonModForumDiscussionItem): discussion is AddonModForumOfflineDiscussion {
         return !this.isNewDiscussionForm(discussion) && !this.isOnlineDiscussion(discussion);
@@ -69,7 +78,7 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
      * Type guard to infer AddonModForumDiscussion objects.
      *
      * @param discussion Item to check.
-     * @return Whether the item is an online discussion.
+     * @returns Whether the item is an online discussion.
      */
     isOnlineDiscussion(discussion: AddonModForumDiscussionItem): discussion is AddonModForumDiscussion {
         return 'id' in discussion;
@@ -94,12 +103,20 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
      * @inheritdoc
      */
     getItemQueryParams(discussion: AddonModForumDiscussionItem): Params {
-        return {
+        const params: Params = {
             courseId: this.COURSE_ID,
             cmId: this.CM_ID,
             forumId: this.forum?.id,
-            ...(this.isOnlineDiscussion(discussion) ? { discussion, trackPosts: this.trackPosts } : {}),
         };
+
+        if (this.isOnlineDiscussion(discussion)) {
+            params.discussion = discussion;
+            params.trackPosts = this.trackPosts;
+        } else if (this.isNewDiscussionForm(discussion)) {
+            params.groupId = this.usesGroups ? this.groupId : undefined;
+        }
+
+        return params;
     }
 
     /**
@@ -130,6 +147,42 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
 
         if (this.forum.istracked !== undefined) {
             this.trackPosts = this.forum.istracked;
+        }
+    }
+
+    /**
+     * Load group info.
+     */
+    async loadGroupInfo(forumId: number): Promise<void> {
+        [this.groupInfo, this.allPartsPermissions] = await Promise.all([
+            CoreGroups.getActivityGroupInfo(this.CM_ID, false),
+            CoreUtils.ignoreErrors(AddonModForum.canAddDiscussionToAll(forumId, { cmId: this.CM_ID })),
+        ]);
+
+        this.supportsChangeGroup = AddonModForum.isGetDiscussionPostsAvailable();
+        this.usesGroups = !!(this.groupInfo.separateGroups || this.groupInfo.visibleGroups);
+        this.groupId = CoreGroups.validateGroupId(this.groupId, this.groupInfo);
+
+        await this.loadSelectedGroupData();
+    }
+
+    /**
+     * Load some specific data for current group.
+     *
+     * @returns Promise resolved when done.
+     */
+    async loadSelectedGroupData(): Promise<void> {
+        if (!this.usesGroups) {
+            this.canAddDiscussionToGroup = true;
+        } else if (this.groupId === 0) {
+            this.canAddDiscussionToGroup = !this.allPartsPermissions || this.allPartsPermissions.status;
+        } else if (this.forum) {
+            const addDiscussionData = await AddonModForum.canAddDiscussion(this.forum.id, this.groupId, { cmId: this.CM_ID });
+
+            this.canAddDiscussionToGroup = addDiscussionData.status;
+        } else {
+            // Shouldn't happen, assume the user can.
+            this.canAddDiscussionToGroup = true;
         }
     }
 
@@ -170,12 +223,27 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
             throw new Error('Can\'t load discussions without a forum or selected sort order');
         }
 
-        const response = await AddonModForum.getDiscussions(this.forum.id, {
-            cmId: this.forum.cmid,
-            sortOrder: this.selectedSortOrder.value,
-            page,
-        });
-        let discussions = response.discussions;
+        let discussions: AddonModForumDiscussion[] = [];
+        let canLoadMore = false;
+        try {
+            const response = await AddonModForum.getDiscussions(this.forum.id, {
+                cmId: this.forum.cmid,
+                sortOrder: this.selectedSortOrder.value,
+                page,
+                groupId: this.groupId,
+            });
+
+            discussions = response.discussions;
+            canLoadMore = response.canLoadMore;
+            this.errorLoadingDiscussions = false;
+        } catch (error) {
+            if (page > 0 || CoreUtils.isWebServiceError(error)) {
+                throw error;
+            }
+
+            // Error loading first discussions, use an empty list.
+            this.errorLoadingDiscussions = true;
+        }
 
         if (this.usesGroups) {
             discussions = await AddonModForum.formatDiscussionsGroups(this.forum.cmid, discussions);
@@ -201,7 +269,7 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
             }
         }
 
-        return { discussions, canLoadMore: response.canLoadMore };
+        return { discussions, canLoadMore };
     }
 
     /**
@@ -239,7 +307,7 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
 
                 discussion.userfullname = user.fullname;
                 discussion.userpictureurl = user.profileimageurl;
-            } catch (error) {
+            } catch {
                 // Ignore errors.
             }
         });
@@ -250,6 +318,36 @@ export class AddonModForumDiscussionsSource extends CoreRoutedItemsManagerSource
         offlineDiscussions.sort((a, b) => b.timecreated - a.timecreated);
 
         return offlineDiscussions;
+    }
+
+    /**
+     * Invalidate cache data.
+     *
+     * @returns Promise resolved when done.
+     */
+    async invalidateCache(): Promise<void> {
+        const promises: Promise<void>[] = [];
+
+        promises.push(AddonModForum.invalidateForumData(this.COURSE_ID));
+
+        if (this.forum) {
+            promises.push(AddonModForum.invalidateDiscussionsList(this.forum.id));
+            promises.push(AddonModForum.invalidateCanAddDiscussion(this.forum.id));
+            promises.push(CoreGroups.invalidateActivityGroupInfo(this.forum.cmid));
+        }
+
+        await Promise.all(promises);
+    }
+
+    /**
+     * Invalidate list cache data.
+     *
+     * @returns Promise resolved when done.
+     */
+    async invalidateList(): Promise<void> {
+        if (this.forum) {
+            await AddonModForum.invalidateDiscussionsList(this.forum.id);
+        }
     }
 
 }

@@ -46,6 +46,8 @@ export class AddonModDataActionComponent implements OnInit {
     @Input() title = ''; // Name of the module.
     @Input() group = 0; // Module group.
     @Input() offset?: number; // Offset of the entry.
+    @Input() sortBy?: string | number; // Sort by used to calculate the offset.
+    @Input() sortDirection?: string; // Sort direction used to calculate the offset.
 
     siteId: string;
     userPicture?: string;
@@ -57,7 +59,7 @@ export class AddonModDataActionComponent implements OnInit {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         if (this.action == AddonModDataAction.USERPICTURE) {
@@ -110,6 +112,8 @@ export class AddonModDataActionComponent implements OnInit {
             title: this.title,
             group: this.group,
             offset: this.offset,
+            sortBy: this.sortBy,
+            sortDirection: this.sortDirection,
         };
 
         const basePath = AddonModDataModuleHandlerService.PAGE_NAME;
@@ -122,7 +126,7 @@ export class AddonModDataActionComponent implements OnInit {
     /**
      * Undo delete action.
      *
-     * @return Solved when done.
+     * @returns Solved when done.
      */
     async undoDelete(): Promise<void> {
         const dataId = this.database.id;

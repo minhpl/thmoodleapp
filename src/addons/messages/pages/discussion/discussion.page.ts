@@ -36,8 +36,7 @@ import { CoreLogger } from '@singletons/logger';
 import { CoreApp } from '@services/app';
 import { CoreInfiniteLoadingComponent } from '@components/infinite-loading/infinite-loading';
 import { Md5 } from 'ts-md5/dist/md5';
-import moment from 'moment';
-import { CoreAnimations } from '@components/animations';
+import moment from 'moment-timezone';
 import { CoreError } from '@classes/errors/error';
 import { Translate } from '@singletons';
 import { CoreNavigator } from '@services/navigator';
@@ -53,7 +52,6 @@ import { CoreDom } from '@singletons/dom';
 @Component({
     selector: 'page-addon-messages-discussion',
     templateUrl: 'discussion.html',
-    animations: [CoreAnimations.SLIDE_IN_OUT],
     styleUrls: ['discussion.scss'],
 })
 export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterViewInit {
@@ -156,28 +154,14 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      * Setup code for the page.
      */
     async ngOnInit(): Promise<void> {
+        this.conversationId = CoreNavigator.getRouteNumberParam('conversationId');
+        this.userId = CoreNavigator.getRouteNumberParam('userId');
+        this.showInfo = !CoreNavigator.getRouteBooleanParam('hideInfo');
+        this.showKeyboard = !!CoreNavigator.getRouteBooleanParam('showKeyboard');
 
-        this.route.queryParams.subscribe(async (params) => {
-            const oldConversationId = this.conversationId;
-            const oldUserId = this.userId;
-            let forceScrollToBottom = false;
-            this.conversationId = CoreNavigator.getRouteNumberParam('conversationId', { params }) || undefined;
-            this.userId = CoreNavigator.getRouteNumberParam('userId', { params }) || undefined;
-            this.showInfo = !params.hideInfo;
+        await this.fetchData();
 
-            if (oldConversationId != this.conversationId || oldUserId != this.userId) {
-                // Showing reload again can break animations.
-                this.loaded = false;
-                this.initialized = false;
-                forceScrollToBottom = true;
-            }
-
-            this.showKeyboard = CoreNavigator.getRouteBooleanParam('showKeyboard', { params }) || false;
-
-            await this.fetchData();
-
-            this.scrollToBottom(forceScrollToBottom);
-        });
+        this.scrollToBottom(true);
     }
 
     /**
@@ -192,7 +176,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      *
      * @param message Message to be added.
      * @param keep If set the keep flag or not.
-     * @return If message is not mine and was recently added.
+     * @returns If message is not mine and was recently added.
      */
     protected addMessage(
         message: AddonMessagesConversationMessageFormatted,
@@ -241,7 +225,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Convenience function to fetch the conversation data.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchData(): Promise<void> {
         let loader: CoreIonLoadingElement | undefined;
@@ -305,7 +289,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
             } else {
                 if (this.userId) {
                     // Fake the user member info.
-                    promises.push(CoreUser.getProfile(this.userId!).then(async (user) => {
+                    promises.push(CoreUser.getProfile(this.userId).then(async (user) => {
                         this.otherMember = {
                             id: user.id,
                             fullname: user.fullname,
@@ -381,7 +365,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      * Convenience function to fetch messages.
      *
      * @param messagesAreNew If messages loaded are new messages.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchMessages(messagesAreNew: boolean = true): Promise<void> {
         this.loadMoreError = false;
@@ -433,8 +417,8 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Format and load a list of messages into the view.
      *
-     * @param messagesAreNew If messages loaded are new messages.
      * @param messages Messages to load.
+     * @param messagesAreNew If messages loaded are new messages.
      */
     protected loadMessages(
         messages: AddonMessagesConversationMessageFormatted[],
@@ -524,7 +508,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
             return;
         }
 
-        const messages = Array.from(this.hostElement.querySelectorAll('.addon-message-not-mine'))
+        const messages = Array.from(this.hostElement.querySelectorAll('core-message:not(.is-mine)'))
             .slice(-this.newMessages)
             .reverse();
 
@@ -547,7 +531,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      *
      * @param conversationId Conversation ID.
      * @param userId User ID.
-     * @return Promise resolved with a boolean: whether the conversation exists or not.
+     * @returns Promise resolved with a boolean: whether the conversation exists or not.
      */
     protected async getConversation(conversationId?: number, userId?: number): Promise<boolean> {
         let fallbackConversation: AddonMessagesConversationFormatted | undefined;
@@ -555,7 +539,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
         // Try to get the conversationId if we don't have it.
         if (!conversationId && userId) {
             try {
-                if (userId == this.currentUserId && AddonMessages.isSelfConversationEnabled()) {
+                if (userId === this.currentUserId && AddonMessages.isSelfConversationEnabled()) {
                     fallbackConversation = await AddonMessages.getSelfConversation();
                 } else {
                     fallbackConversation = await AddonMessages.getConversationBetweenUsers(userId, undefined, true);
@@ -563,7 +547,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
                 conversationId = fallbackConversation.id;
             } catch (error) {
                 // Probably conversation does not exist or user is offline. Try to load offline messages.
-                this.isSelf = userId == this.currentUserId;
+                this.isSelf = userId === this.currentUserId;
 
                 const messages = await AddonMessagesOffline.getMessages(userId);
 
@@ -584,11 +568,15 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
             }
         }
 
+        if (!conversationId) {
+            return false;
+        }
+
         // Retrieve the conversation. Invalidate data first to get the right unreadcount.
-        await AddonMessages.invalidateConversation(conversationId!);
+        await AddonMessages.invalidateConversation(conversationId);
 
         try {
-            this.conversation = await AddonMessages.getConversation(conversationId!, undefined, true);
+            this.conversation = await AddonMessages.getConversation(conversationId, undefined, true);
         } catch (error) {
             // Get conversation failed, use the fallback one if we have it.
             if (fallbackConversation) {
@@ -623,7 +611,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      *
      * @param pagesToLoad Number of "pages" to load.
      * @param offset Offset for message list.
-     * @return Promise resolved with the list of messages.
+     * @returns Promise resolved with the list of messages.
      */
     protected async getConversationMessages(
         pagesToLoad: number,
@@ -676,7 +664,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      * @param lfReceivedRead Number of read received messages already fetched, so fetch will be done from this.
      * @param lfSentUnread Number of unread sent messages already fetched, so fetch will be done from this.
      * @param lfSentRead Number of read sent messages already fetched, so fetch will be done from this.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async getDiscussionMessages(
         pagesToLoad: number,
@@ -886,20 +874,15 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Wait until fetching is false.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
-    protected waitForFetch(): Promise<void> {
+    protected async waitForFetch(): Promise<void> {
         if (!this.fetching) {
-            return Promise.resolve();
+            return;
         }
 
-        const deferred = CoreUtils.promiseDefer<void>();
-
-        setTimeout(() => this.waitForFetch().finally(() => {
-            deferred.resolve();
-        }), 400);
-
-        return deferred.promise;
+        await CoreUtils.wait(400);
+        await CoreUtils.ignoreErrors(this.waitForFetch());
     }
 
     /**
@@ -952,7 +935,6 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
         message: AddonMessagesConversationMessageFormatted,
         index: number,
     ): Promise<void> {
-
         const canDeleteAll = this.conversation && this.conversation.candeletemessagesforallusers;
         const langKey = message.pending || canDeleteAll || this.isSelf ? 'core.areyousure' :
             'addon.messages.deletemessageconfirmation';
@@ -1000,7 +982,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      * Function to load previous messages.
      *
      * @param infiniteComplete Infinite scroll complete function. Only used from core-infinite-loading.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async loadPrevious(infiniteComplete?: () => void): Promise<void> {
         if (!this.initialized) {
@@ -1104,7 +1086,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      */
     scrollToFirstUnreadMessage(): void {
         if (this.newMessages > 0) {
-            const messages = Array.from(this.hostElement.querySelectorAll<HTMLElement>('.addon-message-not-mine'));
+            const messages = Array.from(this.hostElement.querySelectorAll<HTMLElement>('core-message:not(.is-mine)'));
 
             CoreDom.scrollToElement(messages[messages.length - this.newMessages]);
         }
@@ -1129,7 +1111,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
             useridfrom: this.currentUserId,
             smallmessage: text,
             text: text,
-            timecreated: new Date().getTime(),
+            timecreated: Date.now(),
         };
         message.showDate = this.showDate(message, this.messages[this.messages.length - 1]);
         this.addMessage(message, false);
@@ -1207,7 +1189,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      *
      * @param message Current message where to show the date.
      * @param prevMessage Previous message where to compare the date with.
-     * @return If date has changed and should be shown.
+     * @returns If date has changed and should be shown.
      */
     showDate(
         message: AddonMessagesConversationMessageFormatted,
@@ -1229,7 +1211,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      *
      * @param message Current message where to show the user info.
      * @param prevMessage Previous message.
-     * @return Whether user data should be shown.
+     * @returns Whether user data should be shown.
      */
     showUserData(
         message: AddonMessagesConversationMessageFormatted,
@@ -1245,7 +1227,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
      *
      * @param message Current message where to show the user info.
      * @param nextMessage Next message.
-     * @return Whether user data should be shown.
+     * @returns Whether user data should be shown.
      */
     showTail(
         message: AddonMessagesConversationMessageFormatted,
@@ -1269,7 +1251,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
             });
 
             if (userId !== undefined) {
-                const splitViewLoaded = CoreNavigator.isCurrentPathInTablet('**/messages/**/discussion');
+                const splitViewLoaded = CoreNavigator.isCurrentPathInTablet('**/messages/**/discussion/**');
 
                 // Open user conversation.
                 if (splitViewLoaded) {
@@ -1281,7 +1263,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
                     );
                 } else {
                     // Open the discussion in a new view.
-                    CoreNavigator.navigateToSitePath('/messages/discussion', { params: { userId } });
+                    CoreNavigator.navigateToSitePath(`/messages/discussion/user/${userId}`);
                 }
             }
         } else {
@@ -1396,7 +1378,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Displays a confirmation modal to block the user of the individual conversation.
      *
-     * @return Promise resolved when user is blocked or dialog is cancelled.
+     * @returns Promise resolved when user is blocked or dialog is cancelled.
      */
     async blockUser(): Promise<void> {
         if (!this.otherMember) {
@@ -1483,7 +1465,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Displays a confirmation modal to unblock the user of the individual conversation.
      *
-     * @return Promise resolved when user is unblocked or dialog is cancelled.
+     * @returns Promise resolved when user is unblocked or dialog is cancelled.
      */
     async unblockUser(): Promise<void> {
         if (!this.otherMember) {
@@ -1522,7 +1504,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Displays a confirmation modal to send a contact request to the other user of the individual conversation.
      *
-     * @return Promise resolved when the request is sent or the dialog is cancelled.
+     * @returns Promise resolved when the request is sent or the dialog is cancelled.
      */
     async createContactRequest(): Promise<void> {
         if (!this.otherMember) {
@@ -1561,7 +1543,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Confirms the contact request of the other user of the individual conversation.
      *
-     * @return Promise resolved when the request is confirmed.
+     * @returns Promise resolved when the request is confirmed.
      */
     async confirmContactRequest(): Promise<void> {
         if (!this.otherMember) {
@@ -1587,7 +1569,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Declines the contact request of the other user of the individual conversation.
      *
-     * @return Promise resolved when the request is confirmed.
+     * @returns Promise resolved when the request is confirmed.
      */
     async declineContactRequest(): Promise<void> {
         if (!this.otherMember) {
@@ -1613,7 +1595,7 @@ export class AddonMessagesDiscussionPage implements OnInit, OnDestroy, AfterView
     /**
      * Displays a confirmation modal to remove the other user of the conversation from contacts.
      *
-     * @return Promise resolved when the request is sent or the dialog is cancelled.
+     * @returns Promise resolved when the request is sent or the dialog is cancelled.
      */
     async removeContact(): Promise<void> {
         if (!this.otherMember) {

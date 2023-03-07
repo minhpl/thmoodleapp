@@ -21,7 +21,7 @@ import { CoreDomUtils } from '@services/utils/dom';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { CoreUser, CoreUserProfile, CoreUserProvider } from '@features/user/services/user';
+import { CoreUser, CoreUserProfile, USER_PROFILE_PICTURE_UPDATED, USER_PROFILE_REFRESHED } from '@features/user/services/user';
 import { CoreUserHelper } from '@features/user/services/user-helper';
 import { CoreNavigator } from '@services/navigator';
 import { CoreIonLoadingElement } from '@classes/ion-loading';
@@ -65,7 +65,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
             return;
         }
 
-        this.obsProfileRefreshed = CoreEvents.on(CoreUserProvider.PROFILE_REFRESHED, (data) => {
+        this.obsProfileRefreshed = CoreEvents.on(USER_PROFILE_REFRESHED, (data) => {
             if (!this.user || !data.user) {
                 return;
             }
@@ -97,7 +97,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
     /**
      * Fetches the user data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async fetchUser(): Promise<void> {
         try {
@@ -129,7 +129,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
     /**
      * Check if current user image has changed.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async checkUserImageUpdated(): Promise<void> {
         if (!this.site || !this.site.getInfo() || !this.user) {
@@ -147,7 +147,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
             await CoreSites.updateSiteInfo(this.site.getId());
         } catch {
             // Cannot update site info. Assume the profile image is the right one.
-            CoreEvents.trigger(CoreUserProvider.PROFILE_PICTURE_UPDATED, {
+            CoreEvents.trigger(USER_PROFILE_PICTURE_UPDATED, {
                 userId: this.userId,
                 picture: this.user.profileimageurl,
             }, this.site.getId());
@@ -158,7 +158,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
             await this.refreshUser();
         } else {
             // Now they're the same, send event to use the right avatar in the rest of the app.
-            CoreEvents.trigger(CoreUserProvider.PROFILE_PICTURE_UPDATED, {
+            CoreEvents.trigger(USER_PROFILE_PICTURE_UPDATED, {
                 userId: this.userId,
                 picture: this.user.profileimageurl,
             }, this.site.getId());
@@ -181,7 +181,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
 
             const profileImageURL = await CoreUser.changeProfilePicture(result.itemid, this.userId, this.site.getId());
 
-            CoreEvents.trigger(CoreUserProvider.PROFILE_PICTURE_UPDATED, {
+            CoreEvents.trigger(USER_PROFILE_PICTURE_UPDATED, {
                 userId: this.userId,
                 picture: profileImageURL,
             }, this.site.getId());
@@ -200,7 +200,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
      * Refresh the user data.
      *
      * @param event Event.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async refreshUser(event?: IonRefresher): Promise<void> {
         await CoreUtils.ignoreErrors(CoreUser.invalidateUserCache(this.userId));
@@ -210,7 +210,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
         event?.complete();
 
         if (this.user) {
-            CoreEvents.trigger(CoreUserProvider.PROFILE_REFRESHED, {
+            CoreEvents.trigger(USER_PROFILE_REFRESHED, {
                 courseId: this.courseId,
                 userId: this.userId,
                 user: this.user,
@@ -221,7 +221,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
     /**
      * Check whether the user avatar is not up to date with site info.
      *
-     * @return Whether the user avatar differs from site info cache.
+     * @returns Whether the user avatar differs from site info cache.
      */
     protected isUserAvatarDirty(): boolean {
         if (!this.user || !this.site) {
@@ -241,7 +241,7 @@ export class CoreUserAboutPage implements OnInit, OnDestroy {
      * the values returned by this function may not be valid urls, given that they are intended for string comparison.
      *
      * @param avatarUrl Avatar url.
-     * @return Normalized avatar string (may not be a valid url).
+     * @returns Normalized avatar string (may not be a valid url).
      */
     protected normalizeAvatarUrl(avatarUrl?: string): string {
         if (!avatarUrl) {

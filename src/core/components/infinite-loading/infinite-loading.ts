@@ -103,7 +103,7 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
         }
 
         this.loadingMore = true;
-        this.action.emit(this.complete.bind(this));
+        this.action.emit(() => this.complete());
     }
 
     /**
@@ -112,7 +112,7 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
     complete(): void {
         if (this.position == 'top') {
             // Wait a bit before allowing loading more, otherwise it could be re-triggered automatically when it shouldn't.
-            setTimeout(this.completeLoadMore.bind(this), 400);
+            setTimeout(() => this.completeLoadMore(), 400);
         } else {
             this.completeLoadMore();
         }
@@ -132,7 +132,7 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
     /**
      * Get the height of the element.
      *
-     * @return Height.
+     * @returns Height.
      * @todo erase if not needed: I'm depreacating it because if not needed or getBoundingClientRect has the same result, it should
      * be erased, also with getElementHeight
      * @deprecated since 3.9.5
@@ -144,7 +144,7 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
     /**
      * Get the infinite scroll element.
      *
-     * @return Element or null.
+     * @returns Element or null.
      */
     get infiniteScrollElement(): HTMLIonInfiniteScrollElement | null {
         return this.hostElement.querySelector('ion-infinite-scroll');

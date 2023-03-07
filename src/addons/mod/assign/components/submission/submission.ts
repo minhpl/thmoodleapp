@@ -49,7 +49,7 @@ import { AddonModAssignOffline } from '../../services/assign-offline';
 import { CoreUser, CoreUserProfile } from '@features/user/services/user';
 import { CoreTimeUtils } from '@services/utils/time';
 import { CoreNavigator } from '@services/navigator';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFileUploaderHelper } from '@features/fileuploader/services/fileuploader-helper';
 import { CoreLang } from '@services/lang';
 import { CoreError } from '@classes/errors/error';
@@ -268,7 +268,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     /**
      * Check if the user can leave the view. If there are changes to be saved, it will ask for confirm.
      *
-     * @return Promise resolved with true if can leave the view, rejected otherwise.
+     * @returns Promise resolved with true if can leave the view, rejected otherwise.
      */
     async canLeave(): Promise<boolean> {
         // Check if there is data to save.
@@ -286,13 +286,15 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
 
     /**
      * Copy a previous attempt and then go to edit.
+     *
+     * @returns Promise resolved when done.
      */
     async copyPrevious(): Promise<void> {
         if (!this.assign) {
             return;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal('core.networkerrormsg', true);
 
             return;
@@ -350,7 +352,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     /**
      * Discard feedback drafts.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async discardDrafts(): Promise<void> {
         if (this.assign && this.feedback && this.feedback.plugins) {
@@ -392,7 +394,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
      * Check if there's data to save (grade).
      *
      * @param isSubmit Whether the user is about to submit the grade.
-     * @return Promise resolved with boolean: whether there's data to save.
+     * @returns Promise resolved with boolean: whether there's data to save.
      */
     protected async hasDataToSave(isSubmit = false): Promise<boolean> {
         if (!this.canSaveGrades || !this.loaded || !this.assign) {
@@ -457,7 +459,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
      * Invalidate and refresh data.
      *
      * @param sync Whether to try to synchronize data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async invalidateAndRefresh(sync = false): Promise<void> {
         this.loaded = false;
@@ -494,7 +496,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
      * Load the data to render the submission.
      *
      * @param sync Whether to try to synchronize data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadData(sync = false): Promise<void> {
         let isBlind = !!this.blindId;
@@ -525,7 +527,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
                             submitId: this.submitId,
                         }, this.siteId);
                     }
-                } catch (error) {
+                } catch {
                     // Ignore errors, probably user is offline or sync is blocked.
                 }
             }
@@ -595,7 +597,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     /**
      * Load profile of submission's user.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSubmissionUserProfile(): Promise<void> {
         this.user = await CoreUser.getProfile(this.submitId, this.courseId);
@@ -604,7 +606,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     /**
      * Load offline data for the submission (not the submission grade).
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSubmissionOfflineData(): Promise<void> {
         if (!this.assign) {
@@ -629,7 +631,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
      *
      * @param assign Assign data.
      * @param feedback The feedback data from the submission status.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadFeedback(assign: AddonModAssignAssign, feedback?: AddonModAssignSubmissionFeedback): Promise<void> {
         this.grade = {
@@ -777,7 +779,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     /**
      * Get the submission plugins that don't support editing.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadUnsupportedPlugins(): Promise<void> {
         this.unsupportedEditPlugins = await AddonModAssign.getUnsupportedEditPlugins(this.userSubmission?.plugins || []);
@@ -901,7 +903,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     /**
      * Submit a grade and feedback.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async submitGrade(): Promise<void> {
         // Check if there's something to be saved.
@@ -973,7 +975,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     /**
      * Treat the grade info.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async treatGradeInfo(): Promise<void> {
         if (!this.gradeInfo) {
@@ -1074,7 +1076,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
      *
      * @param submissionStatus Response of get submission status.
      * @param lastAttempt Last attempt (if any).
-     * @param promises List where to add the promises.
+     * @returns Promises resolved when done.
      */
     protected treatLastAttempt(
         submissionStatus: AddonModAssignGetSubmissionStatusWSResponse,
@@ -1208,7 +1210,7 @@ export class AddonModAssignSubmissionComponent implements OnInit, OnDestroy, Can
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.setGradeSyncBlocked(false);

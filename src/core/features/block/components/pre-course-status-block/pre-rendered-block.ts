@@ -67,8 +67,7 @@ export class AddonBlockCourseStatusComponent extends CoreBlockBaseComponent impl
         return site.write('local_th_course_status_check_status', data, preSets).then((courses) => {
             const jsonValue = JSON.stringify(courses);
             let temp = JSON.parse(jsonValue)
-            console.log(temp.check, temp.status)
-            console.log(temp)
+
             this.data = temp
             if(temp.check = true) {
                 this.block_status = true

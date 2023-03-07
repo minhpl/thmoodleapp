@@ -13,9 +13,10 @@
 // limitations under the License.
 
 import { CoreConstants } from '@/core/constants';
-import { Component, OnInit, Optional } from '@angular/core';
+import { Component, Input, OnInit, Optional } from '@angular/core';
 import { CoreCourseModuleMainActivityComponent } from '@features/course/classes/main-activity-component';
 import { CoreCourseContentsPage } from '@features/course/pages/contents/contents';
+import { CoreCourse } from '@features/course/services/course';
 import { IonContent } from '@ionic/angular';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSync } from '@services/sync';
@@ -51,6 +52,8 @@ import {
     styleUrls: ['index.scss'],
 })
 export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityComponent implements OnInit {
+
+    @Input() autoPlayData?: AddonModScormAutoPlayData; // Data to use to play the SCORM automatically.
 
     component = AddonModScormProvider.COMPONENT;
     moduleName = 'scorm';
@@ -99,7 +102,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         super.ngOnInit();
@@ -118,7 +121,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Download a SCORM package or restores an ongoing download.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async downloadScormPackage(): Promise<void> {
         this.downloading = true;
@@ -188,11 +191,16 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
 
         // Check whether to launch the SCORM immediately.
         if (this.skip === undefined) {
-            this.skip = !this.hasOffline && !this.errorMessage &&
-                    (!this.scorm.lastattemptlock || this.attemptsLeft > 0) &&
-                    this.accessInfo.canskipview && !this.accessInfo.canviewreport &&
-                    this.scorm.skipview! >= AddonModScormProvider.SKIPVIEW_FIRST &&
-                    (this.scorm.skipview == AddonModScormProvider.SKIPVIEW_ALWAYS || this.lastAttempt == 0);
+            this.skip = !this.hasOffline && !this.errorMessage && (!this.scorm.lastattemptlock || this.attemptsLeft > 0) &&
+                (
+                    !!this.autoPlayData
+                    ||
+                    (
+                        this.accessInfo.canskipview && !this.accessInfo.canviewreport &&
+                        (this.scorm.skipview ?? 0) >= AddonModScormProvider.SKIPVIEW_FIRST &&
+                        (this.scorm.skipview == AddonModScormProvider.SKIPVIEW_ALWAYS || this.lastAttempt == 0)
+                    )
+                );
         }
     }
 
@@ -200,7 +208,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
      * Fetch attempt data.
      *
      * @param scorm Scorm.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchAttemptData(scorm: AddonModScormScorm): Promise<void> {
         // Get the number of attempts.
@@ -245,7 +253,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Load SCORM package size if needed.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadPackageSize(scorm: AddonModScormScorm): Promise<void> {
         if (scorm.packagesize || this.errorMessage) {
@@ -259,7 +267,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Fetch the structure of the SCORM (TOC).
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchStructure(scorm: AddonModScormScorm): Promise<void> {
         this.organizations = await AddonModScorm.getOrganizations(scorm.id, { cmId: this.module.id });
@@ -282,7 +290,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
      * @param attempt The attempt number.
      * @param offline Whether it's an offline attempt.
      * @param attempts Object where to add the attempt.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async getAttemptGrade(
         attempt: number,
@@ -300,7 +308,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Get the grades of each attempt and the grade of the SCORM.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async getReportedGrades(scorm: AddonModScormScorm, attempts: AddonModScormAttemptCountResult): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -356,7 +364,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
      * Checks if sync has succeed from result sync data.
      *
      * @param result Data returned on the sync function.
-     * @return If suceed or not.
+     * @returns If suceed or not.
      */
     protected hasSyncSucceed(result: AddonModScormSyncResult): boolean {
         if (result.updated || this.dataSent) {
@@ -395,7 +403,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -413,7 +421,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
      * Compares sync event data with current data to check if refresh content is needed.
      *
      * @param syncEventData Data receiven on sync observer.
-     * @return True if refresh is needed, false otherwise.
+     * @returns True if refresh is needed, false otherwise.
      */
     protected isRefreshSyncNeeded(syncEventData: AddonModScormAutoSyncEventData): boolean {
         if (syncEventData.updated && this.scorm && syncEventData.scormId == this.scorm.id) {
@@ -440,8 +448,9 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Load the TOC of a certain organization.
      *
+     * @param scorm Scorm object.
      * @param organizationId The organization id.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadOrganizationToc(scorm: AddonModScormScorm, organizationId: string): Promise<void> {
         if (!scorm.displaycoursestructure) {
@@ -473,6 +482,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
      * Open a SCORM. It will download the SCORM package if it's not downloaded or it has changed.
      *
      * @param event Event.
+     * @param preview Wether open screen in preview mode or not.
      * @param scoId SCO that needs to be loaded when the SCORM is opened. If not defined, load first SCO.
      */
     async open(event?: Event, preview: boolean = false, scoId?: number): Promise<void> {
@@ -532,7 +542,9 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
      * @param scoId SCO ID.
      */
     protected openScorm(scoId?: number, preview: boolean = false): void {
-        // Display the full page when returning to the page.
+        const autoPlayData = this.autoPlayData;
+
+        this.autoPlayData = undefined;
         this.skip = false;
         this.hasPlayed = true;
 
@@ -542,6 +554,11 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
         this.dataSentObserver = CoreEvents.on(AddonModScormProvider.DATA_SENT_EVENT, (data) => {
             if (data.scormId === this.scorm!.id) {
                 this.dataSent = true;
+
+                if (this.module.completiondata && CoreCourse.isIncompleteAutomaticCompletion(this.module.completiondata)) {
+                    // Always invalidate section data when data is sent, the SCORM could have a link to a section.
+                    CoreCourse.invalidateSections(this.courseId);
+                }
             }
         }, this.siteId);
 
@@ -549,11 +566,11 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
             `${AddonModScormModuleHandlerService.PAGE_NAME}/${this.courseId}/${this.module.id}/player`,
             {
                 params: {
-                    mode: preview ? AddonModScormProvider.MODEBROWSE : AddonModScormProvider.MODENORMAL,
+                    mode: autoPlayData?.mode ?? (preview ? AddonModScormProvider.MODEBROWSE : AddonModScormProvider.MODENORMAL),
                     moduleUrl: this.module.url,
-                    newAttempt: !!this.startNewAttempt,
-                    organizationId: this.currentOrganization.identifier,
-                    scoId: scoId,
+                    newAttempt: autoPlayData?.newAttempt ?? this.startNewAttempt,
+                    organizationId: autoPlayData?.organizationId ?? this.currentOrganization.identifier,
+                    scoId: autoPlayData?.scoId ?? scoId,
                 },
             },
         );
@@ -585,7 +602,7 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
      * Performs the sync of the activity.
      *
      * @param retries Number of retries done.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async sync(retries = 0): Promise<AddonModScormSyncResult> {
         if (CoreSync.isBlocked(AddonModScormProvider.COMPONENT, this.scorm!.id) && retries < 5) {
@@ -614,4 +631,14 @@ export class AddonModScormIndexComponent extends CoreCourseModuleMainActivityCom
  */
 export type AttemptGrade = AddonModScormAttemptGrade & {
     gradeFormatted?: string;
+};
+
+/**
+ * Data to use to auto-play the SCORM.
+ */
+export type AddonModScormAutoPlayData = {
+    mode?: string;
+    newAttempt?: boolean;
+    organizationId?: string;
+    scoId?: number;
 };

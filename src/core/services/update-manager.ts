@@ -21,10 +21,12 @@ import { makeSingleton } from '@singletons';
 import { CoreH5P } from '@features/h5p/services/h5p';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
 import { CoreSites } from './sites';
-import { CoreUtils, PromiseDefer } from './utils/utils';
+import { CoreUtils } from './utils/utils';
 import { CoreApp } from './app';
-
-const VERSION_APPLIED = 'version_applied';
+import { CoreZoomLevel } from '@features/settings/services/settings-helper';
+import { CorePromisedValue } from '@classes/promised-value';
+import { CoreFile } from './file';
+import { CorePlatform } from './platform';
 
 /**
  * Factory to handle app updates. This factory shouldn't be used outside of core.
@@ -34,47 +36,66 @@ const VERSION_APPLIED = 'version_applied';
 @Injectable({ providedIn: 'root' })
 export class CoreUpdateManagerProvider {
 
+    protected static readonly VERSION_APPLIED = 'version_applied';
+    protected static readonly PREVIOUS_APP_FOLDER = 'previous_app_folder';
+
     protected logger: CoreLogger;
-    protected doneDeferred: PromiseDefer<void>;
+    protected doneDeferred: CorePromisedValue<void>;
 
     constructor() {
         this.logger = CoreLogger.getInstance('CoreUpdateManagerProvider');
-        this.doneDeferred = CoreUtils.promiseDefer();
+        this.doneDeferred = new CorePromisedValue();
     }
 
     /**
      * Returns a promise resolved when the load function is done.
      *
-     * @return Promise resolved when the load function is done.
+     * @returns Promise resolved when the load function is done.
      */
     get donePromise(): Promise<void> {
-        return this.doneDeferred.promise;
+        return this.doneDeferred;
     }
 
     /**
      * Check if the app has been updated and performs the needed processes.
      * This function shouldn't be used outside of core.
      *
-     * @return Promise resolved when the update process finishes.
+     * @returns Promise resolved when the update process finishes.
      */
     async initialize(): Promise<void> {
         const promises: Promise<unknown>[] = [];
         const versionCode = CoreConstants.CONFIG.versioncode;
 
-        const versionApplied = await CoreConfig.get<number>(VERSION_APPLIED, 0);
+        const [versionApplied, previousAppFolder, currentAppFolder] = await Promise.all([
+            CoreConfig.get<number>(CoreUpdateManagerProvider.VERSION_APPLIED, 0),
+            CoreConfig.get<string>(CoreUpdateManagerProvider.PREVIOUS_APP_FOLDER, ''),
+            CorePlatform.isMobile() ? CoreUtils.ignoreErrors(CoreFile.getBasePath(), '') : '',
+        ]);
 
         if (versionCode > versionApplied) {
             promises.push(this.checkCurrentSiteAllowed());
         }
 
-        if (versionCode >= 3950 && versionApplied < 3950 && versionApplied > 0) {
+        if (
+            (versionCode >= 3950 && versionApplied < 3950 && versionApplied > 0) ||
+            (currentAppFolder && currentAppFolder !== previousAppFolder)
+        ) {
+            // Delete content indexes if the app folder has changed.
+            // This happens in iOS every time the app is updated, even if the version hasn't changed.
             promises.push(CoreH5P.h5pPlayer.deleteAllContentIndexes());
+        }
+
+        if (versionCode >= 41000 && versionApplied < 41000 && versionApplied > 0) {
+            promises.push(this.upgradeFontSizeNames());
         }
 
         try {
             await Promise.all(promises);
 
-            await CoreConfig.set(VERSION_APPLIED, versionCode);
+            await Promise.all([
+                CoreConfig.set(CoreUpdateManagerProvider.VERSION_APPLIED, versionCode),
+                currentAppFolder ? CoreConfig.set(CoreUpdateManagerProvider.PREVIOUS_APP_FOLDER, currentAppFolder) : undefined,
+            ]);
         } catch (error) {
             this.logger.error(`Error applying update from ${versionApplied} to ${versionCode}`, error);
         } finally {
@@ -85,7 +106,7 @@ export class CoreUpdateManagerProvider {
     /**
      * If there is a current site, check if it's still supported in the new app.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async checkCurrentSiteAllowed(): Promise<void> {
         if (!CoreLoginHelper.getFixedSites()) {
@@ -119,6 +140,19 @@ export class CoreUpdateManagerProvider {
                 },
             },
         });
+    }
+
+    protected async upgradeFontSizeNames(): Promise<void> {
+        const storedFontSizeName = await CoreConfig.get<string>(CoreConstants.SETTINGS_ZOOM_LEVEL, CoreZoomLevel.NONE);
+        switch (storedFontSizeName) {
+            case 'low':
+                await CoreConfig.set(CoreConstants.SETTINGS_ZOOM_LEVEL, CoreZoomLevel.NONE);
+                break;
+
+            case 'normal':
+                await CoreConfig.set(CoreConstants.SETTINGS_ZOOM_LEVEL, CoreZoomLevel.MEDIUM);
+                break;
+        }
     }
 
 }

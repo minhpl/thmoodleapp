@@ -41,7 +41,7 @@ export class CoreEditorOfflineProvider {
      * @param elementId Element ID.
      * @param extraParams Object with extra params to identify the draft.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async deleteDraft(
         contextLevel: string,
@@ -56,7 +56,7 @@ export class CoreEditorOfflineProvider {
             const params = this.fixDraftPrimaryData(contextLevel, contextInstanceId, elementId, extraParams);
 
             await db.deleteRecords(DRAFT_TABLE, params);
-        } catch (error) {
+        } catch {
             // Ignore errors, probably no draft stored.
         }
     }
@@ -68,7 +68,7 @@ export class CoreEditorOfflineProvider {
      * @param contextInstanceId The instance ID related to the context.
      * @param elementId Element ID.
      * @param extraParams Object with extra params to identify the draft.
-     * @return Object with the fixed primary data.
+     * @returns Object with the fixed primary data.
      */
     protected fixDraftPrimaryData(
         contextLevel: string,
@@ -93,7 +93,7 @@ export class CoreEditorOfflineProvider {
      * @param elementId Element ID.
      * @param extraParams Object with extra params to identify the draft.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the draft data. Undefined if no draft stored.
+     * @returns Promise resolved with the draft data. Undefined if no draft stored.
      */
     async getDraft(
         contextLevel: string,
@@ -120,7 +120,7 @@ export class CoreEditorOfflineProvider {
      * @param pageInstance Unique identifier to prevent storing data from several sources at the same time.
      * @param originalContent Original content of the editor.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the draft data. Undefined if no draft stored.
+     * @returns Promise resolved with the draft data. Undefined if no draft stored.
      */
     async resumeDraft(
         contextLevel: string,
@@ -149,12 +149,12 @@ export class CoreEditorOfflineProvider {
                 }
 
                 await db.insertRecord(DRAFT_TABLE, entry);
-            } catch (error) {
+            } catch {
                 // Ignore errors saving the draft. It shouldn't happen.
             }
 
             return entry;
-        } catch (error) {
+        } catch {
             // No draft stored. Store an empty draft to save the pageinstance.
             await this.saveDraft(
                 contextLevel,
@@ -180,7 +180,7 @@ export class CoreEditorOfflineProvider {
      * @param draftText The text to store.
      * @param originalContent Original content of the editor.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async saveDraft(
         contextLevel: string,

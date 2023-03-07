@@ -41,7 +41,7 @@ import {
 } from '../../services/data';
 import { AddonModDataHelper } from '../../services/data-helper';
 import { CoreDom } from '@singletons/dom';
-import { AddonModDataEntryFieldInitialized } from '../../classes/field-plugin-component';
+import { AddonModDataEntryFieldInitialized } from '../../classes/base-field-plugin-component';
 
 /**
  * Page that displays the view edit page.
@@ -122,7 +122,7 @@ export class AddonModDataEditPage implements OnInit {
     /**
      * Check if we can leave the page or not and ask to confirm the lost of data.
      *
-     * @return True if we can leave, false otherwise.
+     * @returns True if we can leave, false otherwise.
      */
     async canLeave(): Promise<boolean> {
         if (this.forceLeave || !this.entry) {
@@ -152,7 +152,7 @@ export class AddonModDataEditPage implements OnInit {
      * Fetch the entry data.
      *
      * @param refresh To refresh all downloaded data.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchEntryData(refresh = false): Promise<void> {
         try {
@@ -179,7 +179,7 @@ export class AddonModDataEditPage implements OnInit {
 
                 if (refresh) {
                     groupInfo = await CoreGroups.getActivityGroupInfo(this.database.coursemodule);
-                    if (groupInfo.visibleGroups && groupInfo.groups?.length) {
+                    if (groupInfo.visibleGroups && groupInfo.groups.length) {
                         // There is a bug in Moodle with All participants and visible groups (MOBILE-3597). Remove it.
                         groupInfo.groups = groupInfo.groups.filter(group => group.id !== 0);
                         groupInfo.defaultGroupId = groupInfo.groups[0].id;
@@ -240,7 +240,7 @@ export class AddonModDataEditPage implements OnInit {
      * Saves data.
      *
      * @param e Event.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async save(e: Event): Promise<void> {
         e.preventDefault();
@@ -270,7 +270,7 @@ export class AddonModDataEditPage implements OnInit {
             const modal = await CoreDomUtils.showModalLoading('core.sending', true);
 
             // Create an ID to assign files.
-            const entryTemp = this.entryId ? this.entryId : - (new Date().getTime());
+            const entryTemp = this.entryId ? this.entryId : - (Date.now());
             let editData: AddonModDataEntryWSField[] = [];
 
             try {
@@ -384,7 +384,7 @@ export class AddonModDataEditPage implements OnInit {
      * Set group to see the database.
      *
      * @param groupId Group identifier to set.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     setGroup(groupId: number): Promise<void> {
         this.selectedGroup = groupId;
@@ -396,7 +396,7 @@ export class AddonModDataEditPage implements OnInit {
     /**
      * Displays Edit Search Fields.
      *
-     * @return Generated HTML.
+     * @returns Generated HTML.
      */
     protected displayEditFields(): string {
         this.jsData = {
@@ -405,7 +405,7 @@ export class AddonModDataEditPage implements OnInit {
             form: this.editForm,
             database: this.database,
             errors: this.errors,
-            onFieldInit: this.onFieldInit.bind(this),
+            onFieldInit: (data) => this.onFieldInit(data),
         };
 
         let template = AddonModDataHelper.getTemplate(this.database!, AddonModDataTemplateType.ADD, this.fieldsArray);
@@ -464,7 +464,7 @@ export class AddonModDataEditPage implements OnInit {
     /**
      * Return to the entry list (previous page) discarding temp data.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async returnToEntryList(): Promise<void> {
         const inputData = this.editForm.value;

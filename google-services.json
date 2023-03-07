@@ -1,40 +1,40 @@
 {
   "project_info": {
-    "project_number": "343856164343",
-    "project_id": "aumtnuapp",
-    "storage_bucket": "aumtnuapp.appspot.com"
+    "project_number": "859472982443",
+    "project_id": "thtuafapp",
+    "storage_bucket": "thtuafapp.appspot.com"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:343856164343:android:7742a7791f09964259d2f2",
+        "mobilesdk_app_id": "1:859472982443:android:a29382a494614292f362ee",
         "android_client_info": {
-          "package_name": "vn.edu.aum.tnu"
+          "package_name": "vn.edu.aum.tuaf"
         }
       },
       "oauth_client": [
         {
-          "client_id": "343856164343-f0m71jbcgh6gje8rtn5lvfqecbtgnhpg.apps.googleusercontent.com",
+          "client_id": "859472982443-16i030esuhkekq1u9j6ssks1b6nd451u.apps.googleusercontent.com",
           "client_type": 3
         }
       ],
       "api_key": [
         {
-          "current_key": "AIzaSyA3xaEwS32F4tyAsdXveP0bzpBc08yw7Ms"
+          "current_key": "AIzaSyBBL7gEmNKugEXrBJ_SeRjPwM3F4mHFqrM"
         }
       ],
       "services": {
         "appinvite_service": {
           "other_platform_oauth_client": [
             {
-              "client_id": "343856164343-f0m71jbcgh6gje8rtn5lvfqecbtgnhpg.apps.googleusercontent.com",
+              "client_id": "859472982443-16i030esuhkekq1u9j6ssks1b6nd451u.apps.googleusercontent.com",
               "client_type": 3
             },
             {
-              "client_id": "343856164343-qm42nn2f9ggtou40c571h6b0c36dlsvj.apps.googleusercontent.com",
+              "client_id": "859472982443-3gavgajfd7sn67r3t2642a5ivt6s879q.apps.googleusercontent.com",
               "client_type": 2,
               "ios_info": {
-                "bundle_id": "vn.edu.aum.tnu"
+                "bundle_id": "vn.edu.aum.tuaf"
               }
             }
           ]

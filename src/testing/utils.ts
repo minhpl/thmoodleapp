@@ -12,35 +12,72 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AbstractType, Component, CUSTOM_ELEMENTS_SCHEMA, Type, ViewChild } from '@angular/core';
+import { AbstractType, Component, CUSTOM_ELEMENTS_SCHEMA, EventEmitter, Type, ViewChild } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Observable, Subject } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 import { sep } from 'path';
 
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { CoreSingletonProxy, Network, Platform } from '@singletons';
+import { ApplicationInit, CoreSingletonProxy, Translate } from '@singletons';
 import { CoreTextUtilsProvider } from '@services/utils/text';
 
 import { TranslatePipeStub } from './stubs/pipes/translate';
 import { CoreExternalContentDirectiveStub } from './stubs/directives/core-external-content';
+import { CoreNetwork } from '@services/network';
+import { CorePlatform } from '@services/platform';
+import { CoreDB } from '@services/db';
+import { CoreNavigator, CoreNavigatorService } from '@services/navigator';
+import { CoreDomUtils } from '@services/utils/dom';
+import { TranslateService, TranslateStore } from '@ngx-translate/core';
+import { CoreIonLoadingElement } from '@classes/ion-loading';
+import { BrowserAnimationsModule } from '@angular/platform-browser/animations';
+import { DefaultUrlSerializer, UrlSerializer } from '@angular/router';
+import { CoreUtils, CoreUtilsProvider } from '@services/utils/utils';
 
 abstract class WrapperComponent<U> {
 
     child!: U;
 
-};
+}
 
 type ServiceInjectionToken = AbstractType<unknown> | Type<unknown> | string;
 
 let testBedInitialized = false;
 const textUtils = new CoreTextUtilsProvider();
-const DEFAULT_SERVICE_SINGLETON_MOCKS: [CoreSingletonProxy, Record<string, unknown>][] = [
-    [Platform, mock({ is: () => false, ready: () => Promise.resolve(), resume: new Subject<void>() })],
-    [Network, { onChange: () => new Observable() }],
+const DEFAULT_SERVICE_SINGLETON_MOCKS: [CoreSingletonProxy, unknown][] = [
+    [Translate, mock({
+        instant: key => key,
+        get: key => of(key),
+        onTranslationChange: new EventEmitter(),
+        onLangChange: new EventEmitter(),
+        onDefaultLangChange: new EventEmitter(),
+    })],
+    [CoreDB, mock({ getDB: () => mock() })],
+    [CoreNavigator, mock({ navigateToSitePath: () => Promise.resolve(true) })],
+    [ApplicationInit, mock({
+        donePromise: Promise.resolve(),
+        runInitializers: () => Promise.resolve(),
+    })],
+    [CorePlatform, mock({
+        is: () => false,
+        isMobile: () => false,
+        ready: () => Promise.resolve(),
+        resume: new Subject<void>(),
+    })],
+    [CoreNetwork, mock({
+        isOnline: () => true,
+        onChange: () => new Observable(),
+    })],
+    [CoreDomUtils, mock({
+        showModalLoading: () => Promise.resolve(mock<CoreIonLoadingElement>({ dismiss: jest.fn() })),
+    })],
+    [CoreUtils, mock(new CoreUtilsProvider(), {
+        nextTick: () => Promise.resolve(),
+    })],
 ];
 
-async function renderAngularComponent<T>(component: Type<T>, config: RenderConfig): Promise<ComponentFixture<T>> {
+async function renderAngularComponent<T>(component: Type<T>, config: RenderConfig): Promise<TestingComponentFixture<T>> {
     config.declarations.push(component);
 
     TestBed.configureTestingModule({
@@ -49,11 +86,15 @@ async function renderAngularComponent<T>(component: Type<T>, config: RenderConfi
             ...config.declarations,
         ],
         providers: [
-            ...getDefaultProviders(),
+            ...getDefaultProviders(config),
             ...config.providers,
         ],
         schemas: [CUSTOM_ELEMENTS_SCHEMA],
-        imports: [BrowserModule],
+        imports: [
+            BrowserModule,
+            BrowserAnimationsModule,
+            ...config.imports,
+        ],
     });
 
     testBedInitialized = true;
@@ -88,7 +129,7 @@ function getDefaultDeclarations(): unknown[] {
     ];
 }
 
-function getDefaultProviders(): unknown[] {
+function getDefaultProviders(config: RenderConfig): unknown[] {
     const serviceProviders = DEFAULT_SERVICE_SINGLETON_MOCKS.map(
         ([singleton, mockInstance]) => ({
             provide: singleton.injectionToken,
@@ -98,6 +139,19 @@ function getDefaultProviders(): unknown[] {
 
     return [
         ...serviceProviders,
+        {
+            provide: TranslateStore,
+            useFactory: () => {
+                const store = new TranslateStore();
+
+                store.translations = {
+                    en: config.translations ?? {},
+                };
+
+                return store;
+            },
+        },
+        { provide: UrlSerializer, useClass: DefaultUrlSerializer },
         { provide: CORE_SITE_SCHEMAS, multiple: true, useValue: [] },
     ];
 }
@@ -123,16 +177,61 @@ function createNewServiceInstance(injectionToken: Exclude<ServiceInjectionToken,
 export interface RenderConfig {
     declarations: unknown[];
     providers: unknown[];
+    imports: unknown[];
+    translations?: Record<string, string>;
 }
 
-export type WrapperComponentFixture<T> = ComponentFixture<WrapperComponent<T>>;
+export interface RenderPageConfig extends RenderConfig {
+    routeParams: Record<string, unknown>;
+}
+
+export type TestingComponentFixture<T = unknown> = Omit<ComponentFixture<T>, 'nativeElement'> & { nativeElement: Element };
+
+export type WrapperComponentFixture<T = unknown> = TestingComponentFixture<WrapperComponent<T>>;
+
+export function findElement<E = HTMLElement>(
+    fixture: TestingComponentFixture,
+    selector: string,
+    content?: string | RegExp,
+): E | null {
+    const elements = fixture.nativeElement.querySelectorAll(selector);
+    const matches = typeof content === 'string'
+        ? (textContent: string | null) => textContent?.includes(content)
+        : (textContent: string | null) => textContent?.match(content ?? '');
+
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements[i];
+
+        if (content && !matches(element.textContent)) {
+            continue;
+        }
+
+        return element as unknown as E;
+    }
+
+    return null;
+}
+
+export function requireElement<E = HTMLElement>(
+    fixture: TestingComponentFixture,
+    selector: string,
+    content?: string | RegExp,
+): E {
+    const element = findElement<E>(fixture, selector, content);
+
+    if (!element) {
+        throw Error(`Could not find '${selector}' element`);
+    }
+
+    return element;
+}
 
 /**
  * Mock a certain class, converting its methods to Mock functions and overriding the specified properties and methods.
  *
  * @param instance Instance to mock.
  * @param overrides Object with the properties or methods to override, or a list of methods to override with an empty function.
- * @return Mock instance.
+ * @returns Mock instance.
  */
 export function mock<T>(
     instance: T | Partial<T> = {},
@@ -140,7 +239,7 @@ export function mock<T>(
 ): T {
     // If overrides is an object, apply them to the instance.
     if (!Array.isArray(overrides)) {
-        Object.assign(instance, overrides);
+        Object.assign(instance as Record<string, unknown>, overrides);
     }
 
     // Convert instance functions to jest functions.
@@ -164,8 +263,7 @@ export function mock<T>(
     return instance as T;
 }
 
-export function mockSingleton<T>(singletonClass: CoreSingletonProxy<T>, instance: T): T;
-export function mockSingleton<T>(singletonClass: CoreSingletonProxy<unknown>, instance?: Record<string, unknown>): T;
+export function mockSingleton<T>(singletonClass: CoreSingletonProxy<T>, instance: T | Partial<T>): T;
 export function mockSingleton<T>(
     singletonClass: CoreSingletonProxy<unknown>,
     methods: string[],
@@ -181,8 +279,17 @@ export function mockSingleton<T>(
     const methods = Array.isArray(methodsOrProperties) ? methodsOrProperties : [];
     const instance = getServiceInstance(singleton.injectionToken) as T;
     const mockInstance = mock(instance, methods);
+    const mockInstancePrototype = Object.getPrototypeOf(mockInstance);
 
-    Object.assign(mockInstance, properties);
+    for (const [name, value] of Object.entries(properties)) {
+        const descriptor = Object.getOwnPropertyDescriptor(mockInstancePrototype, name);
+
+        if (descriptor && !descriptor.writable) {
+            continue;
+        }
+
+        mockInstance[name] = value;
+    }
 
     singleton.setInstance(mockInstance);
 
@@ -207,12 +314,34 @@ export function getServiceInstance(injectionToken: ServiceInjectionToken): Recor
         ?? {};
 }
 
-export async function renderComponent<T>(component: Type<T>, config: Partial<RenderConfig> = {}): Promise<ComponentFixture<T>> {
+export async function renderComponent<T>(
+    component: Type<T>,
+    config: Partial<RenderConfig> = {},
+): Promise<TestingComponentFixture<T>> {
     return renderAngularComponent(component, {
         declarations: [],
         providers: [],
+        imports: [],
         ...config,
     });
+}
+
+export async function renderPageComponent<T>(
+    component: Type<T>,
+    config: Partial<RenderPageConfig> = {},
+): Promise<TestingComponentFixture<T>> {
+    mockSingleton(CoreNavigator, mock<CoreNavigatorService>({
+        getRequiredRouteParam<T>(name: string) {
+            if (!config.routeParams?.[name]) {
+                throw new Error();
+            }
+
+            return config.routeParams?.[name] as T;
+        },
+        getRouteParam: <T>(name: string) => config.routeParams?.[name] as T | undefined,
+    }));
+
+    return renderComponent(component, config);
 }
 
 export async function renderTemplate<T>(
@@ -228,6 +357,7 @@ export async function renderTemplate<T>(
         {
             declarations: [],
             providers: [],
+            imports: [],
             ...config,
         },
     );
@@ -255,4 +385,37 @@ export async function renderWrapperComponent<T>(
  */
 export function agnosticPath(unixPath: string): string {
     return unixPath.replace(/\//g, sep);
+}
+
+/**
+ * Waits a certain time.
+ *
+ * @param time Number of milliseconds.
+ */
+export function wait(time: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, time);
+    });
+}
+
+/**
+ * Mocks translate service with certain translations.
+ *
+ * @param translations List of translations.
+ */
+export function mockTranslate(translations: Record<string, string> = {}): void {
+    mockSingleton(Translate as CoreSingletonProxy<TranslateService>, {
+        instant: (key, replacements) => {
+            const applyReplacements = (text: string): string => Object.entries(replacements ?? {}).reduce(
+                (text, [name, value]) => text.replace(`{{${name}}}`, value),
+                text,
+            );
+
+            return Array.isArray(key)
+                ? key.map(k => applyReplacements(translations[k] ?? k))
+                : applyReplacements(translations[key] ?? key);
+        },
+    });
 }

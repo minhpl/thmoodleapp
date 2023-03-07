@@ -14,7 +14,7 @@
 
 import { Injectable } from '@angular/core';
 
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFilepool } from '@services/filepool';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
@@ -27,7 +27,6 @@ import { CoreStatusWithWarningsWSResponse, CoreWSExternalWarning } from '@servic
 import { CoreError } from '@classes/errors/error';
 import { USERS_TABLE_NAME, CoreUserDBRecord } from './database/user';
 import { CorePushNotifications } from '@features/pushnotifications/services/pushnotifications';
-import { CoreUserDelegateService, CoreUserUpdateHandlerData } from './user-delegate';
 
 const ROOT_CACHE_KEY = 'mmUser:';
 
@@ -39,12 +38,21 @@ declare module '@singletons/events' {
      * @see https://www.typescriptlang.org/docs/handbook/declaration-merging.html#module-augmentation
      */
     export interface CoreEventsData {
-        [CoreUserProvider.PROFILE_REFRESHED]: CoreUserProfileRefreshedData;
-        [CoreUserProvider.PROFILE_PICTURE_UPDATED]: CoreUserProfilePictureUpdatedData;
-        [CoreUserDelegateService.UPDATE_HANDLER_EVENT]: CoreUserUpdateHandlerData;
+        [USER_PROFILE_REFRESHED]: CoreUserProfileRefreshedData;
+        [USER_PROFILE_PICTURE_UPDATED]: CoreUserProfilePictureUpdatedData;
     }
 
 }
+
+/**
+ * Profile picture updated event.
+ */
+export const USER_PROFILE_REFRESHED = 'CoreUserProfileRefreshed';
+
+/**
+ * Profile picture updated event.
+ */
+export const USER_PROFILE_PICTURE_UPDATED = 'CoreUserProfilePictureUpdated';
 
 /**
  * Service to provide user functionalities.
@@ -53,8 +61,6 @@ declare module '@singletons/events' {
 export class CoreUserProvider {
 
     static readonly PARTICIPANTS_LIST_LIMIT = 50; // Max of participants to retrieve in each WS call.
-    static readonly PROFILE_REFRESHED = 'CoreUserProfileRefreshed';
-    static readonly PROFILE_PICTURE_UPDATED = 'CoreUserProfilePictureUpdated';
 
     protected logger: CoreLogger;
 
@@ -70,7 +76,7 @@ export class CoreUserProvider {
      * Check if WS to search participants is available in site.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: whether it's available.
+     * @returns Promise resolved with boolean: whether it's available.
      * @since 3.8
      */
     async canSearchParticipants(siteId?: string): Promise<boolean> {
@@ -83,7 +89,7 @@ export class CoreUserProvider {
      * Check if WS to search participants is available in site.
      *
      * @param site Site. If not defined, current site.
-     * @return Whether it's available.
+     * @returns Whether it's available.
      * @since 3.8
      */
     canSearchParticipantsInSite(site?: CoreSite): boolean {
@@ -95,7 +101,7 @@ export class CoreUserProvider {
     /**
      * Check if WS to update profile picture is available in site.
      *
-     * @return Promise resolved with boolean: whether it's available.
+     * @returns Promise resolved with boolean: whether it's available.
      * @deprecated since app 4.0
      */
     async canUpdatePicture(): Promise<boolean> {
@@ -105,7 +111,7 @@ export class CoreUserProvider {
     /**
      * Check if WS to search participants is available in site.
      *
-     * @return Whether it's available.
+     * @returns Whether it's available.
      * @deprecated since app 4.0
      */
     canUpdatePictureInSite(): boolean {
@@ -118,7 +124,7 @@ export class CoreUserProvider {
      * @param draftItemId New picture draft item id.
      * @param userId User ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolve with the new profileimageurl
+     * @returns Promise resolve with the new profileimageurl
      */
     async changeProfilePicture(draftItemId: number, userId: number, siteId?: string): Promise<string> {
         const site = await CoreSites.getSite(siteId);
@@ -131,11 +137,11 @@ export class CoreUserProvider {
 
         const result = await site.write<CoreUserUpdatePictureWSResponse>('core_user_update_picture', params);
 
-        if (!result.success) {
+        if (!result.success || !result.profileimageurl) {
             return Promise.reject(null);
         }
 
-        return result.profileimageurl!;
+        return result.profileimageurl;
     }
 
     /**
@@ -169,7 +175,7 @@ export class CoreUserProvider {
      *
      * @param userId User ID.
      * @param siteId ID of the site. If not defined, use current site.
-     * @return Promise resolve when the user is deleted.
+     * @returns Promise resolve when the user is deleted.
      */
     async deleteStoredUser(userId: number, siteId?: string): Promise<void> {
         if (isNaN(userId)) {
@@ -192,7 +198,7 @@ export class CoreUserProvider {
      * @param limitNumber Number of participants to get.
      * @param siteId Site Id. If not defined, use current site.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
-     * @return Promise resolved when the participants are retrieved.
+     * @returns Promise resolved when the participants are retrieved.
      */
     async getParticipants(
         courseId: number,
@@ -245,7 +251,7 @@ export class CoreUserProvider {
      * Get cache key for participant list WS calls.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getParticipantsListCacheKey(courseId: number): string {
         return ROOT_CACHE_KEY + 'list:' + courseId;
@@ -258,7 +264,7 @@ export class CoreUserProvider {
      * @param courseId Course ID to get course profile, undefined or 0 to get site profile.
      * @param forceLocal True to retrieve the user data from local DB, false to retrieve it from WS.
      * @param siteId ID of the site. If not defined, use current site.
-     * @return Promise resolved with the user data.
+     * @returns Promise resolved with the user data.
      */
     async getProfile(
         userId: number,
@@ -291,7 +297,7 @@ export class CoreUserProvider {
      * Get cache key for a user WS call.
      *
      * @param userId User ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getUserCacheKey(userId: number): string {
         return ROOT_CACHE_KEY + 'data:' + userId;
@@ -302,7 +308,7 @@ export class CoreUserProvider {
      *
      * @param userId User ID.
      * @param siteId ID of the site. If not defined, use current site.
-     * @return Promise resolve when the user is retrieved.
+     * @returns Promise resolve when the user is retrieved.
      */
     protected async getUserFromLocalDb(userId: number, siteId?: string): Promise<CoreUserDBRecord> {
         const site = await CoreSites.getSite(siteId);
@@ -316,7 +322,7 @@ export class CoreUserProvider {
      * @param userId User ID.
      * @param courseId Course ID.
      * @param siteId Site ID.
-     * @return Promise resolved with user name.
+     * @returns Promise resolved with user name.
      */
     async getUserFullNameWithDefault(userId: number, courseId?: number, siteId?: string): Promise<string> {
         try {
@@ -335,7 +341,7 @@ export class CoreUserProvider {
      * @param userId User ID.
      * @param courseId Course ID to get course profile, undefined or 0 to get site profile.
      * @param siteId ID of the site. If not defined, use current site.
-     * @return Promise resolve when the user is retrieved.
+     * @returns Promise resolve when the user is retrieved.
      */
     protected async getUserFromWS(
         userId: number,
@@ -394,14 +400,14 @@ export class CoreUserProvider {
      *
      * @param name Name of the preference.
      * @param siteId Site Id. If not defined, use current site.
-     * @return Preference value or null if preference not set.
+     * @returns Preference value or null if preference not set.
      */
     async getUserPreference(name: string, siteId?: string): Promise<string | null> {
         siteId = siteId || CoreSites.getCurrentSiteId();
 
         const preference = await CoreUtils.ignoreErrors(CoreUserOffline.getPreference(name, siteId));
 
-        if (preference && !CoreApp.isOnline()) {
+        if (preference && !CoreNetwork.isOnline()) {
             // Offline, return stored value.
             return preference.value;
         }
@@ -426,7 +432,7 @@ export class CoreUserProvider {
      * Get cache key for a user preference WS call.
      *
      * @param name Preference name.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getUserPreferenceCacheKey(name: string): string {
         return ROOT_CACHE_KEY + 'preference:' + name;
@@ -437,7 +443,7 @@ export class CoreUserProvider {
      *
      * @param name Name of the preference.
      * @param siteId Site Id. If not defined, use current site.
-     * @return Preference value or null if preference not set.
+     * @returns Preference value or null if preference not set.
      */
     async getUserPreferenceOnline(name: string, siteId?: string): Promise<string | null> {
         const site = await CoreSites.getSite(siteId);
@@ -446,7 +452,7 @@ export class CoreUserProvider {
             name,
         };
         const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getUserPreferenceCacheKey(params.name!),
+            cacheKey: this.getUserPreferenceCacheKey(name),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
         };
 
@@ -460,7 +466,7 @@ export class CoreUserProvider {
      *
      * @param userId User ID.
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateUserCache(userId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -473,7 +479,7 @@ export class CoreUserProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved when the list is invalidated.
+     * @returns Promise resolved when the list is invalidated.
      */
     async invalidateParticipantsList(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -486,7 +492,7 @@ export class CoreUserProvider {
      *
      * @param name Name of the preference.
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateUserPreference(name: string, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -498,7 +504,7 @@ export class CoreUserProvider {
      * Check if course participants is disabled in a certain site.
      *
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved with true if disabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if disabled, rejected or resolved with false otherwise.
      */
     async isParticipantsDisabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -510,7 +516,7 @@ export class CoreUserProvider {
      * Check if course participants is disabled in a certain site.
      *
      * @param site Site. If not defined, use current site.
-     * @return Whether it's disabled.
+     * @returns Whether it's disabled.
      */
     isParticipantsDisabledInSite(site?: CoreSite): boolean {
         site = site || CoreSites.getCurrentSite();
@@ -523,7 +529,7 @@ export class CoreUserProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
      */
     isPluginEnabledForCourse(courseId: number, siteId?: string): Promise<boolean> {
         if (!courseId) {
@@ -538,7 +544,7 @@ export class CoreUserProvider {
      * Check if update profile picture is disabled in a certain site.
      *
      * @param site Site. If not defined, use current site.
-     * @return True if disabled, false otherwise.
+     * @returns True if disabled, false otherwise.
      */
     isUpdatePictureDisabledInSite(site?: CoreSite): boolean {
         site = site || CoreSites.getCurrentSite();
@@ -552,7 +558,7 @@ export class CoreUserProvider {
      * @param userId User ID.
      * @param courseId Course ID.
      * @param name Name of the user.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async logView(userId: number, courseId?: number, name?: string, siteId?: string): Promise<CoreStatusWithWarningsWSResponse> {
         const site = await CoreSites.getSite(siteId);
@@ -575,7 +581,7 @@ export class CoreUserProvider {
      * Log Participants list view in Moodle.
      *
      * @param courseId Course ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async logParticipantsView(courseId: number, siteId?: string): Promise<CoreStatusWithWarningsWSResponse> {
         const site = await CoreSites.getSite(siteId);
@@ -595,7 +601,7 @@ export class CoreUserProvider {
      * @param userIds List of user IDs.
      * @param courseId Course the users belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when prefetched.
+     * @returns Promise resolved when prefetched.
      */
     async prefetchProfiles(userIds: number[], courseId?: number, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -607,7 +613,7 @@ export class CoreUserProvider {
         const treated: Record<string, boolean> = {};
 
         await Promise.all(userIds.map(async (userId) => {
-            if (userId === null) {
+            if (userId === null || !siteId) {
                 return;
             }
 
@@ -624,7 +630,7 @@ export class CoreUserProvider {
                 const profile = await this.getProfile(userId, courseId, false, siteId);
 
                 if (profile.profileimageurl) {
-                    await CoreFilepool.addToQueueByUrl(siteId!, profile.profileimageurl);
+                    await CoreFilepool.addToQueueByUrl(siteId, profile.profileimageurl);
                 }
             } catch (error) {
                 this.logger.warn(`Ignore error when prefetching user ${userId}`, error);
@@ -638,7 +644,7 @@ export class CoreUserProvider {
      * @param entries List of entries that have the images.
      * @param propertyName The name of the property that contains the image.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when prefetched.
+     * @returns Promise resolved when prefetched.
      */
     async prefetchUserAvatars(entries: Record<string, unknown>[], propertyName: string, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -652,7 +658,7 @@ export class CoreUserProvider {
         const promises = entries.map(async (entry) => {
             const imageUrl = <string> entry[propertyName];
 
-            if (!imageUrl || treated[imageUrl]) {
+            if (!imageUrl || treated[imageUrl] || !siteId) {
                 // It doesn't have an image or it has already been treated.
                 return;
             }
@@ -660,7 +666,7 @@ export class CoreUserProvider {
             treated[imageUrl] = true;
 
             try {
-                await CoreFilepool.addToQueueByUrl(siteId!, imageUrl);
+                await CoreFilepool.addToQueueByUrl(siteId, imageUrl);
             } catch (ex) {
                 this.logger.warn(`Ignore error when prefetching user avatar ${imageUrl}`, entry, ex);
             }
@@ -676,9 +682,9 @@ export class CoreUserProvider {
      * @param search The string to search.
      * @param searchAnywhere Whether to find a match anywhere or only at the beginning.
      * @param page Page to get.
-     * @param limitNumber Number of participants to get.
+     * @param perPage Number of participants to get.
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved when the participants are retrieved.
+     * @returns Promise resolved when the participants are retrieved.
      * @since 3.8
      */
     async searchParticipants(
@@ -717,7 +723,7 @@ export class CoreUserProvider {
      * @param fullname User full name.
      * @param avatar User avatar URL.
      * @param siteId ID of the site. If not defined, use current site.
-     * @return Promise resolve when the user is stored.
+     * @returns Promise resolve when the user is stored.
      */
     protected async storeUser(userId: number, fullname: string, avatar?: string, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -736,7 +742,7 @@ export class CoreUserProvider {
      *
      * @param users Users to store.
      * @param siteId ID of the site. If not defined, use current site.
-     * @return Promise resolve when the user is stored.
+     * @returns Promise resolve when the user is stored.
      */
     async storeUsers(users: CoreUserBasicData[], siteId?: string): Promise<void> {
 
@@ -755,12 +761,12 @@ export class CoreUserProvider {
      * @param name Name of the preference.
      * @param value Value of the preference.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved on success.
+     * @returns Promise resolved on success.
      */
     async setUserPreference(name: string, value: string, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // Offline, just update the preference.
             return CoreUserOffline.setPreference(name, value);
         }
@@ -791,7 +797,7 @@ export class CoreUserProvider {
      * @param value Preference new value.
      * @param userId User ID. If not defined, site's current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if success.
+     * @returns Promise resolved if success.
      */
     updateUserPreference(name: string, value: string | undefined, userId?: number, siteId?: string): Promise<void> {
         const preferences = [
@@ -811,7 +817,7 @@ export class CoreUserProvider {
      * @param disableNotifications Whether to disable all notifications. Undefined to not update this value.
      * @param userId User ID. If not defined, site's current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if success.
+     * @returns Promise resolved if success.
      */
     async updateUserPreferences(
         preferences: { type: string; value: string | undefined }[],
@@ -840,20 +846,6 @@ export class CoreUserProvider {
 
 }
 export const CoreUser = makeSingleton(CoreUserProvider);
-
-declare module '@singletons/events' {
-
-    /**
-     * Augment CoreEventsData interface with events specific to this service.
-     *
-     * @see https://www.typescriptlang.org/docs/handbook/declaration-merging.html#module-augmentation
-     */
-    export interface CoreEventsData {
-        [CoreUserProvider.PROFILE_REFRESHED]: CoreUserProfileRefreshedData;
-        [CoreUserProvider.PROFILE_PICTURE_UPDATED]: CoreUserProfilePictureUpdatedData;
-    }
-
-}
 
 /**
  * Data passed to PROFILE_REFRESHED event.
@@ -1011,7 +1003,7 @@ export type CoreUserParticipant = CoreUserBasicData & {
     interests?: string; // User interests (separated by commas).
     firstaccess?: number; // First access to the site (0 if never).
     lastaccess?: number; // Last access to the site (0 if never).
-    lastcourseaccess?: number | null; // Last access to the course (0 if never).
+    lastcourseaccess?: number | null; // @since 3.7. Last access to the course (0 if never).
     description?: string; // User profile description.
     descriptionformat?: number; // Description format (1 = HTML, 0 = MOODLE, 2 = PLAIN or 4 = MARKDOWN).
     city?: string; // Home city of the user.
@@ -1114,7 +1106,7 @@ type CoreUserGetUserPreferencesWSParams = {
 type CoreUserGetUserPreferencesWSResponse = {
     preferences: { // User custom fields (also known as user profile fields).
         name: string; // The name of the preference.
-        value: string; // The value of the preference.
+        value: string | null; // The value of the preference.
     }[];
     warnings?: CoreWSExternalWarning[];
 };

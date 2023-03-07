@@ -33,6 +33,7 @@ import {
     Type,
     KeyValueDiffer,
 } from '@angular/core';
+import { CorePromisedValue } from '@classes/promised-value';
 
 import { CoreCompile } from '@features/compile/services/compile';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -163,7 +164,7 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
     /**
      * Get a class that defines the dynamic component.
      *
-     * @return The component class.
+     * @returns The component class.
      */
     protected getComponentClass(): Type<unknown> {
         // eslint-disable-next-line @typescript-eslint/no-this-alias
@@ -171,6 +172,8 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
 
         // Create the component, using the text as the template.
         return class CoreCompileHtmlFakeComponent implements OnInit, AfterContentInit, AfterViewInit, OnDestroy {
+
+            private ongoingLifecycleHooks: Set<keyof AfterViewInit | keyof AfterContentInit | keyof OnDestroy> = new Set();
 
             constructor() {
                 // Store this instance so it can be accessed by the outer component.
@@ -221,21 +224,41 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
              * Content has been initialized.
              */
             ngAfterContentInit(): void {
-                // To be overridden.
+                this.callLifecycleHookOverride('ngAfterContentInit');
             }
 
             /**
              * View has been initialized.
              */
             ngAfterViewInit(): void {
-                // To be overridden.
+                this.callLifecycleHookOverride('ngAfterViewInit');
             }
 
             /**
              * Component destroyed.
              */
             ngOnDestroy(): void {
-                // To be overridden.
+                this.callLifecycleHookOverride('ngOnDestroy');
+            }
+
+            /**
+             * Call a lifecycle method that can be overriden in plugins.
+             *
+             * This is necessary because overriding lifecycle hooks at runtime does not work in Angular. This may be happening
+             * because lifecycle hooks are special methods treated by the Angular compiler, so it is possible that it's storing
+             * a reference to the method defined during compilation. In order to work around that, this will call the actual method
+             * from the plugin without causing infinite loops in case it wasn't overriden.
+             *
+             * @param method Lifecycle hook method name.
+             */
+            private callLifecycleHookOverride(method: keyof AfterViewInit | keyof AfterContentInit | keyof OnDestroy): void {
+                if (this.ongoingLifecycleHooks.has(method)) {
+                    return;
+                }
+
+                this.ongoingLifecycleHooks.add(method);
+                this[method]();
+                this.ongoingLifecycleHooks.delete(method);
             }
 
         };
@@ -261,7 +284,7 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
      * @param params List of params to send to the function.
      * @param callWhenCreated If this param is true and the component hasn't been created yet, call the function
      *                        once the component has been created.
-     * @return Result of the call. Undefined if no component instance or the function doesn't exist.
+     * @returns Result of the call. Undefined if no component instance or the function doesn't exist.
      */
     callComponentFunction(name: string, params?: unknown[], callWhenCreated: boolean = true): unknown {
         if (this.componentInstance) {
@@ -278,14 +301,14 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
                 return this.pendingCalls[name].defer.promise;
             }
 
-            const defer = CoreUtils.promiseDefer();
+            const defer = new CorePromisedValue();
 
             this.pendingCalls[name] = {
                 params,
                 defer,
             };
 
-            return defer.promise;
+            return defer;
         }
     }
 

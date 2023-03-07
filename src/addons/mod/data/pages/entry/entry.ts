@@ -56,6 +56,8 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
     protected fields: Record<number, AddonModDataField> = {};
     protected fieldsArray: AddonModDataField[] = [];
     protected logAfterFetch = true;
+    protected sortBy = 0;
+    protected sortDirection = 'DESC';
 
     moduleId = 0;
     courseId!: number;
@@ -139,6 +141,9 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
             this.title = CoreNavigator.getRouteParam<string>('title') || '';
             this.selectedGroup = CoreNavigator.getRouteNumberParam('group') || 0;
             this.offset = CoreNavigator.getRouteNumberParam('offset');
+            this.sortDirection = CoreNavigator.getRouteParam('sortDirection') ?? this.sortDirection;
+            const sortBy = Number(CoreNavigator.getRouteParam('sortBy'));
+            this.sortBy = isNaN(sortBy) ? this.sortBy : sortBy;
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
 
@@ -157,7 +162,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      *
      * @param refresh Whether to refresh the current data or not.
      * @param isPtr Whether is a pull to refresh action.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchEntryData(refresh = false, isPtr = false): Promise<void> {
         this.isPullingToRefresh = isPtr;
@@ -174,7 +179,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
             this.access = await AddonModData.getDatabaseAccessInformation(this.database.id, { cmId: this.moduleId });
 
             this.groupInfo = await CoreGroups.getActivityGroupInfo(this.database.coursemodule);
-            if (this.groupInfo.visibleGroups && this.groupInfo.groups?.length) {
+            if (this.groupInfo.visibleGroups && this.groupInfo.groups.length) {
                 // There is a bug in Moodle with All participants and visible groups (MOBILE-3597). Remove it.
                 this.groupInfo.groups = this.groupInfo.groups.filter(group => group.id !== 0);
                 this.groupInfo.defaultGroupId = this.groupInfo.groups[0].id;
@@ -189,9 +194,13 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
                 template,
                 this.fieldsArray,
                 this.entry!,
-                this.offset,
                 AddonModDataTemplateMode.SHOW,
                 actions,
+                {
+                    offset: this.offset,
+                    sortBy: this.sortBy,
+                    sortDirection: this.sortDirection,
+                },
             );
 
             this.showComments = actions.comments;
@@ -232,7 +241,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Go to selected entry without changing state.
      *
      * @param offset Entry offset.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async gotoEntry(offset: number): Promise<void> {
         this.offset = offset;
@@ -248,7 +257,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Refresh all the data.
      *
      * @param isPtr Whether is a pull to refresh action.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshAllData(isPtr?: boolean): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -276,7 +285,6 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Refresh the data.
      *
      * @param refresher Refresher.
-     * @return Promise resolved when done.
      */
     refreshDatabase(refresher?: IonRefresher): void {
         if (!this.entryLoaded) {
@@ -292,7 +300,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Set group to see the database.
      *
      * @param groupId Group identifier to set.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async setGroup(groupId: number): Promise<void> {
         this.selectedGroup = groupId;
@@ -308,7 +316,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
     /**
      * Convenience function to fetch the entry and set next/previous entries.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async setEntryFromOffset(): Promise<void> {
         if (this.offset === undefined && this.entryId !== undefined) {
@@ -331,8 +339,8 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
 
         const entries = await AddonModDataHelper.fetchEntries(this.database!, this.fieldsArray, {
             groupId: this.selectedGroup,
-            sort: 0,
-            order: 'DESC',
+            sort: this.sortBy,
+            order: this.sortDirection,
             page,
             perPage,
         });
@@ -344,6 +352,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
         if (this.offset === undefined) {
             // No offset passed, display the first entry.
             pageIndex = 0;
+            this.offset = 0;
         } else if (this.offset > 0) {
             // Online entry.
             pageIndex = this.offset % perPage + (entries.offlineEntries?.length || 0);
@@ -412,7 +421,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.syncObserver?.off();
