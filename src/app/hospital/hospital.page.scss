@@ -1,0 +1,21 @@
+ion-buttons {
+    font-size: 1.5rem;
+    margin-left: 12px;
+}
+
+button .gm-ui-hover-effect {
+    background: none;
+    display: block;
+    border: 0px;
+    margin: 0px;
+    padding: 0px;
+    text-transform: none;
+    appearance: none;
+    position: absolute;
+    cursor: pointer;
+    user-select: none;
+    top: 0px !important;
+    right: -5px;
+    width: 30px;
+    height: 30px;
+}

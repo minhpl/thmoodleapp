@@ -115,6 +115,8 @@ export class CoreSitePluginsPluginContentComponent implements OnInit, DoCheck {
             this.jsData.updateModuleCourseContent = this.updateModuleCourseContent.bind(this);
 
             this.onContentLoaded.emit({ refresh: !!refresh, success: true });
+
+            console.log(this.data,this.jsData,this.content)
         } catch (error) {
             // Make it think it's loaded - otherwise it sticks on 'loading' and stops navigation working.
             this.content = '<div></div>';

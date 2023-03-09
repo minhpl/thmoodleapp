@@ -143,6 +143,8 @@ export class CoreSitePluginsModuleIndexComponent implements OnInit, OnDestroy, C
         // Get the data for the context menu.
         this.description = this.module.description;
         this.externalUrl = this.module.url;
+
+        console.log(this.jsData)
     }
 
     /**
@@ -213,6 +215,8 @@ export class CoreSitePluginsModuleIndexComponent implements OnInit, OnDestroy, C
                 },
             },
         });
+
+        console.log(data)
 
         if (data && data.action == 'refresh' && this.content?.dataLoaded) {
             this.content?.refreshContent(true);

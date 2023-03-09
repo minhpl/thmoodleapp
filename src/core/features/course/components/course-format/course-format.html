@@ -1,13 +1,12 @@
 <core-navbar-buttons slot="end" prepend>
-    <ion-button fill="clear" (click)="gotoCourseDownloads()" [attr.aria-label]="'addon.storagemanager.coursedownloads' | translate">
+    <!-- <ion-button fill="clear" (click)="gotoCourseDownloads()" [attr.aria-label]="'addon.storagemanager.coursedownloads' | translate">
         <ion-icon name="fas-cloud-download-alt" slot="icon-only" aria-hidden="true"></ion-icon>
-    </ion-button>
+    </ion-button> -->
 </core-navbar-buttons>
 <core-dynamic-component [component]="courseFormatComponent" [data]="data">
-    <!-- Default course format. -->
+
     <core-loading [hideUntil]="loaded">
 
-        <!-- Single section. -->
         <div *ngIf="selectedSection && selectedSection.id != allSectionsId">
             <core-dynamic-component [component]="singleSectionComponent" [data]="data">
                 <ng-container *ngTemplateOutlet="sectionTemplate; context: {section: selectedSection}"></ng-container>
@@ -17,7 +16,7 @@
             </core-dynamic-component>
         </div>
 
-        <!-- Multiple sections. -->
+
         <div *ngIf="selectedSection && selectedSection.id == allSectionsId">
             <core-dynamic-component [component]="allSectionsComponent" [data]="data">
                 <ng-container *ngFor="let section of sections; index as i">
@@ -53,7 +52,7 @@
     [instanceId]="course.id">
 </core-block-side-blocks-button>
 
-<!-- Course Index button. -->
+
 <ion-fab slot="fixed" core-fab vertical="bottom" horizontal="end" *ngIf="loaded && displayCourseIndex">
     <ion-fab-button (click)="openCourseIndex()" [userTour]="courseIndexTour" [attr.aria-label]="'core.course.courseindex' | translate"
         color="secondary">
@@ -62,7 +61,7 @@
     </ion-fab-button>
 </ion-fab>
 
-<!-- Template to render a section. -->
+
 <ng-template #sectionTemplate let-section="section">
     <section *ngIf="!section.hiddenbynumsections && section.id != allSectionsId && section.id != stealthModulesSectionId"
         class="core-course-module-list-wrapper" [id]="section.id">

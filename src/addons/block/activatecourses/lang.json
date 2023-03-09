@@ -1,0 +1,9 @@
+{
+    "nocourses": "No recent courses",
+    "pluginname": "Registered Courses",
+    "btnactivecourse": "Activate course",
+    "comfirmquestion": "The course {{$a.fullname}} is valid for {{$a.duration_hr}} from the datetime of activation. Are you sure you want to active now?",
+    "comfirmquestion2": "Are you sure you want to active the courses {{$a.fullname}} now?",
+    "btnactivenow": "Activate now",
+    "btngoback": "Go back"
+}

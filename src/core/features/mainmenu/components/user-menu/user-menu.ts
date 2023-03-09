@@ -160,8 +160,8 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         this.nav.navigateForward(['main/purchase_history', { data: JSON.stringify(this.theuser)  }])
     }
 
-    Transcript() {
-        this.nav.navigateForward(['main/transcript'])
+    Gradebook() {
+        this.nav.navigateForward(['main/gradebook'])
     }
     /**
      * A handler was clicked.

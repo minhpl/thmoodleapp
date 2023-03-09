@@ -1,0 +1,97 @@
+<ion-header>
+  <ion-toolbar>
+    <div class="header-title">
+      <img src="../../assets/img/logovmc.png">
+      <h3>VMC</h3>
+    </div>
+    <ion-icon class="prouct_icon_cart" (click)="view_cart(product)" name="cart-outline"></ion-icon>
+    <!-- <p class="product_total_orders" *ngIf="boolean_total">{{total_product}}</p> -->
+    <ion-icon class="search" name="search" (click)="Search()"></ion-icon>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content fullscreen="true">
+  <!-- <ion-grid>
+    <ion-row>
+      <ion-col size="6" (click)="hospital()">
+        <img src="../../assets/img/hospital_logo.png">
+        Bệnh viện
+      </ion-col>
+      <ion-col size="6" (click)="spa()">
+        <img src="../../assets/img/spa.png">
+        Thẩm mỹ
+      </ion-col>
+    </ion-row>
+  </ion-grid> -->
+
+  <ion-slides pager [options]="slideOpts1" class="slides_introduce">
+
+    <ion-slide>
+      <img src="../../assets/img/slide1.png">
+    </ion-slide>
+
+    <ion-slide>
+      <img src="../../assets/img/slide2.png">
+    </ion-slide>
+
+    <ion-slide>
+      <img src="../../assets/img/slide3.jpg">
+    </ion-slide>
+
+    <ion-slide>
+      <img src="../../assets/img/slide4.jpg">
+    </ion-slide>
+
+  </ion-slides>
+  <header>
+    <div class="title-menu">
+      <span>Khóa học nổi bật</span>
+    </div>
+    <p>Cho bạn</p>
+  </header>
+  <ion-slides [options]="slideOpts" class="ion-slides-products">
+    <ion-slide *ngFor="let product of products" (click)="openProductPage(product)">
+      <ion-card>
+        <img src={{product.images[0].src}} alt="">
+        <ion-card-content>
+          <div class="ion-card-price">
+            <span class="product-name">{{product.name1}}</span>
+            <span class="ion-card-description" style="font-size: 0.9rem; font-weight: 400;"
+              [innerHTML]="product.short_description.substr(0,50) + '...'"></span>
+          </div>
+          <div>
+            <p class="sale_price">{{product.sale_price | currency :'VND' :true: '1.0-3'}}</p>
+            <p style="margin-top: 1px;">{{product.regular_price | currency :'VND' :true: '1.0-3'}}</p>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </ion-slide>
+  </ion-slides>
+  <header>
+    <div class="title-menu">
+      <span>Khóa học xu hướng</span>
+    </div>
+    <p>Xu hướng học tập của thời đại</p>
+  </header>
+  <ion-slides [options]="slideOpts" class="ion-slides-products">
+    <ion-slide *ngFor="let product of productscombo" (click)="openProductPage(product)">
+      <ion-card>
+        <img src={{product.images[0].src}} alt="">
+        <ion-card-content>
+          <div class="ion-card-price">
+            <span class="product-name">{{product.name1}}</span>
+            <span style="font-size: 0.9rem; font-weight: 400;" class="ion-card-description" *ngIf="product.short_description"
+              [innerHTML]="product.short_description.substr(0,50) + '...'"></span>
+          </div>
+          <div>
+            <p class="sale_price">{{product.sale_price | currency :'VND' :true: '1.0-3'}}</p>
+            <p style="margin-top: 1px;">{{product.regular_price | currency :'VND' :true: '1.0-3'}}</p>
+          </div>
+        </ion-card-content>
+      </ion-card>
+    </ion-slide>
+  </ion-slides>
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+</ion-content>

@@ -42,6 +42,7 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
 
     constructor(@Optional() courseContentsPage?: CoreCourseContentsPage) {
         super('AddonModPageIndexComponent', courseContentsPage);
+        //console.log(this.module.id)
     }
 
     /**
