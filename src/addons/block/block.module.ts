@@ -41,6 +41,7 @@ import { AddonBlockSiteMainMenuModule } from './sitemainmenu/sitemainmenu.module
 import { AddonBlockStarredCoursesModule } from './starredcourses/starredcourses.module';
 import { AddonBlockTagsModule } from './tags/tags.module';
 import { AddonBlockTimelineModule } from './timeline/timeline.module';
+import { AddonBlockCourseStatusModule } from './coursestatus/html.module';
 
 @NgModule({
     imports: [
@@ -71,6 +72,7 @@ import { AddonBlockTimelineModule } from './timeline/timeline.module';
         AddonBlockStarredCoursesModule,
         AddonBlockTagsModule,
         AddonBlockTimelineModule,
+        AddonBlockCourseStatusModule
     ],
 })
 export class AddonBlockModule { }

@@ -75,7 +75,7 @@ export class AddonBlockStarredCoursesComponent extends CoreBlockBaseComponent im
     /**
      * @inheritdoc
      */
-    protected async invalidateContent(): Promise<void> {
+    async invalidateContent(): Promise<void> {
         const courseIds = this.courses.map((course) => course.id);
 
         await this.invalidateCourses(courseIds);
@@ -84,7 +84,7 @@ export class AddonBlockStarredCoursesComponent extends CoreBlockBaseComponent im
     /**
      * Invalidate list of courses.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async invalidateCourseList(): Promise<void> {
         return AddonBlockStarredCourses.invalidateStarredCourses();
@@ -94,7 +94,7 @@ export class AddonBlockStarredCoursesComponent extends CoreBlockBaseComponent im
      * Helper function to invalidate only selected courses.
      *
      * @param courseIds Course Id array.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async invalidateCourses(courseIds: number[]): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -153,20 +153,20 @@ export class AddonBlockStarredCoursesComponent extends CoreBlockBaseComponent im
      * Refresh course list based on a EVENT_MY_COURSES_UPDATED event.
      *
      * @param data Event data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshCourseList(data: CoreCoursesMyCoursesUpdatedEventData): Promise<void> {
         if (data.action == CoreCoursesProvider.ACTION_ENROL) {
             // Always update if user enrolled in a course.
             // New courses shouldn't be favourite by default, but just in case.
-            return await this.refreshContent();
+            return this.refreshContent();
         }
 
         if (data.action == CoreCoursesProvider.ACTION_STATE_CHANGED && data.state == CoreCoursesProvider.STATE_FAVOURITE) {
             const courseIndex = this.courses.findIndex((course) => course.id == data.courseId);
             if (courseIndex < 0) {
                 // Not found, use WS update. Usually new favourite.
-                return await this.refreshContent();
+                return this.refreshContent();
             }
 
             const course = this.courses[courseIndex];

@@ -25,7 +25,11 @@ import {
 import { makeSingleton, Translate } from '@singletons';
 import { CoreWSExternalFile } from '@services/ws';
 import { AddonCourseCompletion } from '@addons/coursecompletion/services/coursecompletion';
-import moment from 'moment';
+import moment from 'moment-timezone';
+import { of } from 'rxjs';
+import { firstValueFrom, zipIncludingComplete } from '@/core/utils/rxjs';
+import { catchError, map } from 'rxjs/operators';
+import { chainRequests, WSObservable } from '@classes/site';
 
 /**
  * Helper to gather some common courses functions.
@@ -39,7 +43,7 @@ export class CoreCoursesHelperProvider {
      * Get the courses to display the course picker popover. If a courseId is specified, it will also return its categoryId.
      *
      * @param courseId Course ID to get the category.
-     * @return Promise resolved with the list of courses and the category.
+     * @returns Promise resolved with the list of courses and the category.
      */
     async getCoursesForPopover(courseId?: number): Promise<{courses: Partial<CoreEnrolledCourseData>[]; categoryId?: number}> {
         const courses: Partial<CoreEnrolledCourseData>[] = await CoreCourses.getUserCourses(false);
@@ -93,7 +97,7 @@ export class CoreCoursesHelperProvider {
      * Loads the color of courses or the thumb image.
      *
      * @param courses List of courses.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async loadCoursesColorAndImage(courses: CoreCourseSearchedData[]): Promise<void> {
         if (!courses.length) {
@@ -109,37 +113,55 @@ export class CoreCoursesHelperProvider {
      *
      * @param courses List of courses.
      * @param loadCategoryNames Whether load category names or not.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async loadCoursesExtraInfo(courses: CoreEnrolledCourseDataWithExtraInfo[], loadCategoryNames: boolean = false): Promise<void> {
-        if (!courses.length ) {
-            // No courses or cannot get the data, stop.
-            return;
+    loadCoursesExtraInfo(
+        courses: CoreEnrolledCourseDataWithExtraInfo[],
+        loadCategoryNames: boolean = false,
+    ): Promise<CoreEnrolledCourseDataWithExtraInfo[]> {
+        return firstValueFrom(this.loadCoursesExtraInfoObservable(courses, loadCategoryNames));
+    }
+
+    /**
+     * Given a list of courses returned by core_enrol_get_users_courses, load some extra data using the WebService
+     * core_course_get_courses_by_field if available.
+     *
+     * @param courses List of courses.
+     * @param loadCategoryNames Whether load category names or not.
+     * @returns Promise resolved when done.
+     */
+    loadCoursesExtraInfoObservable(
+        courses: CoreEnrolledCourseDataWithExtraInfo[],
+        loadCategoryNames: boolean = false,
+        options: CoreSitesCommonWSOptions = {},
+    ): WSObservable<CoreEnrolledCourseDataWithExtraInfo[]> {
+        if (!courses.length) {
+            return of([]);
         }
 
-        let coursesInfo = {};
-        let courseInfoAvailable = false;
-
-        if (loadCategoryNames || (courses[0].overviewfiles === undefined && courses[0].displayname === undefined)) {
-            const courseIds = courses.map((course) => course.id).join(',');
-
-            courseInfoAvailable = true;
-
-            // Get the extra data for the courses.
-            const coursesInfosArray = await CoreCourses.getCoursesByField('ids', courseIds);
-
-            coursesInfo = CoreUtils.arrayToObject(coursesInfosArray, 'id');
+        if (!loadCategoryNames && (courses[0].overviewfiles !== undefined || courses[0].displayname !== undefined)) {
+            // No need to load more data.
+            return of(courses);
         }
 
-        courses.forEach((course) => {
-            this.loadCourseExtraInfo(course, courseInfoAvailable ? coursesInfo[course.id] : course, loadCategoryNames);
-        });
+        const courseIds = courses.map((course) => course.id).join(',');
+
+        // Get the extra data for the courses.
+        return CoreCourses.getCoursesByFieldObservable('ids', courseIds, options).pipe(map(coursesInfosArray => {
+            const coursesInfo = CoreUtils.arrayToObject(coursesInfosArray, 'id');
+
+            courses.forEach((course) => {
+                this.loadCourseExtraInfo(course, coursesInfo[course.id], loadCategoryNames);
+            });
+
+            return courses;
+        }));
     }
 
     /**
      * Load course colors from site config.
      *
-     * @return course colors RGB.
+     * @returns course colors RGB.
      */
     protected async loadCourseSiteColors(): Promise<(string | undefined)[]> {
         const site = CoreSites.getRequiredCurrentSite();
@@ -196,43 +218,77 @@ export class CoreCoursesHelperProvider {
      * @param slice Slice results to get the X first one. If slice > 0 it will be done after sorting.
      * @param filter Filter using some field.
      * @param loadCategoryNames Whether load category names or not.
-     * @return Courses filled with options.
+     * @param options Options.
+     * @returns Courses filled with options.
      */
-    async getUserCoursesWithOptions(
+    getUserCoursesWithOptions(
         sort: string = 'fullname',
         slice: number = 0,
         filter?: string,
         loadCategoryNames: boolean = false,
         options: CoreSitesCommonWSOptions = {},
-    ): Promise<CoreEnrolledCourseDataWithOptions[]> {
-
-        let courses: CoreEnrolledCourseDataWithOptions[] = await CoreCourses.getUserCourses(
-            false,
-            options.siteId,
-            options.readingStrategy,
-        );
-        if (courses.length <= 0) {
-            return [];
-        }
-
-        const promises: Promise<void>[] = [];
-        const courseIds = courses.map((course) => course.id);
-
-        // Load course options of the course.
-        promises.push(CoreCourses.getCoursesAdminAndNavOptions(courseIds, options.siteId).then((options) => {
-            courses.forEach((course) => {
-                course.navOptions = options.navOptions[course.id];
-                course.admOptions = options.admOptions[course.id];
-            });
-
-            return;
+    ): Promise<CoreEnrolledCourseDataWithExtraInfoAndOptions[]> {
+        return firstValueFrom(this.getUserCoursesWithOptionsObservable({
+            sort,
+            slice,
+            filter,
+            loadCategoryNames,
+            ...options,
         }));
+    }
 
-        promises.push(this.loadCoursesExtraInfo(courses, loadCategoryNames));
+    /**
+     * Get user courses with admin and nav options.
+     *
+     * @param options Options.
+     * @returns Courses filled with options.
+     */
+    getUserCoursesWithOptionsObservable(
+        options: CoreCoursesGetWithOptionsOptions = {},
+    ): WSObservable<CoreEnrolledCourseDataWithExtraInfoAndOptions[]> {
 
-        await Promise.all(promises);
+        return CoreCourses.getUserCoursesObservable(options).pipe(
+            chainRequests(options.readingStrategy, (courses, newReadingStrategy) => {
+                if (courses.length <= 0) {
+                    return of([]);
+                }
 
-        switch (filter) {
+                const courseIds = courses.map((course) => course.id); // Use all courses to get options, to use cache.
+                const newOptions = {
+                    ...options,
+                    readingStrategy: newReadingStrategy,
+                };
+                courses = this.filterAndSortCoursesWithOptions(courses, options);
+
+                return zipIncludingComplete(
+                    this.loadCoursesExtraInfoObservable(courses, options.loadCategoryNames, newOptions),
+                    CoreCourses.getCoursesAdminAndNavOptionsObservable(courseIds, newOptions).pipe(map(courseOptions => {
+                        courses.forEach((course: CoreEnrolledCourseDataWithOptions) => {
+                            course.navOptions = courseOptions.navOptions[course.id];
+                            course.admOptions = courseOptions.admOptions[course.id];
+                        });
+                    })),
+                    ...courses.map(course => this.loadCourseCompletedStatus(course, newOptions)),
+                ).pipe(map(() => courses));
+            }),
+        );
+    }
+
+    /**
+     * Filter and sort some courses.
+     *
+     * @param courses Courses.
+     * @param options Options
+     * @returns Courses filtered and sorted.
+     */
+    protected filterAndSortCoursesWithOptions(
+        courses: CoreEnrolledCourseData[],
+        options: CoreCoursesGetWithOptionsOptions = {},
+    ): CoreEnrolledCourseData[] {
+        const sort = options.sort ?? 'fullname';
+        const slice = options.slice ?? -1;
+
+        switch (options.filter) {
             case 'isfavourite':
                 courses = courses.filter((course) => !!course.isfavourite);
                 break;
@@ -270,28 +326,42 @@ export class CoreCoursesHelperProvider {
 
         courses = slice > 0 ? courses.slice(0, slice) : courses;
 
-        return Promise.all(courses.map(async (course) => {
-            if (course.completed !== undefined) {
-                // The WebService already returns the completed status, no need to fetch it.
+        return courses;
+    }
+
+    /**
+     * Given a course object, fetch and set its completed status if not present already.
+     *
+     * @param course Course.
+     * @returns Observable.
+     */
+    protected loadCourseCompletedStatus(
+        course: CoreEnrolledCourseDataWithExtraInfo,
+        options: CoreSitesCommonWSOptions = {},
+    ): WSObservable<CoreEnrolledCourseDataWithExtraInfo> {
+        if (course.completed !== undefined) {
+            // The WebService already returns the completed status, no need to fetch it.
+            return of(course);
+        }
+
+        if (course.enablecompletion !== undefined && !course.enablecompletion) {
+            // Completion is disabled for this course, there is no need to fetch the completion status.
+            return of(course);
+        }
+
+        return AddonCourseCompletion.getCompletionObservable(course.id, options).pipe(
+            map(completion => {
+                course.completed = completion.completed;
+
                 return course;
-            }
-
-            if (course.enablecompletion !== undefined && !course.enablecompletion) {
-                // Completion is disabled for this course, there is no need to fetch the completion status.
-                return course;
-            }
-
-            try {
-                const completion = await AddonCourseCompletion.getCompletion(course.id, undefined, undefined, options.siteId);
-
-                course.completed = completion?.completed;
-            } catch {
+            }),
+            catchError(() => {
                 // Ignore error, maybe course completion is disabled or user has no permission.
                 course.completed = false;
-            }
 
-            return course;
-        }));
+                return of(course);
+            }),
+        );
     }
 
     /**
@@ -299,7 +369,7 @@ export class CoreCoursesHelperProvider {
      *
      * @param course Course Object.
      * @param gradePeriodAfter Classify past courses as in progress for these many days after the course end date.
-     * @return Wether the course is past.
+     * @returns Wether the course is past.
      */
     isPastCourse(course: CoreEnrolledCourseDataWithOptions, gradePeriodAfter = 0): boolean {
         if (course.completed) {
@@ -322,7 +392,7 @@ export class CoreCoursesHelperProvider {
      * @param course Course Object.
      * @param gradePeriodAfter Classify past courses as in progress for these many days after the course end date.
      * @param gradePeriodBefore Classify future courses as in progress for these many days prior to the course start date.
-     * @return Wether the course is future.
+     * @returns Wether the course is future.
      */
     isFutureCourse(
         course: CoreEnrolledCourseDataWithOptions,
@@ -337,6 +407,15 @@ export class CoreCoursesHelperProvider {
         const startDate = moment(course.startdate * 1000).subtract(gradePeriodBefore, 'days').valueOf();
 
         return startDate > Date.now();
+    }
+
+    /**
+     * Retrieves my courses page module.
+     *
+     * @returns My courses page module.
+     */
+    async getMyRouteModule(): Promise<unknown> {
+        return import('../pages/my/my.module').then(m => m.CoreCoursesMyCoursesPageModule);
     }
 
 }
@@ -392,4 +471,14 @@ export type CoreCourseSearchedDataWithExtraInfoAndOptions = CoreCourseWithImageA
  */
 export type CoreCourseAnyCourseDataWithExtraInfoAndOptions = CoreCourseWithImageAndColor & CoreCourseAnyCourseDataWithOptions & {
     categoryname?: string; // Category name,
+};
+
+/**
+ * Options for getUserCoursesWithOptionsObservable.
+ */
+export type CoreCoursesGetWithOptionsOptions = CoreSitesCommonWSOptions & {
+    sort?: string; // Sort courses after get them. Defaults to 'fullname'.
+    slice?: number; // Slice results to get the X first one. If slice > 0 it will be done after sorting.
+    filter?: string; // Filter using some field.
+    loadCategoryNames?: boolean; // Whether load category names or not.
 };

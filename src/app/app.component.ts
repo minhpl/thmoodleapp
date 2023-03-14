@@ -12,66 +12,45 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AfterViewInit, ChangeDetectorRef, Component, OnInit, ViewChild } from '@angular/core';
+import { AfterViewInit, Component, OnInit, ViewChild } from '@angular/core';
 import { IonRouterOutlet } from '@ionic/angular';
 import { BackButtonEvent, ScrollDetail } from '@ionic/core';
 
 import { CoreLang } from '@services/lang';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
 import { CoreEvents } from '@singletons/events';
-import { Network, NgZone, Platform, SplashScreen, Translate } from '@singletons';
-import { CoreApp, CoreAppProvider } from '@services/app';
+import { NgZone, SplashScreen } from '@singletons';
+import { CoreNetwork } from '@services/network';
+import { CoreApp } from '@services/app';
 import { CoreSites } from '@services/sites';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSubscriptions } from '@singletons/subscriptions';
 import { CoreWindow } from '@singletons/window';
-import { CoreCustomURLSchemes } from '@services/urlschemes';
 import { CoreUtils } from '@services/utils/utils';
-import { CoreUrlUtils } from '@services/utils/url';
 import { CoreConstants } from '@/core/constants';
 import { CoreSitePlugins } from '@features/siteplugins/services/siteplugins';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreDom } from '@singletons/dom';
+import { CorePlatform } from '@services/platform';
 
 const MOODLE_VERSION_PREFIX = 'version-';
 const MOODLEAPP_VERSION_PREFIX = 'moodleapp-';
 
-type AutomatedTestsWindow = Window & {
-    changeDetector?: ChangeDetectorRef;
-};
-
 @Component({
     selector: 'app-root',
     templateUrl: 'app.component.html',
-    styleUrls: ['app.component.scss'],
 })
 export class AppComponent implements OnInit, AfterViewInit {
 
     @ViewChild(IonRouterOutlet) outlet?: IonRouterOutlet;
 
-    protected lastUrls: Record<string, number> = {};
-    protected lastInAppUrl?: string;
-
-    constructor(changeDetector: ChangeDetectorRef) {
-        if (CoreAppProvider.isAutomated()) {
-            (window as AutomatedTestsWindow).changeDetector = changeDetector;
-        }
-    }
-
     /**
-     * Component being initialized.
-     *
-     * @todo Review all old code to see if something is missing:
-     * - IAB events listening.
-     * - Platform pause/resume subscriptions.
-     * - handleOpenURL and openWindowSafely.
-     * - Back button registering to close modal first.
-     * - Note: HideKeyboardFormAccessoryBar has been moved to config.xml.
+     * @inheritdoc
      */
     ngOnInit(): void {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const win = <any> window;
-        document.body.classList.add('ionic5');
+        CoreDomUtils.toggleModeClass('ionic5', true);
         this.addVersionClass(MOODLEAPP_VERSION_PREFIX, CoreConstants.CONFIG.versionname.replace('-dev', ''));
 
         CoreEvents.on(CoreEvents.LOGOUT, async () => {
@@ -108,111 +87,15 @@ export class AppComponent implements OnInit, AfterViewInit {
             content.classList.toggle('core-footer-shadow', !CoreDom.scrollIsBottom(scrollElement));
         });
 
-        // Listen for session expired events.
-        CoreEvents.on(CoreEvents.SESSION_EXPIRED, (data) => {
-            CoreLoginHelper.sessionExpired(data);
-        });
-
-        // Listen for passwordchange and usernotfullysetup events to open InAppBrowser.
-        CoreEvents.on(CoreEvents.PASSWORD_CHANGE_FORCED, (data) => {
-            CoreLoginHelper.passwordChangeForced(data.siteId!);
-        });
-        CoreEvents.on(CoreEvents.USER_NOT_FULLY_SETUP, (data) => {
-            CoreLoginHelper.openInAppForEdit(data.siteId!, '/user/edit.php', 'core.usernotfullysetup');
-        });
-
-        // Listen for sitepolicynotagreed event to accept the site policy.
-        CoreEvents.on(CoreEvents.SITE_POLICY_NOT_AGREED, (data) => {
-            CoreLoginHelper.sitePolicyNotAgreed(data.siteId);
-        });
-
-        // Check URLs loaded in any InAppBrowser.
-        CoreEvents.on(CoreEvents.IAB_LOAD_START, (event) => {
-            // URLs with a custom scheme can be prefixed with "http://" or "https://", we need to remove this.
-            const protocol = CoreUrlUtils.getUrlProtocol(event.url);
-            const url = event.url.replace(/^https?:\/\//, '');
-            const urlScheme = CoreUrlUtils.getUrlProtocol(url);
-            const isExternalApp = urlScheme && urlScheme !== 'file' && urlScheme !== 'cdvfile';
-
-            if (CoreCustomURLSchemes.isCustomURL(url)) {
-                // Close the browser if it's a valid SSO URL.
-                CoreCustomURLSchemes.handleCustomURL(url).catch((error) => {
-                    CoreCustomURLSchemes.treatHandleCustomURLError(error);
-                });
-                CoreUtils.closeInAppBrowser();
-
-            } else if (isExternalApp && url.includes('://token=')) {
-                // It's an SSO token for another app. Close the IAB and show an error.
-                CoreUtils.closeInAppBrowser();
-                CoreDomUtils.showErrorModal(Translate.instant('core.login.contactyouradministratorissue', {
-                    $a: '<br><br>' + Translate.instant('core.errorurlschemeinvalidscheme', {
-                        $a: urlScheme,
-                    }),
-                }));
-
-            } else if (CoreApp.isAndroid()) {
-                // Check if the URL has a custom URL scheme. In Android they need to be opened manually.
-                if (isExternalApp) {
-                    // Open in browser should launch the right app if found and do nothing if not found.
-                    CoreUtils.openInBrowser(url, { showBrowserWarning: false });
-
-                    // At this point the InAppBrowser is showing a "Webpage not available" error message.
-                    // Try to navigate to last loaded URL so this error message isn't found.
-                    if (this.lastInAppUrl) {
-                        CoreUtils.openInApp(this.lastInAppUrl);
-                    } else {
-                        // No last URL loaded, close the InAppBrowser.
-                        CoreUtils.closeInAppBrowser();
-                    }
-                } else {
-                    this.lastInAppUrl = protocol ? `${protocol}://${url}` : url;
-                }
-            }
-        });
-
-        // Check InAppBrowser closed.
-        CoreEvents.on(CoreEvents.IAB_EXIT, () => {
-            this.lastInAppUrl = '';
-
-            if (CoreLoginHelper.isWaitingForBrowser()) {
-                CoreLoginHelper.stopWaitingForBrowser();
-                CoreLoginHelper.checkLogout();
-            }
-        });
-
-        Platform.resume.subscribe(() => {
+        CorePlatform.resume.subscribe(() => {
             // Wait a second before setting it to false since in iOS there could be some frozen WS calls.
             setTimeout(() => {
-                if (CoreLoginHelper.isWaitingForBrowser()) {
+                if (CoreLoginHelper.isWaitingForBrowser() && !CoreUtils.isInAppBrowserOpen()) {
                     CoreLoginHelper.stopWaitingForBrowser();
                     CoreLoginHelper.checkLogout();
                 }
             }, 1000);
         });
-
-        // Handle app launched with a certain URL (custom URL scheme).
-        win.handleOpenURL = (url: string): void => {
-            // Execute the callback in the Angular zone, so change detection doesn't stop working.
-            NgZone.run(() => {
-                // First check that the URL hasn't been treated a few seconds ago. Sometimes this function is called more than once.
-                if (this.lastUrls[url] && Date.now() - this.lastUrls[url] < 3000) {
-                    // Function called more than once, stop.
-                    return;
-                }
-
-                if (!CoreCustomURLSchemes.isCustomURL(url)) {
-                    // Not a custom URL, ignore.
-                    return;
-                }
-
-                this.lastUrls[url] = Date.now();
-
-                CoreEvents.trigger(CoreEvents.APP_LAUNCHED_URL, { url });
-                CoreCustomURLSchemes.handleCustomURL(url).catch((error) => {
-                    CoreCustomURLSchemes.treatHandleCustomURLError(error);
-                });
-            });
-        };
 
         // "Expose" CoreWindow.open.
         win.openWindowSafely = (url: string, name?: string): void => {
@@ -287,6 +170,9 @@ export class AppComponent implements OnInit, AfterViewInit {
                 CoreApp.closeApp();
             });
         });
+
+        // @todo Pause Youtube videos in Android when app is put in background or screen is locked?
+        // See: https://github.com/moodlehq/moodleapp/blob/ionic3/src/app/app.component.ts#L312
     }
 
     /**
@@ -304,31 +190,31 @@ export class AppComponent implements OnInit, AfterViewInit {
      * Async init function on platform ready.
      */
     protected async onPlatformReady(): Promise<void> {
-        await Platform.ready();
+        await CorePlatform.ready();
 
         // Refresh online status when changes.
-        Network.onChange().subscribe(() => {
+        CoreNetwork.onChange().subscribe(() => {
             // Execute the callback in the Angular zone, so change detection doesn't stop working.
             NgZone.run(() => {
-                const isOnline = CoreApp.isOnline();
-                const hadOfflineMessage = document.body.classList.contains('core-offline');
+                const isOnline = CoreNetwork.isOnline();
+                const hadOfflineMessage = CoreDomUtils.hasModeClass('core-offline');
 
-                document.body.classList.toggle('core-offline', !isOnline);
+                CoreDomUtils.toggleModeClass('core-offline', !isOnline);
 
                 if (isOnline && hadOfflineMessage) {
-                    document.body.classList.add('core-online');
+                    CoreDomUtils.toggleModeClass('core-online', true);
 
                     setTimeout(() => {
-                        document.body.classList.remove('core-online');
+                        CoreDomUtils.toggleModeClass('core-online', false);
                     }, 3000);
                 } else if (!isOnline) {
-                    document.body.classList.remove('core-online');
+                    CoreDomUtils.toggleModeClass('core-online', false);
                 }
             });
         });
 
-        const isOnline = CoreApp.isOnline();
-        document.body.classList.toggle('core-offline', !isOnline);
+        const isOnline = CoreNetwork.isOnline();
+        CoreDomUtils.toggleModeClass('core-offline', !isOnline);
 
         // Set StatusBar properties.
         CoreApp.setStatusBarColor();
@@ -357,11 +243,9 @@ export class AppComponent implements OnInit, AfterViewInit {
         parts[1] = parts[1] || '0';
         parts[2] = parts[2] || '0';
 
-        document.body.classList.add(
-            prefix + parts[0],
-            prefix + parts[0] + '-' + parts[1],
-            prefix + parts[0] + '-' + parts[1] + '-' + parts[2],
-        );
+        CoreDomUtils.toggleModeClass(prefix + parts[0], true);
+        CoreDomUtils.toggleModeClass(prefix + parts[0] + '-' + parts[1], true);
+        CoreDomUtils.toggleModeClass(prefix + parts[0] + '-' + parts[1] + '-' + parts[2], true);
     }
 
     /**
@@ -370,17 +254,13 @@ export class AppComponent implements OnInit, AfterViewInit {
      * @param prefix Prefix of to the class.
      */
     protected removeVersionClass(prefix: string): void {
-        const remove: string[] = [];
-
-        Array.from(document.body.classList).forEach((tempClass) => {
-            if (tempClass.substring(0, 8) == prefix) {
-                remove.push(tempClass);
+        for (const versionClass of CoreDomUtils.getModeClasses()) {
+            if (!versionClass.startsWith(prefix)) {
+                continue;
             }
-        });
 
-        remove.forEach((tempClass) => {
-            document.body.classList.remove(tempClass);
-        });
+            CoreDomUtils.toggleModeClass(versionClass, false);
+        }
     }
 
 }

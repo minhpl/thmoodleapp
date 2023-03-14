@@ -42,7 +42,7 @@ export class AddonModWikiPrefetchHandlerService extends CoreCourseActivityPrefet
      * @param module The module object returned by WS.
      * @param courseId The course ID.
      * @param options Other options.
-     * @return List of pages.
+     * @returns List of pages.
      */
     protected async getAllPages(
         module: CoreCourseAnyModuleData,
@@ -140,7 +140,7 @@ export class AddonModWikiPrefetchHandlerService extends CoreCourseActivityPrefet
         return this.prefetchPackage(
             module,
             courseId,
-            this.prefetchWiki.bind(this, module, courseId, !!single, downloadTime),
+            (siteId) => this.prefetchWiki(module, courseId, !!single, downloadTime, siteId),
             siteId,
         );
     }
@@ -153,7 +153,7 @@ export class AddonModWikiPrefetchHandlerService extends CoreCourseActivityPrefet
      * @param single True if we're downloading a single module, false if we're downloading a whole section.
      * @param downloadTime The previous download time, 0 if no previous download.
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchWiki(
         module: CoreCourseAnyModuleData,

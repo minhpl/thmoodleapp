@@ -1,4 +1,4 @@
-Moodle App 4.0.2
+Moodle App
 =================
 
 This is the primary repository of source code for the official mobile app for Moodle.

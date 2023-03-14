@@ -3,6 +3,7 @@
 # Script to create langindex from available language packs.
 # ./create_langindex.sh [findbetter]
 # If findbetter is set it will try to find a better solution for every key.
+# Edit lang_functions.sh LANGPACKSFOLDER variable to match your system's
 #
 
 source "functions.sh"
@@ -39,12 +40,14 @@ function exists_in_file {
 
     completeFile="$LANGPACKSFOLDER/en/$file.php"
     if [ -f "$completeFile" ]; then
-        coincidence=`grep "string\[\'$id\'\]" $completeFile`
-        if [ ! -z "$coincidence" ]; then
+        foundInFile=`grep "string\[\'$id\'\]" $completeFile`
+        if [ ! -z "$foundInFile" ]; then
+            coincidence=1
             found=$file
             return
         fi
     fi
+    coincidence=0
     found=0
 }
 
@@ -67,6 +70,8 @@ function do_match {
         print_message "$2"
         tput setaf 6
         grep "$match" $LANGPACKSFOLDER/en/*.php
+    else
+        coincidence=0
     fi
 }
 
