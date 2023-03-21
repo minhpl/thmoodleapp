@@ -46,8 +46,8 @@ const appRoutes: Routes = [
         loadChildren: () => import('./pages/reload/reload.module').then( m => m.CoreMainMenuReloadPageModule),
     },
     {
-        path: 'transcript',
-        loadChildren: () => import('./pages/transcript/transcript.module').then( m => m.TranscriptPageModule),
+        path: 'gradebook',
+        loadChildren: () => import('./pages/gradebook/gradebook.module').then( m => m.TranscriptPageModule),
     },
 ];
 

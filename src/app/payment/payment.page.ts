@@ -1,9 +1,7 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
-import { HTTP } from '@ionic-native/http';
-import { LoadingController, ModalController, NavController } from '@ionic/angular';
-import { HttpClient } from '@angular/common/http';
-import { ProductdetailsPage } from '../productdetails/productdetails.page';
+import { AlertController, LoadingController, ModalController, NavController } from '@ionic/angular';
+import { HTTP } from '@ionic-native/http/ngx';
 
 // import { LoadingController, NavController, NavParams } from '@ionic-angular';
 
@@ -28,19 +26,20 @@ export class PaymentPage implements OnInit {
   boolean: boolean | undefined;
   boolean2: boolean | undefined;
   boolean3: boolean | undefined
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
   item: any;
   param: any;
+  url: any;
+  consumerKey:any;
+  consumersecret:any
 
   currentFood = undefined;
 
-  constructor( private route: ActivatedRoute, public nav:NavController, public http: HttpClient,private navController: NavController,private loadingController:LoadingController, private modal: ModalController) {
-    // public http: HTTP
+  constructor(public alertCtrl: AlertController, private route: ActivatedRoute, public nav:NavController, public http: HTTP,private navController: NavController,private loadingController:LoadingController, private modal: ModalController) {
+    this.url = this.route.snapshot.params['url']
+    this.consumerKey = this.route.snapshot.params['consumerKey']
+    this.consumersecret = this.route.snapshot.params['consumersecret']
     this.item = this.route.snapshot.params['data']
     this.product = JSON.parse(this.item)
-    // this.video = this.navParams.get("video");
     this.sale_price_new = this.product.sale_price
     this.getCode();
 
@@ -57,11 +56,11 @@ export class PaymentPage implements OnInit {
         .get(
           `${this.url}/wp-json/wc/v3/coupons?consumer_key=${
             this.consumerKey
-          }&consumer_secret=${this.consumerSecret}`
+          }&consumer_secret=${this.consumersecret}`,{},{}
         )
-      .subscribe(data => {
+      .then(data => {
         resolve(data);
-        let code1:any[] =  JSON.parse(JSON.stringify(data))
+        let code1:any[] =  JSON.parse(data.data)
           for(let i = 0; i <code1.length; i++){
             if(code1[i].date_expires != null) {
               // code1[i].date_expires1 =new Date(code1[i].date_expires.split("T")[0])
@@ -73,6 +72,15 @@ export class PaymentPage implements OnInit {
           console.log(new Date().getTime())
         loading.dismiss();
       })
+      .catch(async error => {
+        const alert = await this.alertCtrl.create({
+          header: 'Thông báo',
+          message: 'Đã xảy ra lỗi bạn vui lòng load lại trang!',
+          buttons: ['OK']
+        });
+        loading.dismiss();
+        await alert.present();
+      });
     });
   }
 
@@ -112,11 +120,10 @@ export class PaymentPage implements OnInit {
 
   Payment(product) {
     if(this.coupons != undefined) {
-      this.nav.navigateForward(['main/payload', { data: JSON.stringify(product),price : this.sale_price_new, coupons: JSON.stringify(this.coupons)}])
+      this.nav.navigateForward(['main/payload', { data: JSON.stringify(product),price : this.sale_price_new, coupons: JSON.stringify(this.coupons) ,url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumersecret}])
     }else {
-      this.nav.navigateForward(['main/payload', { data: JSON.stringify(product),price : this.sale_price_new}])
+      this.nav.navigateForward(['main/payload', { data: JSON.stringify(product),price : this.sale_price_new ,url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumersecret}])
     }
-    //this.nav.navigateForward(['main/payload', { data: JSON.stringify(product),price : this.sale_price_new, coupons: JSON.stringify(this.coupons)}])
   }
 
   ngOnInit() {

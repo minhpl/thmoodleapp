@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, Optional, OnInit, OnDestroy } from '@angular/core';
+import { Component, Optional, OnInit, OnDestroy, Output, EventEmitter } from '@angular/core';
 import { IonContent } from '@ionic/angular';
 
 import { CoreConstants } from '@/core/constants';
@@ -24,7 +24,7 @@ import { CoreH5PHelper } from '@features/h5p/classes/helper';
 import { CoreH5P } from '@features/h5p/services/h5p';
 import { CoreXAPIOffline } from '@features/xapi/services/offline';
 import { CoreXAPI } from '@features/xapi/services/xapi';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFilepool } from '@services/filepool';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
@@ -54,6 +54,8 @@ import { AddonModH5PActivityModuleHandlerService } from '../../services/handlers
     templateUrl: 'addon-mod-h5pactivity-index.html',
 })
 export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActivityComponent implements OnInit, OnDestroy {
+
+    @Output() onActivityFinish = new EventEmitter<boolean>();
 
     component = AddonModH5PActivityProvider.COMPONENT;
     moduleName = 'h5pactivity';
@@ -96,7 +98,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
         this.siteCanDownload = this.site.canDownloadFiles() && !CoreH5P.isOfflineDisabledInSite();
 
         // Listen for messages from the iframe.
-        this.messageListenerFunction = this.onIframeMessage.bind(this);
+        this.messageListenerFunction = (event) => this.onIframeMessage(event);
         window.addEventListener('message', this.messageListenerFunction);
     }
 
@@ -149,7 +151,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
             // Cannot download the file or already downloaded, play the package directly.
             this.play();
 
-        } else if ((this.state == CoreConstants.NOT_DOWNLOADED || this.state == CoreConstants.OUTDATED) && CoreApp.isOnline() &&
+        } else if ((this.state == CoreConstants.NOT_DOWNLOADED || this.state == CoreConstants.OUTDATED) && CoreNetwork.isOnline() &&
                     this.deployedFile?.filesize && CoreFilepool.shouldDownload(this.deployedFile.filesize)) {
             // Package is small, download it automatically. Don't block this function for this.
             this.downloadAutomatically();
@@ -159,7 +161,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
     /**
      * Fetch the access info and store it in the right variables.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async checkHasOffline(): Promise<void> {
         if (!this.h5pActivity) {
@@ -172,7 +174,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
     /**
      * Fetch the access info and store it in the right variables.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchAccessInfo(): Promise<void> {
         if (!this.h5pActivity) {
@@ -188,7 +190,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
     /**
      * Fetch the deployed file data if needed and store it in the right variables.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchDeployedFileData(): Promise<void> {
         if (!this.siteCanDownload || !this.h5pActivity) {
@@ -218,7 +220,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
     /**
      * Calculate the state of the deployed file.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async calculateFileState(): Promise<void> {
         if (!this.fileUrl || !this.deployedFile) {
@@ -270,7 +272,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
      * Download the file and play it.
      *
      * @param event Click event.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async downloadAndPlay(event?: MouseEvent): Promise<void> {
         event?.preventDefault();
@@ -280,7 +282,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
             return;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal('core.networkerrormsg', true);
 
             return;
@@ -309,7 +311,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
     /**
      * Download the file automatically.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async downloadAutomatically(): Promise<void> {
         try {
@@ -326,7 +328,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
     /**
      * Download athe H5P deployed file or restores an ongoing download.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async downloadDeployedFile(): Promise<void> {
         if (!this.fileUrl || !this.deployedFile) {
@@ -428,7 +430,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
      * Treat an iframe message event.
      *
      * @param event Event.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async onIframeMessage(event: MessageEvent): Promise<void> {
         const data = event.data;
@@ -457,13 +459,14 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
                 try {
                     // Invalidate attempts.
                     await AddonModH5PActivity.invalidateUserAttempts(this.h5pActivity.id, undefined, this.siteId);
-                } catch (error) {
+                } catch {
                     // Ignore errors.
                 }
 
                 // Check if the H5P has ended. Final statements don't include a subContentId.
                 const hasEnded = data.statements.some(statement => !statement.object.id.includes('subContentId='));
                 if (hasEnded) {
+                    this.onActivityFinish.emit(hasEnded);
                     this.checkCompletion();
                 }
             }
@@ -476,7 +479,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
      * Check if an event is an XAPI post statement of the current activity.
      *
      * @param data Event data.
-     * @return Whether it's an XAPI post statement of the current activity.
+     * @returns Whether it's an XAPI post statement of the current activity.
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     protected isCurrentXAPIPost(data: any): data is AddonModH5PActivityXAPIData {
@@ -515,7 +518,7 @@ export class AddonModH5PActivityIndexComponent extends CoreCourseModuleMainActiv
             };
         }
 
-        return await AddonModH5PActivitySync.syncActivity(this.h5pActivity.context, this.site.getId());
+        return AddonModH5PActivitySync.syncActivity(this.h5pActivity.context, this.site.getId());
     }
 
     /**

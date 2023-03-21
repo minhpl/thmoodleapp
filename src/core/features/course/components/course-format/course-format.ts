@@ -23,7 +23,7 @@ import {
     QueryList,
     Type,
     ElementRef,
-    AfterContentInit,
+    ChangeDetectorRef,
 } from '@angular/core';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreDynamicComponent } from '@components/dynamic-component/dynamic-component';
@@ -39,7 +39,7 @@ import {
 } from '@features/course/services/course-helper';
 import { CoreCourseFormatDelegate } from '@features/course/services/format-delegate';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { AlertController, IonContent, IonRefresher } from '@ionic/angular';
+import { AlertController, IonContent, IonRefresher, NavController } from '@ionic/angular';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreCourseCourseIndexComponent, CoreCourseIndexSectionWithModule } from '../course-index/course-index';
 import { CoreBlockHelper } from '@features/block/services/block-helper';
@@ -56,7 +56,6 @@ import { CoreFilter } from '@features/filter/services/filter';
 import { Device } from '@ionic-native/device/ngx';
 import { CoreConstants } from '@/core/constants';
 import { CoreSite } from '@classes/site';
-import { NavController } from '@ionic/angular';
 
 /**
  * Component to display course contents using a certain format. If the format isn't found, use default one.
@@ -73,7 +72,7 @@ import { NavController } from '@ionic/angular';
     templateUrl: 'course-format.html',
     styleUrls: ['course-format.scss'],
 })
-export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  {
+export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
 
     static readonly LOAD_MORE_ACTIVITIES = 20; // How many activities should load each time showMoreActivities is called.
 
@@ -83,7 +82,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     @Input() initialSectionNumber?: number; // The section to load first (by number).
     @Input() moduleId?: number; // The module ID to scroll to. Must be inside the initial selected section.
 
-    @ViewChildren(CoreDynamicComponent) dynamicComponents?: QueryList<CoreDynamicComponent>;
+    @ViewChildren(CoreDynamicComponent) dynamicComponents?: QueryList<CoreDynamicComponent<any>>;
 
     // All the possible component classes.
     courseFormatComponent?: Type<unknown>;
@@ -134,10 +133,11 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     constructor(
         protected content: IonContent,
         protected elementRef: ElementRef,
-        private sitesProvider: CoreSitesProvider,
+        protected changeDetectorRef: ChangeDetectorRef,
         private device: Device,
         private nav:NavController,
         public alertCtrl: AlertController
+
     ) {
         // Pass this instance to all components so they can use its methods and properties.
         this.data.coreCourseFormatComponent = this;
@@ -195,6 +195,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
                     }
                 }
             }
+            this.changeDetectorRef.markForCheck();
         });
 
         // TH_edit
@@ -202,9 +203,11 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
         this.checkisloginvalidandlogout();
     }
 
-
-
-
+    /**
+     * kiểm tra nếu không được phép login thì người dùng sẽ bị logout ra khỏi ứng dụng
+     *
+     * @returns Promise
+     */
     async checkisloginvalidandlogout(): Promise<void> {
         const site = await CoreSites.getSite();
 
@@ -279,6 +282,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
         });
     }
 
+
     /**
      * Detect changes on input properties.
      */
@@ -298,6 +302,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
         if (changes.sections && this.sections) {
             this.treatSections(this.sections);
         }
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
@@ -332,12 +337,13 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
             this.loadSingleSectionComponent(),
             this.loadAllSectionsComponent(),
         ]);
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
      * Load course format component.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadCourseFormatComponent(): Promise<void> {
         this.courseFormatComponent = await CoreCourseFormatDelegate.getCourseFormatComponent(this.course);
@@ -346,7 +352,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     /**
      * Load course summary component.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadCourseSummaryComponent(): Promise<void> {
         this.courseSummaryComponent = await CoreCourseFormatDelegate.getCourseSummaryComponent(this.course);
@@ -355,7 +361,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     /**
      * Load single section component.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSingleSectionComponent(): Promise<void> {
         this.singleSectionComponent = await CoreCourseFormatDelegate.getSingleSectionComponent(this.course);
@@ -364,7 +370,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     /**
      * Load all sections component.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadAllSectionsComponent(): Promise<void> {
         this.allSectionsComponent = await CoreCourseFormatDelegate.getAllSectionsComponent(this.course);
@@ -374,7 +380,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
      * Treat received sections.
      *
      * @param sections Sections to treat.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async treatSections(sections: CoreCourseSection[]): Promise<void> {
         const hasAllSections = sections[0].id == CoreCourseProvider.ALL_SECTIONS_ID;
@@ -444,7 +450,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     /**
      * Initialize viewed modules.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async initializeViewedModules(): Promise<void> {
         if (this.viewedModulesInitialized) {
@@ -465,7 +471,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
      *
      * @param sections List of sections.
      * @param viewedModule Viewed module.
-     * @return Section, undefined if not found.
+     * @returns Section, undefined if not found.
      */
     protected getViewedModuleSection(
         sections: CoreCourseSection[],
@@ -488,7 +494,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
     /**
      * Get selected section ID. If viewing all sections, use current scrolled section.
      *
-     * @return Section ID, undefined if not found.
+     * @returns Section ID, undefined if not found.
      */
     protected async getSelectedSectionId(): Promise<number | undefined> {
         if (this.selectedSection?.id !== this.allSectionsId) {
@@ -626,6 +632,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
                 CoreCourse.logView(this.course.id, newSection.section, undefined, this.course.fullname),
             );
         }
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
@@ -646,7 +653,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
      *
      * @param section1 First section.
      * @param section2 Second section.
-     * @return Whether they're equal.
+     * @returns Whether they're equal.
      */
     compareSections(section1: CoreCourseSection, section2: CoreCourseSection): boolean {
         return section1 && section2 ? section1.id === section2.id : section1 === section2;
@@ -658,11 +665,11 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
      * @param refresher Refresher.
      * @param done Function to call when done.
      * @param afterCompletionChange Whether the refresh is due to a completion change.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async doRefresh(refresher?: IonRefresher, done?: () => void, afterCompletionChange?: boolean): Promise<void> {
         const promises = this.dynamicComponents?.map(async (component) => {
-            await component.callComponentFunction('doRefresh', [refresher, done, afterCompletionChange]);
+            await component.callComponentMethod('doRefresh', refresher, done, afterCompletionChange);
         }) || [];
 
         if (this.course) {
@@ -735,7 +742,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
      */
     ionViewDidEnter(): void {
         this.dynamicComponents?.forEach((component) => {
-            component.callComponentFunction('ionViewDidEnter');
+            component.callComponentMethod('ionViewDidEnter');
         });
     }
 
@@ -744,7 +751,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
      */
     ionViewDidLeave(): void {
         this.dynamicComponents?.forEach((component) => {
-            component.callComponentFunction('ionViewDidLeave');
+            component.callComponentMethod('ionViewDidLeave');
         });
     }
 
@@ -752,7 +759,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy  
      * Check whether a section can be viewed.
      *
      * @param section The section to check.
-     * @return Whether the section can be viewed.
+     * @returns Whether the section can be viewed.
      */
     canViewSection(section: CoreCourseSection): boolean {
         return CoreCourseHelper.canUserViewSection(section) && !CoreCourseHelper.isSectionStealth(section);

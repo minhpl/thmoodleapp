@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { NgModule } from '@angular/core';
-import { AddonBlockActivateCoursesModule } from './activatecourses/activatecourses.module';
 
 import { AddonBlockActivityModulesModule } from './activitymodules/activitymodules.module';
 import { AddonBlockActivityResultsModule } from './activityresults/activityresults.module';
@@ -43,6 +42,7 @@ import { AddonBlockStarredCoursesModule } from './starredcourses/starredcourses.
 import { AddonBlockTagsModule } from './tags/tags.module';
 import { AddonBlockTimelineModule } from './timeline/timeline.module';
 import { AddonBlockCourseStatusModule } from './coursestatus/html.module';
+import { AddonBlockActivateCoursesModule } from './activatecourses/activatecourses.module';
 
 @NgModule({
     imports: [
@@ -73,8 +73,8 @@ import { AddonBlockCourseStatusModule } from './coursestatus/html.module';
         AddonBlockStarredCoursesModule,
         AddonBlockTagsModule,
         AddonBlockTimelineModule,
-        AddonBlockActivateCoursesModule,
         AddonBlockCourseStatusModule,
+        AddonBlockActivateCoursesModule
     ],
 })
 export class AddonBlockModule { }

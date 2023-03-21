@@ -1,9 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-
-import { HTTP } from '@ionic-native/http';
+import { HTTP } from '@ionic-native/http/ngx';
 import { ActivatedRoute } from '@angular/router';
-import { LoadingController, ModalController, NavController } from '@ionic/angular';
+import { LoadingController, ModalController, NavController,AlertController } from '@ionic/angular';
 import { ProductdetailsPage } from '../productdetails/productdetails.page';
 
 
@@ -20,30 +19,36 @@ export class CategoryPage implements OnInit {
   products2: any[] | undefined;
   page: number;
   category: any;
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
+  url: any;
+  consumerKey:any;
+  consumersecret:any
   item: any;
 
-  constructor( public http: HttpClient, private route: ActivatedRoute, private nav:NavController ,private loadingController:LoadingController, private modal: ModalController) {
+  constructor(public alertCtrl: AlertController, public http: HTTP, private route: ActivatedRoute, private nav:NavController ,private loadingController:LoadingController, private modal: ModalController) {
+      this.url = this.route.snapshot.params['url']
+      this.consumerKey = this.route.snapshot.params['consumerKey']
+      this.consumersecret = this.route.snapshot.params['consumersecret']
       this.page = 1;
       this.item = this.route.snapshot.params['data']
       this.category = JSON.parse(this.item)
   }
 
   async loadData(event) {
+    const loading = await this.loadingController.create({
+      message: 'Vui lòng chờ...',
+    });
+    loading.present();
     for (let page = 1; page < 100; page++) {
       return new Promise(resolve => {
         this.http
           .get(
             `${this.url}/wp-json/wc/v3/products?category=${this.category.id}&page=${this.page}&consumer_key=${
               this.consumerKey
-            }&consumer_secret=${this.consumerSecret}`
+            }&consumer_secret=${this.consumersecret}`,{},{}
           )
-          .subscribe(productData => {
+          .then(productData => {
             resolve(productData);
-            const jsonValue = JSON.stringify(productData);
-            const valueFromJson = JSON.parse(jsonValue);
+            const valueFromJson = JSON.parse(productData.data);
 
              let temp: any[] = valueFromJson.filter((item) => (
               item.images.length !== 0
@@ -57,27 +62,35 @@ export class CategoryPage implements OnInit {
             } else {
               temp[i].name1 = temp[i].name
             }
-
           }
-
           this.products = this.products.concat(temp);
 
-          this.page ++
-
-          event.target.complete();
+          if(temp.length != 0) {
+            this.page ++
+          } else {
+            event.target.complete();
+          }
+          loading.dismiss()
+        })
+        .catch(async error => {
+          const alert = await this.alertCtrl.create({
+            header: 'Thông báo',
+            message: 'Đã xảy ra lỗi bạn vui lòng load lại trang!',
+            buttons: ['OK']
+          });
+          loading.dismiss();
+          await alert.present();
         });
-  })
+      })
     }
-
-}
-
+  }
 
   view_cart() {
     this.nav.navigateForward(['main/cart'])
   }
 
   async openProductPage(product) {
-    this.nav.navigateForward(['main/productdetails', { data: JSON.stringify(product) }])
+    this.nav.navigateForward(['main/productdetails', { data: JSON.stringify(product), url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumersecret }])
   }
 
 
@@ -86,12 +99,7 @@ export class CategoryPage implements OnInit {
       this.products = JSON.parse(this.route.snapshot.params['product'])
     }
 
-    const loading = await this.loadingController.create({
-      message: 'Vui lòng chờ...',
-    });
-    loading.present();
-    await this.loadData(null)
-    loading.dismiss()
+    this.loadData(null)
   }
 
   onBack() {
@@ -99,11 +107,8 @@ export class CategoryPage implements OnInit {
   }
 
   doRefresh(event) {
-    console.log('Begin async operation');
-
     this.loadData(null);
     setTimeout(() => {
-      console.log('Async operation has ended');
       event.target.complete();
     }, 2000);
   }

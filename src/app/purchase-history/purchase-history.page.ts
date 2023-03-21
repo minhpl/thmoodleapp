@@ -1,9 +1,10 @@
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
-import { HTTP } from '@ionic-native/http';
-import { LoadingController, NavController } from '@ionic/angular';
+import { HTTP } from '@ionic-native/http/ngx';
+import { AlertController, LoadingController, NavController } from '@ionic/angular';
 import { Translate } from '@singletons';
+import { CoreSites } from '@services/sites';
 
 @Component({
   selector: 'app-purchase-history',
@@ -13,9 +14,9 @@ import { Translate } from '@singletons';
 export class  PurchasehistoryPage implements OnInit {
 
   user: any;
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
+  url:any;
+  consumerKey:any;
+  consumerSecret:any;
   products!: any[];
   paymentMethods: any;
   boolean: boolean;
@@ -28,70 +29,58 @@ export class  PurchasehistoryPage implements OnInit {
   item: any;
   title: any
 
-  constructor(private route: ActivatedRoute,public http: HttpClient, private navController: NavController,private loadingController:LoadingController) {
+  constructor(public alertCtrl: AlertController,private route: ActivatedRoute,public http: HTTP, private navController: NavController,private loadingController:LoadingController) {
     this.boolean = false;
     this.item = this.route.snapshot.params['data']
-    this.user = JSON.parse(this.item)
-    this.getPastOrders(this.user.userid);
-    console.log(this.user)
+    this.user = JSON.parse(this.item);
   }
 
+  async ngOnInit() {
+    this.title =  Translate.instant('core.mainmenu.purchase_history');
 
-  // getPastOrders(customerId) {
-  //   // let loading = this.loadingCtrl.create({
-  //   //   content: 'Please wait...'
-  //   // });
+    const site = await CoreSites.getSite();
 
-  //   // loading.present();
-  //   return new Promise(resolve => {
+    const userId = site.getUserId()
 
-  //     this.http.get(`${this.url}/wp-json/wc/v3/orders?consumer_key=${this.consumerKey}&consumer_secret=${this.consumerSecret}`, {}, {})
-  //     .then(data => {
-  //       resolve(data);
-  //       this.products =  JSON.parse(data.data).filter((item) => (
-  //         item.billing.email.toLowerCase().indexOf(this.user.email.toLowerCase()) > -1
-  //       ));
-  //       if(this.products.length !==0) {
-  //               this.boolean = true;
-  //               this.boolean2 = false
-  //             }
-  //       else {
-  //         this.boolean2 = true
-  //       }
+    var data: any = {
+      userid: userId,
+    };
 
-  //       this.products.map((item) => {
-  //         if(item.status === "processing") {
-  //             this.status = 'Đã thanh toán';
-  //             this.boolean3 = true;
-  //         }else {
-  //           this.status = 'Chờ xác nhận'
-  //           this.boolean3 = false;
-  //         }
-  //       })
-  //       // loading.dismiss();
-  //     })
-  //   });
-  // }
+    const preSets = {
+        getFromCache: false,
+    };
+    await site.write('th_woocommerce_key_api', data, preSets).then((data) => {
 
-   async getPastOrders(customerId) {
+      this.url = JSON.parse(JSON.stringify(data)).url_woocommerce
+
+      this.consumerKey = JSON.parse(JSON.stringify(data)).consumerKey_woocommerce
+
+      this.consumerSecret = JSON.parse(JSON.stringify(data)).consumerSecret_woocommerce
+
+    }).catch((e) => {
+         console.log(e)
+    });
+    this.getPastOrders();
+  }
+
+   async getPastOrders() {
     const loading = await this.loadingController.create({
       message: 'Vui lòng chờ...',
     });
     loading.present();
     return new Promise(resolve => {
 
-      this.http.get(`${this.url}/wp-json/wc/v3/orders?per_page=100&consumer_key=${this.consumerKey}&consumer_secret=${this.consumerSecret}`, {})
-      .subscribe(data => {
+      this.http.get(`${this.url}/wp-json/wc/v3/orders?per_page=100&consumer_key=${this.consumerKey}&consumer_secret=${this.consumerSecret}`, {},{})
+      .then(data => {
         resolve(data);
-        const jsonValue = JSON.stringify(data);
-        const valueFromJson = JSON.parse(jsonValue);
+        const valueFromJson = JSON.parse(data.data);
         this.products =  valueFromJson.filter((item) => (
           item.billing.email.toLowerCase().indexOf(this.user.email.toLowerCase()) > -1
         ));
         if(this.products.length !==0) {
                 this.boolean = true;
                 this.boolean2 = false
-              }
+        }
         else {
           this.boolean2 = true
         }
@@ -107,13 +96,24 @@ export class  PurchasehistoryPage implements OnInit {
         })
         loading.dismiss();
       })
+      .catch(async error => {
+
+        const alert = await this.alertCtrl.create({
+          header: 'Thông báo',
+          message: 'Đã xảy ra lỗi bạn vui lòng load lại trang!',
+          buttons: ['OK']
+        });
+        loading.dismiss();
+        await alert.present();
+
+      });
     });
   }
 
   doRefresh(event) {
     console.log('Begin async operation');
 
-    this.getPastOrders(this.user.userid);
+    this.getPastOrders();
 
     setTimeout(() => {
       console.log('Async operation has ended');
@@ -121,14 +121,6 @@ export class  PurchasehistoryPage implements OnInit {
     }, 2000);
   }
 
-  ngOnInit() {
-    this.title =  Translate.instant('core.purchase_history')
-    this.getPastOrders(this.user.userid);
-  }
-
-  ionViewWillEnter() {
-    this.getPastOrders(this.user.userid);
-  }
 
   back(): void {
     this.navController.back()

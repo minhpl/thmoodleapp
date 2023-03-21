@@ -78,7 +78,7 @@ function buildRoutes(injector: Injector): Routes {
                 },
                 {
                     path: CoreMainMenuProvider.MORE_PAGE_NAME14,
-                    loadChildren: () => import('./pages/transcript/transcript.module').then( m => m.TranscriptPageModule)
+                    loadChildren: () => import('./pages/gradebook/gradebook.module').then( m => m.TranscriptPageModule)
                 },
                 ...routes.children,
             ],

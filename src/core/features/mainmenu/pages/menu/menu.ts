@@ -31,12 +31,13 @@ import { trigger, state, style, transition, animate } from '@angular/animations'
 import { CoreSites } from '@services/sites';
 import { CoreDom } from '@singletons/dom';
 import { CoreLogger } from '@singletons/logger';
-import { CoreUser, CoreUserProfile } from '@features/user/services/user';
 import { CoreSite } from '@classes/site';
+import { CoreUser, CoreUserProfile } from '@features/user/services/user';
 import { SafeUrl } from '@angular/platform-browser';
-import { CoreTextUtils } from '@services/utils/text';
 import { CoreUserHelper } from '@features/user/services/user-helper';
+import { CoreTextUtils } from '@services/utils/text';
 import { CoreDomUtils } from '@services/utils/dom';
+import { Storage } from '@ionic/storage-angular';
 
 const ANIMATION_DURATION = 500;
 
@@ -80,6 +81,19 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
     moreBadge = false;
     visibility = 'hidden';
 
+    protected subscription?: Subscription;
+    protected navSubscription?: Subscription;
+    protected keyboardObserver?: CoreEventObserver;
+    protected badgeUpdateObserver?: CoreEventObserver;
+    protected resizeListener?: CoreEventObserver;
+    protected backButtonFunction: (event: BackButtonEvent) => void;
+    protected selectHistory: string[] = [];
+    protected firstSelectedTab?: string;
+    protected urlToOpen?: string;
+    protected redirectPath?: string;
+    protected redirectOptions?: CoreNavigationOptions;
+    protected logger: CoreLogger;
+
     courseId!: number;
     canChangeProfilePicture: any;
     protected userId!: number;
@@ -94,28 +108,19 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
     interests?: string[];
     theuser: any = {};
     paymetboolean: boolean| undefined;
-
-    protected subscription?: Subscription;
-    protected navSubscription?: Subscription;
-    protected keyboardObserver?: CoreEventObserver;
-    protected badgeUpdateObserver?: CoreEventObserver;
-    protected resizeListener?: CoreEventObserver;
-    protected backButtonFunction: (event: BackButtonEvent) => void;
-    protected selectHistory: string[] = [];
-    protected firstSelectedTab?: string;
-    protected urlToOpen?: string;
-    protected redirectPath?: string;
-    protected redirectOptions?: CoreNavigationOptions;
-    protected logger: CoreLogger;
+    url:any;
+    consumerKey:any;
+    consumerSecret:any;
+    data_keyvmc:any;
 
     @ViewChild('mainTabs') mainTabs?: IonTabs;
 
     tabAction: CoreMainMenuRoleTab;
 
-    constructor() {
+    constructor(private storage: Storage) {
         this.courseId = CoreNavigator.getRouteNumberParam('courseId') || this.courseId; // Use 0 for site badges.
         this.userId = CoreNavigator.getRouteNumberParam('userId') || CoreSites.getRequiredCurrentSite().getUserId();
-        this.backButtonFunction = this.backButtonClicked.bind(this);
+        this.backButtonFunction = (event) => this.backButtonClicked(event);
         this.tabAction = new CoreMainMenuRoleTab(this);
         this.logger = CoreLogger.getInstance('CoreMainMenuPage');
 
@@ -132,6 +137,48 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
      * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
+        const site = await CoreSites.getSite();
+
+        const userId = site.getUserId();
+
+        const storage1 =await this.storage.create();
+        this.storage = storage1;
+
+
+        var data: any = {
+            userid: userId,
+          };
+
+          const preSets = {
+              getFromCache: false,
+          };
+          await site.write('th_woocommerce_key_api', data, preSets).then((data) => {
+
+            this.data_keyvmc = JSON.parse(JSON.stringify(data))
+
+            this.storage.get(`key`).then((data) => {
+
+                if(data == null){
+
+                  data = [];
+
+                  data.push({
+                    "data": this.data_keyvmc
+                  })
+                }else {
+
+                  data.url_woocommerce = this.data_keyvmc.url_woocommerce;
+                  data.consumerKey_woocommerce = this.data_keyvmc.consumerKey_woocommerce;
+                  data.consumerSecret_woocommerce = this.data_keyvmc.consumerSecret_woocommerce;
+
+                }
+                this.storage.set(`key`, data).then(() => {
+                });
+              })
+              console.log(data)
+          }).catch((e) => {
+               console.log(e)
+          });
         this.fetchUser().finally(() => {
             this.userLoaded = true;
         });
@@ -144,10 +191,10 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
         this.updateVisibility();
 
         this.subscription = CoreMainMenuDelegate.getHandlersObservable().subscribe((handlers) => {
-            // Remove the handlers that should only appear in the More menu.
+            const previousHandlers = this.allHandlers;
             this.allHandlers = handlers;
 
-            this.initHandlers();
+            this.updateHandlers(previousHandlers);
         });
 
         this.badgeUpdateObserver = CoreEvents.on(CoreMainMenuProvider.MAIN_MENU_HANDLER_BADGE_UPDATED, (data) => {
@@ -157,7 +204,7 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
         });
 
         this.resizeListener = CoreDom.onWindowResize(() => {
-            this.initHandlers();
+            this.updateHandlers();
         });
         document.addEventListener('ionBackButton', this.backButtonFunction);
 
@@ -166,16 +213,19 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
             // Init handlers again once keyboard is closed since the resize event doesn't have the updated height.
             this.keyboardObserver = CoreEvents.on(CoreEvents.KEYBOARD_CHANGE, (kbHeight: number) => {
                 if (kbHeight === 0) {
-                    this.initHandlers();
+                    this.updateHandlers();
 
                     // If the device is slow it can take a bit more to update the window height. Retry in a few ms.
                     setTimeout(() => {
-                        this.initHandlers();
+                        this.updateHandlers();
                     }, 250);
                 }
             });
         }
+        CoreEvents.trigger(CoreEvents.MAIN_HOME_LOADED);
+        console.log('test ')
     }
+
 
     async fetchUser(): Promise<void> {
         try {
@@ -196,6 +246,7 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
             this.user = user;
             this.title = user.fullname;
             this.theuser = this.user
+            console.log(this.user)
             if(this.theuser.email == "hv1@example.com") {
               this.paymetboolean = false
             } else {
@@ -211,9 +262,11 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
       }
 
     /**
-     * Init handlers on change (size or handlers).
+     * Update handlers on change (size or handlers).
+     *
+     * @param previousHandlers Previous handlers (if they haave just been updated).
      */
-    async initHandlers(): Promise<void> {
+    async updateHandlers(previousHandlers?: CoreMainMenuHandlerToDisplay[]): Promise<void> {
         if (!this.allHandlers) {
             return;
         }
@@ -226,8 +279,6 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
 
         // Re-build the list of tabs. If a handler is already in the list, use existing object to prevent re-creating the tab.
         const newTabs: CoreMainMenuHandlerToDisplay[] = [];
-
-
 
         for (let i = 0; i < handlers.length; i++) {
             const handler = handlers[i];
@@ -242,8 +293,6 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
             newTabs.push(tab || handler);
         }
 
-
-
         this.tabs = newTabs;
 
         // Sort them by priority so new handlers are in the right position.
@@ -251,10 +300,18 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
 
         this.updateMoreBadge();
 
+        let removedHandlersPages: string[] = [];
+        if (previousHandlers) {
+            const allHandlers = this.allHandlers;
+            removedHandlersPages = previousHandlers.map(handler => handler.page)
+                .filter(page => !allHandlers.some(handler => handler.page === page));
+        }
+
+        const mainMenuTab = CoreNavigator.getCurrentMainMenuTab();
         this.loaded = CoreMainMenuDelegate.areHandlersLoaded();
 
-        if (this.loaded && !CoreNavigator.getCurrentMainMenuTab()) {
-            // No tab selected, select the first one.
+        if (this.loaded && (!mainMenuTab || removedHandlersPages.includes(mainMenuTab))) {
+            // No tab selected or handler no longer available, select the first one.
             await CoreUtils.nextTick();
 
             const tabPage = this.tabs[0] ? this.tabs[0].page : this.morePageName;
@@ -262,7 +319,8 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
             this.logger.debug(`Select first tab: ${tabPage}.`, this.tabs);
 
             // Use navigate instead of mainTabs.select to be able to pass page params.
-            CoreNavigator.navigate(tabPage, {
+            CoreNavigator.navigateToSitePath(tabPage, {
+                preferCurrentTab: false,
                 params: {
                     urlToOpen: this.urlToOpen,
                     redirectPath: this.redirectPath,
@@ -370,7 +428,7 @@ export class CoreMainMenuPage implements OnInit, OnDestroy {
     /**
      * Check if current route is the root of the current main menu tab.
      *
-     * @return Promise.
+     * @returns Promise.
      */
     protected async currentRouteIsMainMenuRoot(): Promise<boolean> {
         // Check if the current route is the root of the current main menu tab.
@@ -418,6 +476,13 @@ class CoreMainMenuRoleTab extends CoreAriaRoleTab<CoreMainMenuPage> {
      */
     isHorizontal(): boolean {
         return this.componentInstance.tabsPlacement == 'bottom';
+    }
+
+    /**
+     * @inheritdoc
+     */
+    selectTab(tabId: string): void {
+        this.componentInstance.mainTabs?.select(tabId);
     }
 
 }

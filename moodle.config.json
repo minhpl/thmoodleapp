@@ -1,8 +1,8 @@
 {
     "app_id": "org.vmcvietnam.elearning",
     "appname": "VMC-e",
-    "versioncode": 40200,
-    "versionname": "4.0.2",
+    "versioncode": 41001,
+    "versionname": "4.1.0",
     "cache_update_frequency_usually": 420000,
     "cache_update_frequency_often": 1200000,
     "cache_update_frequency_sometimes": 3600000,
@@ -25,9 +25,10 @@
             "password": "moodle"
         }
     },
+    "defaultZoomLevel": "none",
     "zoomlevels": {
-        "normal": 100,
-        "low": 110,
+        "none": 100,
+        "medium": 110,
         "high": 120
     },
     "customurlscheme": "moodlemobile",
@@ -38,7 +39,7 @@
     "onlyallowlistedsites": false,
     "skipssoconfirmation": false,
     "forcedefaultlanguage": false,
-    "privacypolicy": "https://moodle.net/moodle-app-privacy/",
+    "privacypolicy": "https://elearning.vmcvietnam.org/local/staticpage/view.php?page=privacy",
     "notificoncolor": "#f98012",
     "enableanalytics": false,
     "enableonboarding": true,
@@ -46,10 +47,16 @@
     "forceLoginLogo": false,
     "ioswebviewscheme": "moodleappfs",
     "appstores": {
-        "android": "org.vmcvietnam.elearning",
+        "android": "com.moodle.moodlemobile",
         "ios": "id633359593"
     },
     "wsrequestqueuelimit": 10,
     "wsrequestqueuedelay": 100,
-    "calendarreminderdefaultvalue": 3600
+    "calendarreminderdefaultvalue": 3600,
+    "toastDurations": {
+        "short": 2000,
+        "long": 3500,
+        "sticky": 0
+    },
+    "disableTokenFile": false
 }

@@ -4,8 +4,6 @@ import { SafeResourceUrl, DomSanitizer } from '@angular/platform-browser';
 import { LoadingController, NavController, ToastController } from '@ionic/angular';
 import { Storage } from '@ionic/storage-angular';
 import { CoreSites } from '@services/sites';
-import { HttpClient } from '@angular/common/http';
-// import { YoutubeVideoPlayer } from '@ionic-native/youtube-video-player/ngx';
 
 @Component({
   selector: 'app-productdetails',
@@ -33,19 +31,16 @@ export class ProductdetailsPage implements OnInit {
   param: any;
   test: any;
   id: any;
+  url: any;
+  consumerKey:any;
+  consumersecret:any
 
-
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
-
-  constructor(public http: HttpClient,private toastController: ToastController,private storage: Storage,private nav: NavController,private route: ActivatedRoute, private dom: DomSanitizer,private loadingController:LoadingController){
+  constructor(private toastController: ToastController,private storage: Storage,private nav: NavController,private route: ActivatedRoute, private dom: DomSanitizer,private loadingController:LoadingController){
 
     this.id = JSON.parse(this.route.snapshot.params['data'])
-
-    // console.log(this.id)
-
-    // this.getProduct()
+    this.url = this.route.snapshot.params['url']
+    this.consumerKey = this.route.snapshot.params['consumerKey']
+    this.consumersecret = this.route.snapshot.params['consumersecret']
 
     this.item = this.route.snapshot.params['data']
     this.product = JSON.parse(this.item)
@@ -64,68 +59,10 @@ export class ProductdetailsPage implements OnInit {
     ))
     this.videodata = this.product.meta_data[3].value.split("=");
     this.video = 'https://www.youtube.com/embed/' + this.videodata[1] ;
-
-    // this.getProduct()
-  }
-
-
-  async getProduct() {
-    const loading = await this.loadingController.create({
-      message: 'Vui lòng chờ...',
-    });
-    loading.present();
-    return new Promise(resolve => {
-      this.http
-        .get(
-          `${this.url}/wp-json/wc/v3/products/${this.id}?per_page=100&consumer_key=${
-            this.consumerKey
-          }&consumer_secret=${this.consumerSecret}`
-        )
-        .subscribe(productData => {
-          resolve(productData);
-          const jsonValue = JSON.stringify(productData);
-          this.product = JSON.parse(jsonValue)
-          console.log(this.product)
-          this.date =  this.product.date_created.slice(0,10);
-          this.update = this.product.date_modified_gmt.slice(0,10);
-          this.metadata = this.product.meta_data.filter((item) => (
-            item.key == "curriculum"
-          ))
-          this.teacher = this.product.meta_data.filter((item) => (
-            item.key == "lecturer_name"
-          ))
-          this.imgdata = this.product.meta_data.filter((item) => (
-            item.key == "lecturer_image"
-          ))
-          this.videodata = this.product.meta_data[3].value.split("=");
-          this.video = 'https://www.youtube.com/embed/' + this.videodata[1] ;
-
-
-
-          this.text = this.product.description;
-          //console.log(this.product.name.length);
-          this.text = this.product.description;
-          console.log(this.videodata[1])
-          if(this.teacher.length !== 0 && this.imgdata.length !== 0) {
-            this.boolean = true
-          }else {
-            this.boolean = false
-          }
-
-          if(this.metadata[0].value != '') {
-            this.course = true
-          }else {
-            this.course = false
-          }
-          loading.dismiss();
-        });
-
-    });
   }
 
   async ngOnInit() {
     this.text = this.product.description;
-    //console.log(this.product.name.length);
     this.text = this.product.description;
     console.log(this.videodata[1])
     if(this.teacher.length !== 0 && this.imgdata.length !== 0) {
@@ -142,7 +79,6 @@ export class ProductdetailsPage implements OnInit {
   }
 
   async ionViewWillEnter(): Promise<void> {
-    //this.getProduct();
     console.log(this.videodata[1])
     if(this.videodata[1] != undefined) {
       const loading = await this.loadingController.create({
@@ -187,7 +123,7 @@ export class ProductdetailsPage implements OnInit {
   }
 
   product_buy(product) {
-    this.nav.navigateForward(['main/payment', { data: JSON.stringify(product) }])
+    this.nav.navigateForward(['main/payment', { data: JSON.stringify(product),url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumersecret }])
   }
 
   async addToCart(product) {

@@ -23,12 +23,9 @@ import { Storage } from '@ionic/storage-angular';
 export class PayloadPage implements OnInit {
 
   cart: any;
-  // url:any = 'https://tdtweb.net/w/20220418091517';
-  // consumerKey:any = 'ck_7af2841d5c10ed47eb71f705353a6bfe7874ec06';
-  // consumerSecret:any = 'cs_43eb5895ff3ea3e5e19eb50128fbf1eb1667820c';
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
+  url: any;
+  consumerKey:any;
+  consumersecret:any
   email:any;
   username:any;
   address:any;
@@ -67,31 +64,15 @@ export class PayloadPage implements OnInit {
   numbercontact: boolean | undefined;
 
 
-  options : InAppBrowserOptions = {
-    location : 'yes',//Or 'no'
-    hidden : 'no', //Or  'yes'
-    clearcache : 'yes',
-    clearsessioncache : 'yes',
-    zoom : 'yes',//Android only ,shows browser zoom controls
-    hardwareback : 'yes',
-    mediaPlaybackRequiresUserAction : 'no',
-    shouldPauseOnSuspend : 'no', //Android only
-    closebuttoncaption : 'Close', //iOS only
-    disallowoverscroll : 'no', //iOS only
-    toolbar : 'yes', //iOS only
-    enableViewportScale : 'no', //iOS only
-    allowInlineMediaPlayback : 'no',//iOS only
-    presentationstyle : 'pagesheet',//iOS only
-    fullscreen : 'yes',//Windows only
-};
-
-
   constructor(private sitesProvider: CoreSitesProvider,public http: HttpClient,
     public toastCtrl: ToastController, public alertCtrl: AlertController,
     private route: ActivatedRoute,public navController:NavController,private loadingController:LoadingController, router: Router,private iab: InAppBrowser,private storage: Storage) {
 
     this.courseId = CoreNavigator.getRouteNumberParam('courseId') || this.courseId; // Use 0 for site badges.
     this.userId = CoreNavigator.getRouteNumberParam('userId') || CoreSites.getRequiredCurrentSite().getUserId();
+    this.url = this.route.snapshot.params['url']
+    this.consumerKey = this.route.snapshot.params['consumerKey']
+    this.consumersecret = this.route.snapshot.params['consumersecret']
     if(this.route.snapshot.params['data'] != undefined) {
       this.cart = JSON.parse(this.route.snapshot.params['data'])
     }
@@ -103,7 +84,6 @@ export class PayloadPage implements OnInit {
     console.log(this.coupons)
     this.price_new_post = this.route.snapshot.params['price'];
     this.price_new = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(this.route.snapshot.params['price']);
-    this.payload();
 
     var hh = encodeURI(router.url);
     console.log(hh)
@@ -157,27 +137,6 @@ async phonenumer() {
       });
 }
 
-  async payload() {
-  const loading = await this.loadingController.create({
-    message: 'Vui lòng chờ...',
-  });
-  loading.present();
-  return new Promise(resolve => {
-    this.http
-      .get(
-        `${this.url}/wp-json/wc/v3/payment_gateways/bacs?consumer_key=${
-          this.consumerKey
-        }&consumer_secret=${this.consumerSecret}`
-      )
-    .subscribe(data => {
-      resolve(data);
-      this.payload_bacs =  JSON.parse(JSON.stringify(data))
-      console.log(this.payload_bacs)
-      loading.dismiss();
-    })
-  });
-}
-
 
 async fetchUser(): Promise<void> {
   try {
@@ -218,37 +177,6 @@ async copy() {
 }
 
 
-// Onepay1() {
-//   // this.iab.create('https://onepay.vn/paygate/?id=INV-T5RXKHL75WE37CHW&locale=vi','_blank','location=yes');
-//   let target = "_system";
-//   this.iab.create('https://onepay.vn/paygate/?id=INV-TV9382F8XUNDCM26&locale=vi',target,this.options);
-
-// }
-
-// Onepay2() {
-//   let target = "_blank";
-//   this.iab.create('https://pay.vnpay.vn/Transaction/PaymentMethod.html?token=a1aadbbf6ced44b997cac5387c5936a5',target,this.options);
-// }
-
-// Onepay() {
-//   let target = "_self";
-//   this.iab.create('https://pay.vnpay.vn/Transaction/PaymentMethod.html?token=a1aadbbf6ced44b997cac5387c5936a5',target,this.options);
-// }
-
-
-public openWithSystemBrowser(url : string){
-  let target = "_system";
-  this.iab.create(url,target,this.options);
-}
-public openWithInAppBrowser(url : string){
-  let target = "_blank";
-  this.iab.create(url,target,this.options);
-}
-public openWithCordovaBrowser(url : string){
-  let target = "_self";
-  this.iab.create(url,target,this.options);
-}
-
 checkphone() {
   var vnf_regex = /((09|03|07|08|05)+([0-9]{8})\b)/g;
   if(this.theuser.phone1 !== undefined){
@@ -262,15 +190,6 @@ checkphone() {
       this.validPhone = false;
   }
 
-  // if(!isNaN(this.user.phone1)) {
-  //   validPhone = true;
-  // } else {
-  //   validPhone = false;
-  //   this.toastCtrl.create({
-  //     message: "Số điện thoại không hợp lệ",
-  //     showCloseButton: true
-  // }).present();
-  // }
 }
 
   async placeOrder() {
@@ -296,11 +215,6 @@ checkphone() {
 
     let paymentData: any = {};
 
-    // this.paymentMethods.forEach((element, index) => {
-    //   if (element.method_id == this.paymentMethod) {
-    //     paymentData = element;
-    //   }
-    // });
 
     const site = await CoreSites.getSite();
     const userId = site.getUserId();
@@ -309,7 +223,6 @@ checkphone() {
     data = {
       payment_method: this.payload_bacs.id,
       payment_method_title: this.payload_bacs.method_title,
-      //set_paid: true,
 
       billing: {
         address_1: this.address,
@@ -343,7 +256,6 @@ checkphone() {
               product_id: item.product.id,
               price: this.sale_price_new,
               total: this.sale_price_new,
-              //quantity: 1
             })
             console.log(this.sale_price_new)
             console.log(orderItems)
@@ -358,13 +270,7 @@ checkphone() {
 
           }
         });
-      // })
     }
-
-
-
-
-
 
     data.line_items = orderItems;
 
@@ -372,20 +278,13 @@ checkphone() {
       'Content-Type': 'application/x-www-form-urlencoded'
     });
 
-
-
-    // const site = await CoreSites.getSite();
-    // const userId = site.getUserId();
-    // const storage1 = await this.storage.create();
-    // this.storage = storage1;
-    // storage.remove(key);
     if(this.phonenumber != '') {
       return new Promise(resolve => {
         this.http
           .post(
             `${this.url}/wp-json/wc/v3/orders/?consumer_key=${
               this.consumerKey
-            }&consumer_secret=${this.consumerSecret}`,
+            }&consumer_secret=${this.consumersecret}`,
             data,
             { headers }
           )
@@ -404,7 +303,7 @@ checkphone() {
           .post(
             `${this.url}/wp-json/wc/v3/orders/?consumer_key=${
               this.consumerKey
-            }&consumer_secret=${this.consumerSecret}`,
+            }&consumer_secret=${this.consumersecret}`,
             data,
             { headers }
           )
@@ -435,9 +334,6 @@ checkphone() {
 
       toast.present();
     }
-
-
-
 }
 
 

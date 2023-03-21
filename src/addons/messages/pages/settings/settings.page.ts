@@ -20,7 +20,6 @@ import {
     AddonMessages,
 } from '../../services/messages';
 import { CoreUser } from '@features/user/services/user';
-import { CoreApp } from '@services/app';
 import { CoreConfig } from '@services/config';
 import { CoreEvents } from '@singletons/events';
 import { CoreSites } from '@services/sites';
@@ -28,6 +27,7 @@ import { CoreDomUtils } from '@services/utils/dom';
 import { CoreConstants } from '@/core/constants';
 import { IonRefresher } from '@ionic/angular';
 import { AddonNotificationsPreferencesNotificationProcessorState } from '@addons/notifications/services/notifications';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Page that displays the messages settings page.
@@ -66,13 +66,11 @@ export class AddonMessagesSettingsPage implements OnInit, OnDestroy {
     }
 
     protected async asyncInit(): Promise<void> {
-        this.sendOnEnter = !!(await CoreConfig.get(CoreConstants.SETTINGS_SEND_ON_ENTER, !CoreApp.isMobile()));
+        this.sendOnEnter = !!(await CoreConfig.get(CoreConstants.SETTINGS_SEND_ON_ENTER, !CorePlatform.isMobile()));
     }
 
     /**
-     * Runs when the page has loaded. This event only happens once per page being created.
-     * If a page leaves but is cached, then this event will not fire again on a subsequent viewing.
-     * Setup code for the page.
+     * @inheritdoc
      */
     ngOnInit(): void {
         this.fetchPreferences();
@@ -81,7 +79,7 @@ export class AddonMessagesSettingsPage implements OnInit, OnDestroy {
     /**
      * Fetches preference data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchPreferences(): Promise<void> {
         try {
@@ -261,6 +259,9 @@ export class AddonMessagesSettingsPage implements OnInit, OnDestroy {
         });
     }
 
+    /**
+     * Send on Enter toggle has changed.
+     */
     sendOnEnterChanged(): void {
         // Save the value.
         CoreConfig.set(CoreConstants.SETTINGS_SEND_ON_ENTER, this.sendOnEnter ? 1 : 0);
@@ -274,7 +275,7 @@ export class AddonMessagesSettingsPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Page destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         // If there is a pending action to update preferences, execute it right now.

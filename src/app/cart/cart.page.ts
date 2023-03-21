@@ -3,7 +3,7 @@ import { Component, OnInit } from '@angular/core';
 import { AlertController, LoadingController, NavController } from '@ionic/angular';
 import { Storage } from '@ionic/storage-angular';
 import { CoreSites } from '@services/sites';
-
+import { HTTP } from '@ionic-native/http/ngx';
 
 @Component({
   selector: 'app-cart',
@@ -16,9 +16,9 @@ export class CartPage implements OnInit {
   total: any;
   boolean: boolean | undefined;
   boolean1: boolean | undefined;
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
+  url:any;
+  consumerKey:any;
+  consumerSecret:any;
   code!: any[];
   coupons!: any[];
   codesale = '';
@@ -29,16 +29,34 @@ export class CartPage implements OnInit {
 
   currentFood = undefined;
 
-  constructor(private nav:NavController,private storage: Storage,public alertCtrl: AlertController,private loadingController:LoadingController,public http: HttpClient) {
+  constructor(public http: HTTP,private nav:NavController,private storage: Storage,public alertCtrl: AlertController,private loadingController:LoadingController) {
     this.total = 0;
-    this.getCode();
    }
 
   async ngOnInit() {
     const site = await CoreSites.getSite();
 
     const userId = site.getUserId()
-    console.log(userId)
+
+    var data: any = {
+      userid: userId,
+    };
+
+    const preSets = {
+        getFromCache: false,
+    };
+    await site.write('th_woocommerce_key_api', data, preSets).then((data) => {
+
+      this.url = JSON.parse(JSON.stringify(data)).url_woocommerce
+
+      this.consumerKey = JSON.parse(JSON.stringify(data)).consumerKey_woocommerce
+
+      this.consumerSecret = JSON.parse(JSON.stringify(data)).consumerSecret_woocommerce
+
+    }).catch((e) => {
+         console.log(e)
+    });
+
     const storage1 =await this.storage.create();
     this.storage = storage1;
 
@@ -68,11 +86,7 @@ export class CartPage implements OnInit {
       })
     });
 
-
-
-    console.log(this.total);
-    console.log(this.cartItems);
-
+    this.getCode();
   }
 
 
@@ -122,7 +136,6 @@ export class CartPage implements OnInit {
     })
   }
 
-
   async getCode() {
     const loading = await this.loadingController.create({
       message: 'Vui lòng chờ...',
@@ -133,24 +146,32 @@ export class CartPage implements OnInit {
         .get(
           `${this.url}/wp-json/wc/v3/coupons?consumer_key=${
             this.consumerKey
-          }&consumer_secret=${this.consumerSecret}`
+          }&consumer_secret=${this.consumerSecret}`,{},{}
         )
-      .subscribe(data => {
+      .then(data => {
         resolve(data);
-        let code1:any[] =  JSON.parse(JSON.stringify(data))
+        let code1:any[] =  JSON.parse(data.data)
           for(let i = 0; i <code1.length; i++){
             if(code1[i].date_expires != null) {
-              // code1[i].date_expires1 =new Date(code1[i].date_expires.split("T")[0])
               code1[i].date_expires1 = Date.parse(code1[i].date_expires.replace('T', ' '))
             }
           }
           this.code = code1
-          console.log(this.code)
-          console.log(new Date().getTime())
         loading.dismiss();
       })
+      .catch(async error => {
+        const alert = await this.alertCtrl.create({
+          header: 'Thông báo',
+          message: 'Đã xảy ra lỗi bạn vui lòng load lại trang!',
+          buttons: ['OK']
+        });
+        loading.dismiss();
+        await alert.present();
+
+      });
     });
   }
+
 
   CodeSale() {
     if(this.codesale != undefined) {
@@ -181,13 +202,12 @@ export class CartPage implements OnInit {
     }
   }
 
-  Payment(product) {
+  Payment() {
     if(this.coupons != undefined) {
-      this.nav.navigateForward(['main/payload', { price : this.sale_price_new, coupons: JSON.stringify(this.coupons)}])
+      this.nav.navigateForward(['main/payload', { price : this.sale_price_new, coupons: JSON.stringify(this.coupons) ,url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumerSecret}])
     }else {
-      this.nav.navigateForward(['main/payload', { price : this.sale_price_new}])
+      this.nav.navigateForward(['main/payload', { price : this.sale_price_new,url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumerSecret}])
     }
-    //this.nav.navigateForward(['main/payload', {price : this.sale_price_new, coupons: JSON.stringify(this.coupons)}])
   }
 
   customAlertOptions = {

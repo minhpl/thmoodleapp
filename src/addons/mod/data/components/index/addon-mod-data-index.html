@@ -25,18 +25,8 @@
         [courseId]="courseId" [hasDataToSync]="hasOffline || hasOfflineRatings" (completionChanged)="onCompletionChange()">
     </core-course-module-info>
 
-    <ion-item class="ion-text-wrap core-group-selector" *ngIf="groupInfo && (groupInfo.separateGroups || groupInfo.visibleGroups)">
-        <ion-label id="addon-data-groupslabel">
-            <ng-container *ngIf="groupInfo.separateGroups">{{'core.groupsseparate' | translate }}</ng-container>
-            <ng-container *ngIf="groupInfo.visibleGroups">{{'core.groupsvisible' | translate }}</ng-container>
-        </ion-label>
-        <ion-select [(ngModel)]="selectedGroup" (ionChange)="setGroup(selectedGroup)" aria-labelledby="addon-data-groupslabel"
-            interface="action-sheet" [interfaceOptions]="{header: 'core.group' | translate}">
-            <ion-select-option *ngFor="let groupOpt of groupInfo.groups" [value]="groupOpt.id">
-                {{groupOpt.name}}
-            </ion-select-option>
-        </ion-select>
-    </ion-item>
+    <core-group-selector [groupInfo]="groupInfo" [(selected)]="selectedGroup" (selectedChange)="setGroup(selectedGroup)">
+    </core-group-selector>
 
     <ion-card class="core-info-card" *ngIf="!access?.timeavailable && timeAvailableFrom">
         <ion-item>
@@ -72,14 +62,14 @@
 
     <!-- Reset search. -->
     <ng-container *ngIf="search.searching && !isEmpty">
-        <ion-item (click)="searchReset()" button detail="false" *ngIf="!foundRecordsTranslationData">
+        <ion-item (click)="searchReset($event)" button detail="false" *ngIf="!foundRecordsTranslationData">
             <ion-label color="info">
                 {{ 'addon.mod_data.resetsettings' | translate}}
             </ion-label>
         </ion-item>
 
         <ion-card class="core-success-card" *ngIf="foundRecordsTranslationData">
-            <ion-item (click)="searchReset()" button detail="false">
+            <ion-item (click)="searchReset($event)" button detail="false">
                 <ion-label>
                     <p [innerHTML]="'addon.mod_data.foundrecords' | translate:{$a: foundRecordsTranslationData}"></p>
                 </ion-label>
@@ -115,7 +105,7 @@
 
     <core-empty-box *ngIf="isEmpty && search.searching" icon="fas-database" [message]="'addon.mod_data.nomatch' | translate"
         class="core-empty-box-clickable">
-        <button class="as-link" (click)="searchReset()">{{ 'addon.mod_data.resetsettings' | translate}}</button>
+        <button class="as-link" (click)="searchReset($event)">{{ 'addon.mod_data.resetsettings' | translate}}</button>
     </core-empty-box>
 
 </core-loading>

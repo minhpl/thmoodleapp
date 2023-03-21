@@ -18,6 +18,8 @@ import { CoreSite, CoreSiteInfo } from '@classes/site';
 import { CoreFilter } from '@features/filter/services/filter';
 import { CoreLoginSitesComponent } from '@features/login/components/sites/sites';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
+import { CoreUserAuthenticatedSupportConfig } from '@features/user/classes/support/authenticated-support-config';
+import { CoreUserSupport } from '@features/user/services/support';
 import { CoreUser, CoreUserProfile } from '@features/user/services/user';
 import {
     CoreUserProfileHandlerData,
@@ -25,12 +27,12 @@ import {
     CoreUserDelegateService,
     CoreUserDelegateContext,
 } from '@features/user/services/user-delegate';
+import { NavController } from '@ionic/angular';
 import { CoreNavigator } from '@services/navigator';
-import { CoreSites, CoreSitesProvider } from '@services/sites';
+import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { ModalController, Translate } from '@singletons';
 import { Subscription } from 'rxjs';
-import { LoadingController, NavController } from '@ionic/angular';
 
 /**
  * Component to display a user menu.
@@ -52,6 +54,7 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
     handlersLoaded = false;
     user?: CoreUserProfile;
     displaySwitchAccount = true;
+    displayContactSupport = false;
     removeAccountOnLogout = false;
     theuser: any = {};
 
@@ -61,7 +64,7 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
      * @inheritdoc
      */
 
-    constructor( private nav: NavController,private loadingController:LoadingController,private sitesProvider: CoreSitesProvider, ) {}
+    constructor( private nav: NavController, ) {}
     async ngOnInit(): Promise<void> {
         const currentSite = CoreSites.getRequiredCurrentSite();
         this.siteId = currentSite.getId();
@@ -69,13 +72,21 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         this.siteName = currentSite.getSiteName();
         this.siteUrl = currentSite.getURL();
         this.displaySwitchAccount = !currentSite.isFeatureDisabled('NoDelegate_SwitchAccount');
+        this.displayContactSupport = new CoreUserAuthenticatedSupportConfig(currentSite).canContactSupport();
         this.removeAccountOnLogout = !!CoreConstants.CONFIG.removeaccountonlogout;
 
         this.loadSiteLogo(currentSite);
 
         // Load the handlers.
         if (this.siteInfo) {
-            this.user = await CoreUser.getProfile(this.siteInfo.userid);
+            try {
+                this.user = await CoreUser.getProfile(this.siteInfo.userid);
+            } catch {
+                this.user = {
+                    id: this.siteInfo.userid,
+                    fullname: this.siteInfo.fullname,
+                };
+            }
 
             this.theuser = this.user
 
@@ -105,7 +116,7 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
      * Load site logo from current site public config.
      *
      * @param currentSite Current site object.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSiteLogo(currentSite: CoreSite): Promise<void> {
         if (CoreConstants.CONFIG.forceLoginLogo) {
@@ -156,13 +167,16 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         CoreNavigator.navigateToSitePath('preferences');
     }
 
+    // TH edit
+
     openPreferencess() {
         this.nav.navigateForward(['main/purchase_history', { data: JSON.stringify(this.theuser)  }])
     }
 
-    Transcript() {
-        this.nav.navigateForward(['main/transcript'])
-    }
+    // Gradebook() {
+    //     this.nav.navigateForward(['main/gradebook'])
+    // }
+
     /**
      * A handler was clicked.
      *
@@ -177,6 +191,16 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         await this.close(event);
 
         handler.action(event, this.user, CoreUserDelegateContext.USER_MENU);
+    }
+
+    /**
+     * Contact site support.
+     *
+     * @param event Click event.
+     */
+    async contactSupport(event: Event): Promise<void> {
+        await this.close(event);
+        await CoreUserSupport.contact();
     }
 
     /**

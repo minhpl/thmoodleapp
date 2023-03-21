@@ -1,8 +1,7 @@
 import { Component, OnInit } from '@angular/core';
-import { NavController, ModalController , LoadingController} from '@ionic/angular';
-import { HttpClient } from '@angular/common/http';
-import { HTTP } from '@ionic-native/http';
-import { ProductdetailsPage } from '../productdetails/productdetails.page';
+import { NavController, ModalController , LoadingController, AlertController} from '@ionic/angular';
+import { HTTP } from '@ionic-native/http/ngx';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-search',
@@ -11,17 +10,21 @@ import { ProductdetailsPage } from '../productdetails/productdetails.page';
 })
 export class SearchPage implements OnInit {
 
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
   products!: any[];
   searchQuery: string = "";
   lista: string[] | undefined;
   pet!: string;
   boolean: boolean | undefined;
   boolean2: boolean | undefined;
+  url: any;
+  consumerKey:any;
+  consumersecret:any
 
-  constructor(public navCtrl: NavController, public http: HttpClient, public modalCtrl:ModalController, public loadingCtrl: LoadingController, private modal: ModalController) { }
+  constructor(public alertCtrl: AlertController,public http: HTTP,public navCtrl: NavController,private route: ActivatedRoute, public modalCtrl:ModalController, public loadingCtrl: LoadingController, private modal: ModalController) {
+    this.url = this.route.snapshot.params['url']
+    this.consumerKey = this.route.snapshot.params['consumerKey']
+    this.consumersecret = this.route.snapshot.params['consumersecret']
+   }
 
   ngOnInit() {
   }
@@ -34,14 +37,13 @@ export class SearchPage implements OnInit {
     return new Promise(resolve => {
       this.http
         .get(
-          `${this.url}/wp-json/wc/v3/products?per_page=100&consumer_key=${
+          `${this.url}/wp-json/wc/v3/products?per_page=100&search=${this.pet}&consumer_key=${
             this.consumerKey
-          }&consumer_secret=${this.consumerSecret}`
+          }&consumer_secret=${this.consumersecret}`,{},{}
         )
-        .subscribe(productData => {
+        .then(productData => {
           resolve(productData);
-          const jsonValue = JSON.stringify(productData);
-          const valueFromJson = JSON.parse(jsonValue);
+          const valueFromJson = JSON.parse(productData.data);
           this.products =  valueFromJson.filter((item) => (
             item.images.length !== 0 && item.name.toLowerCase().indexOf(this.pet.toLowerCase()) > -1
         ))
@@ -55,7 +57,6 @@ export class SearchPage implements OnInit {
 
                 temp[i].name1 = temp[i].name.substr(0,30) + '...'
 
-                // this.products.push(temp[i]);
             } else {
               temp[i].name1 = temp[i].name
             }
@@ -72,42 +73,16 @@ export class SearchPage implements OnInit {
         }
         loading.dismiss();
 
+      })
+      .catch(async error => {
+        const alert = await this.alertCtrl.create({
+          header: 'Thông báo',
+          message: 'Đã xảy ra lỗi bạn vui lòng load lại trang!',
+          buttons: ['OK']
+        });
+        loading.dismiss();
+        await alert.present();
       });
-
-      // this.http.get(`${this.url}/wp-json/wc/v3/products?per_page=100&consumer_key=${this.consumerKey}&consumer_secret=${this.consumerSecret}`, {}, {})
-      // .then(data => {
-      //   resolve(data);
-      //   this.products =  JSON.parse(data.data).filter((item) => (
-      //           item.images.length !== 0 && item.name.toLowerCase().indexOf(this.pet.toLowerCase()) > -1
-      //       ))
-
-
-      //       let temp: any[] = JSON.parse(data.data).filter((item) => (
-      //         item.images.length !== 0 && item.name.toLowerCase().indexOf(this.pet.toLowerCase()) > -1
-      //     ))
-
-      //     for(let i = 0; i <temp.length; i++){
-      //       if(temp[i].name.length >= 30){
-
-      //           temp[i].name1 = temp[i].name.substr(0,30) + '...'
-
-      //           // this.products.push(temp[i]);
-      //       } else {
-      //         temp[i].name1 = temp[i].name
-      //       }
-
-      //     }
-
-      //     this.products = temp;
-      //     if(this.products.length !== 0 && this.pet.length !== 0) {
-      //       this.boolean = true;
-      //       this.boolean2 = false
-      //     } else {
-      //       this.boolean = false;
-      //       this.boolean2 = true
-      //     }
-      //       // loading.dismiss();
-      // })
     });
   }
 

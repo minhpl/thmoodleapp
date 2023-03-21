@@ -1,7 +1,8 @@
 import { Component, OnInit } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { LoadingController, NavController } from '@ionic/angular';
+import { AlertController, LoadingController, NavController } from '@ionic/angular';
 import { HTTP } from '@ionic-native/http/ngx';
+import { CoreSites } from '@services/sites';
 
 @Component({
   selector: 'app-tab',
@@ -10,16 +11,42 @@ import { HTTP } from '@ionic-native/http/ngx';
 })
 export class TabPage implements OnInit {
 
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
+  url:any;
+  consumerKey:any;
+  consumerSecret:any;
   products: any[] | undefined;
   categories: any[] | undefined;
 
-  constructor(public http: HttpClient, private nav:NavController,private loadingController:LoadingController) {
-    this.getProduct();
+  constructor(public http: HTTP, private nav:NavController,private loadingController:LoadingController,public alertCtrl: AlertController) {
   }
 
+
+  async ngOnInit() {
+    const site = await CoreSites.getSite();
+
+    const userId = site.getUserId()
+
+    var data: any = {
+      userid: userId,
+    };
+
+    const preSets = {
+        getFromCache: false,
+    };
+    await site.write('th_woocommerce_key_api', data, preSets).then((data) => {
+
+      this.url = JSON.parse(JSON.stringify(data)).url_woocommerce
+
+      this.consumerKey = JSON.parse(JSON.stringify(data)).consumerKey_woocommerce
+
+      this.consumerSecret = JSON.parse(JSON.stringify(data)).consumerSecret_woocommerce
+
+    }).catch((e) => {
+         console.log(e)
+    });
+
+    this.getProduct();
+  }
 
   ionViewDidLoad() {
     console.log('ionViewDidLoad CategoryPage');
@@ -35,26 +62,25 @@ export class TabPage implements OnInit {
         .get(
           `${this.url}/wp-json/wc/v3/products/categories?per_page=100&consumer_key=${
             this.consumerKey
-          }&consumer_secret=${this.consumerSecret}`
+          }&consumer_secret=${this.consumerSecret}`,{},{}
         )
-        .subscribe(productData => {
+        .then(productData => {
           resolve(productData);
-          const jsonValue = JSON.stringify(productData);
-          const valueFromJson = JSON.parse(jsonValue);
+          const valueFromJson = JSON.parse(productData.data);
           this.categories=  valueFromJson.filter((item) => (
             item.id !== 16
         ))
         loading.dismiss();
+        })
+        .catch(async error => {
+          const alert = await this.alertCtrl.create({
+            header: 'Thông báo',
+            message: 'Đã xảy ra lỗi bạn vui lòng load lại trang!',
+            buttons: ['OK']
+          });
+          loading.dismiss();
+          await alert.present();
         });
-
-      // this.http.get(`${this.url}/wp-json/wc/v3/products/categories?per_page=100&consumer_key=${this.consumerKey}&consumer_secret=${this.consumerSecret}`, {}, {})
-      // .then(data => {
-      //   resolve(data);
-      //   this.categories=  JSON.parse(data.data).filter((item) => (
-      //            item.id !== 16
-      //      ))
-      //   loading.dismiss();
-      // })
     });
   }
 
@@ -64,7 +90,7 @@ export class TabPage implements OnInit {
 
   openCategoryPage(category){
 
-    this.nav.navigateForward(['main/category', { data: JSON.stringify(category)  }])
+    this.nav.navigateForward(['main/category', { data: JSON.stringify(category), url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumerSecret }])
   }
 
   doRefresh(event) {
@@ -76,9 +102,6 @@ export class TabPage implements OnInit {
       console.log('Async operation has ended');
       event.target.complete();
     }, 2000);
-  }
-
-  ngOnInit() {
   }
 
 }

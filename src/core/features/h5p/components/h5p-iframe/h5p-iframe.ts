@@ -94,7 +94,7 @@ export class CoreH5PIframeComponent implements OnChanges, OnDestroy {
     /**
      * Play the H5P.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async play(): Promise<void> {
         let localUrl: string | undefined;
@@ -129,7 +129,7 @@ export class CoreH5PIframeComponent implements OnChanges, OnDestroy {
                     CoreH5PCore.DISPLAY_OPTION_DOWNLOAD + '=0',
                 );
 
-                // Get auto-login URL so the user is automatically authenticated.
+                // Get auto-login URL so the user is automatically authenticated if needed.
                 const url = await this.site.getAutoLoginUrl(src, false);
 
                 // Add the preventredirect param so the user can authenticate.
@@ -147,7 +147,7 @@ export class CoreH5PIframeComponent implements OnChanges, OnDestroy {
     /**
      * Get the local URL of the package.
      *
-     * @return Promise resolved with the local URL.
+     * @returns Promise resolved with the local URL.
      */
     protected async getLocalUrl(): Promise<string | undefined> {
         try {
@@ -198,7 +198,7 @@ export class CoreH5PIframeComponent implements OnChanges, OnDestroy {
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.subscription?.unsubscribe();

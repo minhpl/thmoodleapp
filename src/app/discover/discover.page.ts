@@ -1,11 +1,12 @@
 import { Component, ElementRef, OnInit, ViewChild } from '@angular/core';
-import { NavController, NavParams, ModalController, LoadingController } from '@ionic/angular';
-import { HTTP } from '@ionic-native/http';
+import { NavController, ModalController, LoadingController, AlertController } from '@ionic/angular';
+import { HTTP } from '@ionic-native/http/ngx';
 import { HttpClient } from '@angular/common/http';
 import { Router } from '@angular/router';
 import { ProductdetailsPage } from '../productdetails/productdetails.page';
 import { Storage } from '@ionic/storage-angular';
 import { CoreSites } from '@services/sites';
+import { rejects } from 'assert';
 
 declare var google: any;
 
@@ -16,9 +17,9 @@ declare var google: any;
 })
 export class DiscoverPage implements OnInit {
 
-  url:any = 'https://vmcvietnam.org';
-  consumerKey:any = 'ck_a8d7832eeec157aa837f08035d0d38a584b84959';
-  consumerSecret:any = 'cs_b2054352baefb9857816fa33a3546e3157dfcb05';
+  url:any;
+  consumerKey:any;
+  consumerSecret:any;
   products: any[] | undefined;
   productscombo: any[] | undefined;
   // @ViewChild('productSlides') productSlides: Slides;
@@ -29,6 +30,7 @@ export class DiscoverPage implements OnInit {
   imgbanner4: any;
   total_product: any;
   boolean_total: boolean | undefined;
+  adasd: any;
 
   private slideOpts = {
     initialSlide: 0,
@@ -40,13 +42,11 @@ export class DiscoverPage implements OnInit {
   private slideOpts1 = {
     initialSlide: 0,
     speed: 500,
-    // spaceBetween: 10,
     slidesPerView: 1,
     pager: true
   }
 
-  constructor(private storage: Storage, public http: HttpClient, private router:Router, private nav:NavController,private loadingController:LoadingController, private modal: ModalController) {
-    this.getProduct();
+  constructor(public alertCtrl: AlertController,private storage: Storage, public http: HTTP, private router:Router, private nav:NavController,private loadingController:LoadingController, private modal: ModalController) {
   }
 
   async ngOnInit(): Promise<void> {
@@ -54,7 +54,26 @@ export class DiscoverPage implements OnInit {
     const site = await CoreSites.getSite();
 
     const userId = site.getUserId()
-    console.log(userId)
+
+    var data: any = {
+      userid: userId,
+    };
+
+    const preSets = {
+        getFromCache: false,
+    };
+    await site.write('th_woocommerce_key_api', data, preSets).then((data) => {
+
+      this.url = JSON.parse(JSON.stringify(data)).url_woocommerce
+
+      this.consumerKey = JSON.parse(JSON.stringify(data)).consumerKey_woocommerce
+
+      this.consumerSecret = JSON.parse(JSON.stringify(data)).consumerSecret_woocommerce
+
+    }).catch((e) => {
+         console.log(e)
+    });
+
     const storage1 =await this.storage.create();
     this.storage = storage1;
 
@@ -71,10 +90,8 @@ export class DiscoverPage implements OnInit {
       }
     });
 
-
+    this.getProduct();
   }
-
-
 
   async getProduct() {
     const loading = await this.loadingController.create({
@@ -86,12 +103,11 @@ export class DiscoverPage implements OnInit {
         .get(
           `${this.url}/wp-json/wc/v3/products?per_page=14&consumer_key=${
             this.consumerKey
-          }&consumer_secret=${this.consumerSecret}`
+          }&consumer_secret=${this.consumerSecret}`,{},{}
         )
-        .subscribe(productData => {
+        .then(productData => {
           resolve(productData);
-          const jsonValue = JSON.stringify(productData);
-             let temp: any[] = JSON.parse(jsonValue).slice(0,6).filter((item) => (
+             let temp: any[] = JSON.parse(productData.data).slice(0,6).filter((item) => (
           item.images.length !== 0
         ));
 
@@ -110,7 +126,7 @@ export class DiscoverPage implements OnInit {
           }
 
           this.products = temp;
-          let temp2: any[] = JSON.parse(jsonValue).slice(6,13).filter((item) => (
+          let temp2: any[] = JSON.parse(productData.data).slice(6,13).filter((item) => (
             item.images.length !== 0
           ))
 
@@ -132,6 +148,17 @@ export class DiscoverPage implements OnInit {
         this.productscombo =  temp2;
         loading.dismiss();
 
+        })
+        .catch(async error => {
+
+          const alert = await this.alertCtrl.create({
+            header: 'Thông báo',
+            message: 'Đã xảy ra lỗi bạn vui lòng load lại trang!',
+            buttons: ['OK']
+          });
+          loading.dismiss();
+          await alert.present();
+
         });
       });
 
@@ -151,13 +178,11 @@ export class DiscoverPage implements OnInit {
 
 
   async openProductPage(product) {
-    //console.log(product.id)
-    this.nav.navigateForward(['main/productdetails', { data: JSON.stringify(product)}])
-    //this.router.navigate(['/product-details', product.id]);
+    this.nav.navigateForward(['main/productdetails', {data: JSON.stringify(product), url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumerSecret}])
   }
 
   Search() {
-    this.nav.navigateForward(['main/search'])
+    this.nav.navigateForward(['main/search',{url: this.url, consumerKey: this.consumerKey, consumersecret:this.consumerSecret}])
   }
 
   doRefresh(event) {

@@ -16,8 +16,9 @@ import { Injectable } from '@angular/core';
 import { BehaviorSubject, Observable } from 'rxjs';
 import { distinctUntilChanged, map } from 'rxjs/operators';
 
-import { makeSingleton, Platform } from '@singletons';
+import { makeSingleton } from '@singletons';
 import { CoreEvents } from '@singletons/events';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Screen breakpoints.
@@ -73,7 +74,7 @@ export class CoreScreenService {
         }), {} as Record<Breakpoint, boolean>));
 
         this._layoutObservable = this.breakpointsObservable.pipe(
-            map(this.calculateLayout.bind(this)),
+            map(breakpoints => this.calculateLayout(breakpoints)),
             distinctUntilChanged<CoreScreenLayout>(),
         );
     }
@@ -120,7 +121,7 @@ export class CoreScreenService {
      * Watch orientation changes.
      */
     async watchOrientation(): Promise<void> {
-        await Platform.ready();
+        await CorePlatform.ready();
 
         screen.orientation.addEventListener('change', () => {
             CoreEvents.trigger(CoreEvents.ORIENTATION_CHANGE, { orientation: this.orientation });
@@ -162,7 +163,7 @@ export class CoreScreenService {
      * Calculate the layout given the current breakpoints.
      *
      * @param breakpoints Breakpoints visibility.
-     * @return Active layout.
+     * @returns Active layout.
      */
     protected calculateLayout(breakpoints: Record<Breakpoint, boolean>): CoreScreenLayout {
         if (breakpoints[Breakpoint.MEDIUM]) {

@@ -65,7 +65,7 @@ export class CoreMimetypeUtilsProvider {
      * Check if a file extension can be embedded without using iframes.
      *
      * @param extension Extension.
-     * @return Whether it can be embedded.
+     * @returns Whether it can be embedded.
      */
     canBeEmbedded(extension?: string): boolean {
         return this.isExtensionInGroup(extension, ['web_image', 'web_video', 'web_audio']);
@@ -75,7 +75,7 @@ export class CoreMimetypeUtilsProvider {
      * Clean a extension, removing the dot, hash, extra params...
      *
      * @param extension Extension to clean.
-     * @return Clean extension.
+     * @returns Clean extension.
      */
     cleanExtension(extension: string): string {
         if (!extension) {
@@ -134,10 +134,9 @@ export class CoreMimetypeUtilsProvider {
      *
      * @param mimetype Mimetype.
      * @param url URL of the file. It will be used if there's more than one possible extension.
-     * @return Extension.
+     * @returns Extension.
      */
     getExtension(mimetype: string, url?: string): string | undefined {
-        console.log(mimetype)
         mimetype = mimetype || '';
         mimetype = mimetype.split(';')[0]; // Remove codecs from the mimetype if any.
 
@@ -165,9 +164,10 @@ export class CoreMimetypeUtilsProvider {
      *
      * @param file File object.
      * @param path Alternative path that will override fileurl from file object.
-     * @param lesss File object.
-     * TH_edit
+     * @returns The embedded HTML string.
+     /* TH_edit
      */
+
     getEmbeddedHtml(file: CoreFileEntry, path?: string, lesss?: CoreCourseModuleContentFile[]): string {
         const filename = CoreUtils.isFileEntry(file) ? (file as FileEntry).name : file.filename;
         const extension = !CoreUtils.isFileEntry(file) && file.mimetype
@@ -189,8 +189,6 @@ export class CoreMimetypeUtilsProvider {
             path = path ?? (CoreUtils.isFileEntry(file) ? file.toURL() : CoreFileHelper.getFileUrl(file));
             path = path && CoreFile.convertFileSrc(path);
             var track = ''
-
-            console.log(lesss)
 
             if(lesss !== undefined) {
                 lesss.slice(1).map((item)=> {
@@ -231,7 +229,7 @@ export class CoreMimetypeUtilsProvider {
      * Get the URL of the icon of an extension.
      *
      * @param extension Extension.
-     * @return Icon URL.
+     * @returns Icon URL.
      */
     getExtensionIcon(extension: string): string {
         const icon = this.getExtensionIconName(extension) || 'unknown';
@@ -243,7 +241,7 @@ export class CoreMimetypeUtilsProvider {
      * Get the name of the icon of an extension.
      *
      * @param extension Extension.
-     * @return Icon. Undefined if not found.
+     * @returns Icon. Undefined if not found.
      */
     getExtensionIconName(extension: string): string | undefined {
         if (this.extToMime[extension]) {
@@ -262,7 +260,7 @@ export class CoreMimetypeUtilsProvider {
      * Get the "type" (string) of an extension, something like "image", "video" or "audio".
      *
      * @param extension Extension.
-     * @return Type of the extension.
+     * @returns Type of the extension.
      */
     getExtensionType(extension: string): string | undefined {
         extension = this.cleanExtension(extension);
@@ -276,7 +274,7 @@ export class CoreMimetypeUtilsProvider {
      * Get all the possible extensions of a mimetype. Returns empty array if not found.
      *
      * @param mimetype Mimetype.
-     * @return Extensions.
+     * @returns Extensions.
      */
     getExtensions(mimetype: string): string[] {
         mimetype = mimetype || '';
@@ -288,8 +286,8 @@ export class CoreMimetypeUtilsProvider {
     /**
      * Get a file icon URL based on its file name.
      *
-     * @param The name of the file.
-     * @return The path to a file icon.
+     * @param filename The name of the file.
+     * @returns The path to a file icon.
      */
     getFileIcon(filename: string): string {
         const extension = this.getFileExtension(filename);
@@ -301,7 +299,7 @@ export class CoreMimetypeUtilsProvider {
     /**
      * Get the folder icon URL.
      *
-     * @return The path to a folder icon.
+     * @returns The path to a folder icon.
      */
     getFolderIcon(): string {
         return 'assets/img/files/folder-64.png';
@@ -311,7 +309,7 @@ export class CoreMimetypeUtilsProvider {
      * Given a type (audio, video, html, ...), return its file icon path.
      *
      * @param type The type to get the icon.
-     * @return The icon path.
+     * @returns The icon path.
      */
     getFileIconForType(type: string): string {
         return 'assets/img/files/' + type + '-64.png';
@@ -322,18 +320,16 @@ export class CoreMimetypeUtilsProvider {
      * This is very weak and unreliable.
      *
      * @param fileUrl The file URL.
-     * @return The lowercased extension without the dot, or undefined.
+     * @returns The lowercased extension without the dot, or undefined.
      */
     guessExtensionFromUrl(fileUrl: string): string | undefined {
         const split = fileUrl.split('.');
-        let candidate;
-        let extension;
-        let position;
+        let extension: string | undefined;
 
         if (split.length > 1) {
-            candidate = split[split.length - 1].toLowerCase();
+            let candidate = split[split.length - 1].toLowerCase();
             // Remove params if any.
-            position = candidate.indexOf('?');
+            let position = candidate.indexOf('?');
             if (position > -1) {
                 candidate = candidate.substring(0, position);
             }
@@ -363,11 +359,11 @@ export class CoreMimetypeUtilsProvider {
      * When the file does not have an extension, it returns undefined.
      *
      * @param filename The file name.
-     * @return The lowercased extension, or undefined.
+     * @returns The lowercased extension, or undefined.
      */
     getFileExtension(filename: string): string | undefined {
         const dot = filename.lastIndexOf('.');
-        let ext;
+        let ext: string | undefined;
 
         if (dot > -1) {
             ext = filename.substring(dot + 1).toLowerCase();
@@ -389,7 +385,7 @@ export class CoreMimetypeUtilsProvider {
      *
      * @param group Group name.
      * @param field The field to get. If not supplied, all the info will be returned.
-     * @return Info for the group.
+     * @returns Info for the group.
      */
     getGroupMimeInfo(group: string): MimeTypeGroupInfo;
     getGroupMimeInfo(group: string, field: string): string[] | undefined;
@@ -409,7 +405,7 @@ export class CoreMimetypeUtilsProvider {
      * Get the mimetype of an extension. Returns undefined if not found.
      *
      * @param extension Extension.
-     * @return Mimetype.
+     * @returns Mimetype.
      */
     getMimeType(extension?: string): string | undefined {
         if (!extension) {
@@ -429,7 +425,7 @@ export class CoreMimetypeUtilsProvider {
      *
      * @param obj Instance of FileEntry OR object with 'filename' and 'mimetype' OR string with mimetype.
      * @param capitalise If true, capitalises first character of result.
-     * @return Type description.
+     * @returns Type description.
      */
     getMimetypeDescription(obj: CoreFileEntry | string, capitalise?: boolean): string {
         const langPrefix = 'assets.mimetypes.';
@@ -509,7 +505,7 @@ export class CoreMimetypeUtilsProvider {
      * Get the "type" (string) of a mimetype, something like "image", "video" or "audio".
      *
      * @param mimetype Mimetype.
-     * @return Type of the mimetype.
+     * @returns Type of the mimetype.
      */
     getMimetypeType(mimetype: string): string | undefined {
         mimetype = mimetype.split(';')[0]; // Remove codecs from the mimetype if any.
@@ -531,7 +527,7 @@ export class CoreMimetypeUtilsProvider {
      * Get the icon of a mimetype.
      *
      * @param mimetype Mimetype.
-     * @return Type of the mimetype.
+     * @returns Type of the mimetype.
      */
     getMimetypeIcon(mimetype: string): string {
         mimetype = mimetype.split(';')[0]; // Remove codecs from the mimetype if any.
@@ -555,7 +551,7 @@ export class CoreMimetypeUtilsProvider {
      * Given a group name, return the translated name.
      *
      * @param name Group name.
-     * @return Translated name.
+     * @returns Translated name.
      */
     getTranslatedGroupName(name: string): string {
         const key = 'assets.mimetypes.group:' + name;
@@ -570,7 +566,7 @@ export class CoreMimetypeUtilsProvider {
      *
      * @param extension Extension.
      * @param groups List of groups to check.
-     * @return Whether the extension belongs to any of the groups.
+     * @returns Whether the extension belongs to any of the groups.
      */
     isExtensionInGroup(extension: string | undefined, groups: string[]): boolean {
         if (!extension) {
@@ -592,7 +588,7 @@ export class CoreMimetypeUtilsProvider {
      * Check if a mimetype belongs to a file that can be streamed (audio, video).
      *
      * @param mimetype Mimetype.
-     * @return Boolean.
+     * @returns Boolean.
      */
     isStreamedMimetype(mimetype: string): boolean {
         return mimetype.indexOf('video') != -1 || mimetype.indexOf('audio') != -1;
@@ -602,15 +598,14 @@ export class CoreMimetypeUtilsProvider {
      * Remove the extension from a path (if any).
      *
      * @param path Path.
-     * @return Path without extension.
+     * @returns Path without extension.
      */
     removeExtension(path: string): string {
         const position = path.lastIndexOf('.');
-        let extension;
 
         if (position > -1) {
             // Check extension corresponds to a mimetype to know if it's valid.
-            extension = path.substring(position + 1).toLowerCase();
+            const extension = path.substring(position + 1).toLowerCase();
             if (this.getMimeType(extension) !== undefined) {
                 return path.substring(0, position); // Remove extension.
             }
