@@ -28,13 +28,12 @@ import { FormControl } from '@angular/forms';
 import { IonTextarea, IonContent, IonSlides } from '@ionic/angular';
 import { Subscription } from 'rxjs';
 
-import { CoreApp } from '@services/app';
 import { CoreSites } from '@services/sites';
 import { CoreFilepool } from '@services/filepool';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUrlUtils } from '@services/utils/url';
 import { CoreUtils } from '@services/utils/utils';
-import { Platform, Translate } from '@singletons';
+import { Translate } from '@singletons';
 import { CoreEventFormActionData, CoreEventObserver, CoreEvents } from '@singletons/events';
 import { CoreEditorOffline } from '../../services/editor-offline';
 import { CoreComponentsRegistry } from '@singletons/components-registry';
@@ -42,6 +41,7 @@ import { CoreLoadingComponent } from '@components/loading/loading';
 import { CoreScreen } from '@services/screen';
 import { CoreCancellablePromise } from '@classes/cancellable-promise';
 import { CoreDom } from '@singletons/dom';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Component to display a rich text editor if enabled.
@@ -59,9 +59,9 @@ import { CoreDom } from '@singletons/dom';
 export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit, OnDestroy {
 
     // Based on: https://github.com/judgewest2000/Ionic3RichText/
-    // @todo: Anchor button, fullscreen...
-    // @todo: Textarea height is not being updated when editor is resized. Height is calculated if any css is changed.
-    // @todo: Implement ControlValueAccessor https://angular.io/api/forms/ControlValueAccessor.
+    // @todo Anchor button, fullscreen...
+    // @todo Textarea height is not being updated when editor is resized. Height is calculated if any css is changed.
+    // @todo Implement ControlValueAccessor https://angular.io/api/forms/ControlValueAccessor.
 
     @Input() placeholder = ''; // Placeholder to set in textarea.
     @Input() control?: FormControl; // Form control.
@@ -155,7 +155,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
         this.canScanQR = CoreUtils.canScanQR();
         this.isPhone = CoreScreen.isMobile;
         this.toolbarHidden = this.isPhone;
-        this.direction = Platform.isRTL ? 'rtl' : 'ltr';
+        this.direction = CorePlatform.isRTL ? 'rtl' : 'ltr';
     }
 
     /**
@@ -171,11 +171,11 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
         this.setContent(this.control?.value);
         this.originalContent = this.control?.value;
         this.lastDraft = this.control?.value;
-        this.editorElement.onchange = this.onChange.bind(this);
-        this.editorElement.onkeyup = this.onChange.bind(this);
-        this.editorElement.onpaste = this.onChange.bind(this);
-        this.editorElement.oninput = this.onChange.bind(this);
-        this.editorElement.onkeydown = this.moveCursor.bind(this);
+        this.editorElement.onchange = () => this.onChange();
+        this.editorElement.onkeyup = () => this.onChange();
+        this.editorElement.onpaste = () => this.onChange();
+        this.editorElement.oninput = () => this.onChange();
+        this.editorElement.onkeydown = event => this.moveCursor(event);
 
         // Use paragraph on enter.
         document.execCommand('DefaultParagraphSeparator', false, 'p');
@@ -258,7 +258,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
             this.windowResized();
         }, 50);
 
-        document.addEventListener('selectionchange', this.selectionChangeFunction = this.updateToolbarStyles.bind(this));
+        document.addEventListener('selectionchange', this.selectionChangeFunction = () => this.updateToolbarStyles());
 
         this.keyboardObserver = CoreEvents.on(CoreEvents.KEYBOARD_CHANGE, () => {
             // Opening or closing the keyboard also calls the resize function, but sometimes the resize is called too soon.
@@ -269,7 +269,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
         // Change the side when the language changes.
         this.languageChangedSubscription = Translate.onLangChange.subscribe(() => {
             setTimeout(() => {
-                this.direction = Platform.isRTL ? 'rtl' : 'ltr';
+                this.direction = CorePlatform.isRTL ? 'rtl' : 'ltr';
             });
         });
     }
@@ -292,7 +292,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
     /**
      * Wait until all <core-loading> children inside the page.
      *
-     * @return Promise resolved when loadings are done.
+     * @returns Promise resolved when loadings are done.
      */
     protected async waitLoadingsDone(): Promise<void> {
         this.domPromise = CoreDom.waitToBeInDOM(this.element);
@@ -310,7 +310,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
     /**
      * Get the height of the space in blank at the end of the page.
      *
-     * @return Blank height in px. Will be negative if no blank space.
+     * @returns Blank height in px. Will be negative if no blank space.
      */
     protected async getBlankHeightInContent(): Promise<number> {
         await CoreUtils.nextTicks(5); // Ensure content is completely loaded in the DOM.
@@ -401,7 +401,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
      * Returns the number of chars from the beggining where is placed the cursor.
      *
      * @param parent Parent where to get the position from.
-     * @return Position in chars.
+     * @returns Position in chars.
      */
     protected getCurrentCursorPosition(parent: Node): number {
         const selection = window.getSelection();
@@ -446,7 +446,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
          * @param node Node where to start.
          * @param range Previous calculated range.
          * @param chars Object with counting of characters (input-output param).
-         * @return Selection range.
+         * @returns Selection range.
          */
         const setRange = (node: Node, range: Range, chars: { count: number }): Range => {
             if (chars.count === 0) {
@@ -463,7 +463,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
                     }
                 } else if ((node.textContent || '').length < chars.count) {
                     // Jump this node.
-                    // @todo: empty nodes will be omitted.
+                    // @todo empty nodes will be omitted.
                     chars.count -= (node.textContent || '').length;
                 } else {
                     // The cursor will be placed in this element.
@@ -591,6 +591,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
      * Check if text is empty.
      *
      * @param value text
+     * @returns If value is null only a white space.
      */
     protected isNullOrWhiteSpace(value: string | null): boolean {
         if (value == null || value === undefined) {
@@ -797,7 +798,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
         const selection = window.getSelection()?.toString();
 
         // When RTE is focused with a whole paragraph in desktop the stopBubble will not fire click.
-        if (CoreApp.isMobile() || !this.rteEnabled || document.activeElement != this.editorElement || selection == '') {
+        if (CorePlatform.isMobile() || !this.rteEnabled || document.activeElement != this.editorElement || selection == '') {
             this.stopBubble(event);
         }
     }
@@ -918,7 +919,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
     /**
      * Check if should auto save drafts.
      *
-     * @return {boolean} Whether it should auto save drafts.
+     * @returns {boolean} Whether it should auto save drafts.
      */
     protected shouldAutoSaveDrafts(): boolean {
         return !!CoreSites.getCurrentSite() &&
@@ -931,7 +932,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
     /**
      * Restore a draft if there is any.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async restoreDraft(): Promise<void> {
         try {
@@ -973,7 +974,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
                     this.showMessage('core.editor.textrecovered', this.RESTORE_MESSAGE_CLEAR_TIME);
                 }
             }
-        } catch (error) {
+        } catch {
             // Ignore errors, shouldn't happen.
         }
     }
@@ -1057,7 +1058,7 @@ export class CoreEditorRichTextEditorComponent implements OnInit, AfterViewInit,
      * Scan a QR code and put its text in the editor.
      *
      * @param event Event data
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async scanQR(event: Event): Promise<void> {
         this.stopBubble(event);

@@ -1,0 +1,28 @@
+<ion-header>
+    <ion-toolbar>
+        <ion-buttons slot="start">
+            <ion-back-button></ion-back-button>
+        </ion-buttons>
+        <ion-title>
+            <h1>
+                {{mycourse.fullname}}
+            </h1>
+        </ion-title>
+    </ion-toolbar>
+</ion-header>
+
+<ion-content>
+
+    <ion-card>
+        <ion-card-content *ngIf="mycourse.duration>0">
+            {{ 'addon.block_activatecourses.comfirmquestion' | translate:{$a: {'fullname':mycourse.fullname,
+            'duration_hr':mycourse.duration_hr} } }}
+        </ion-card-content>
+        <ion-card-content *ngIf="mycourse.duration==0">
+            {{ 'addon.block_activatecourses.comfirmquestion2' | translate:{$a: {'fullname':mycourse.fullname} } }}
+        </ion-card-content>
+        <ion-button ion-button (click)="kichhoat()" (click)="vaokhoahoc()">{{ 'addon.block_activatecourses.btnactivenow' | translate }}
+        </ion-button>
+        <ion-button ion-button (click)="goback()">{{ 'addon.block_activatecourses.btngoback' | translate }}</ion-button>
+    </ion-card>
+</ion-content>

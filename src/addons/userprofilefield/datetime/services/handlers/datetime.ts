@@ -18,9 +18,9 @@ import { AuthEmailSignupProfileField } from '@features/login/services/login-help
 import { CoreUserProfileField } from '@features/user/services/user';
 import { CoreUserProfileFieldHandler, CoreUserProfileFieldHandlerData } from '@features/user/services/user-profile-field-delegate';
 import { CoreFormFields } from '@singletons/form';
-import { CoreTimeUtils } from '@services/utils/time';
 import { makeSingleton } from '@singletons';
 import { AddonUserProfileFieldDatetimeComponent } from '../../component/datetime';
+import moment from 'moment-timezone';
 
 /**
  * Datetime user profile field handlers.
@@ -34,7 +34,7 @@ export class AddonUserProfileFieldDatetimeHandlerService implements CoreUserProf
     /**
      * Whether or not the handler is enabled on a site level.
      *
-     * @return Promise resolved with true if enabled.
+     * @returns Promise resolved with true if enabled.
      */
     async isEnabled(): Promise<boolean> {
         return true;
@@ -47,7 +47,7 @@ export class AddonUserProfileFieldDatetimeHandlerService implements CoreUserProf
      * @param signup True if user is in signup page.
      * @param registerAuth Register auth method. E.g. 'email'.
      * @param formValues Form Values.
-     * @return Data to send for the field.
+     * @returns Data to send for the field.
      */
     async getData(
         field: AuthEmailSignupProfileField | CoreUserProfileField,
@@ -61,7 +61,7 @@ export class AddonUserProfileFieldDatetimeHandlerService implements CoreUserProf
             return {
                 type: 'datetime',
                 name: 'profile_field_' + field.shortname,
-                value: CoreTimeUtils.convertToTimestamp(<string> formValues[name]),
+                value: moment(<string> formValues[name]).unix(),
             };
         }
     }
@@ -70,7 +70,7 @@ export class AddonUserProfileFieldDatetimeHandlerService implements CoreUserProf
      * Return the Component to use to display the user profile field.
      * It's recommended to return the class of the component, but you can also return an instance of the component.
      *
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @returns The component (or promise resolved with component) to use, undefined if not found.
      */
     getComponent(): Type<unknown> | Promise<Type<unknown>> {
         return AddonUserProfileFieldDatetimeComponent;

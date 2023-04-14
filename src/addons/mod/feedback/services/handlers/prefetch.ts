@@ -114,7 +114,7 @@ export class AddonModFeedbackPrefetchHandlerService extends CoreCourseActivityPr
      * @inheritdoc
      */
     prefetch(module: CoreCourseAnyModuleData, courseId: number): Promise<void> {
-        return this.prefetchPackage(module, courseId, this.prefetchFeedback.bind(this, module, courseId));
+        return this.prefetchPackage(module, courseId, (siteId) => this.prefetchFeedback(module, courseId, siteId));
     }
 
     /**
@@ -123,7 +123,7 @@ export class AddonModFeedbackPrefetchHandlerService extends CoreCourseActivityPr
      * @param module Module.
      * @param courseId Course ID the module belongs to.
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchFeedback(module: CoreCourseAnyModuleData, courseId: number, siteId: string): Promise<void> {
         const commonOptions = {

@@ -24,6 +24,7 @@ import {
 import { AddonModAssignHelper, AddonModAssignPluginConfig } from '../../services/assign-helper';
 import { AddonModAssignSubmissionDelegate } from '../../services/submission-delegate';
 import { CoreFileEntry } from '@services/file-helper';
+import type { AddonModAssignSubmissionPluginBaseComponent } from '@addons/mod/assign/classes/base-submission-plugin-component';
 
 /**
  * Component that displays an assignment submission plugin.
@@ -34,7 +35,7 @@ import { CoreFileEntry } from '@services/file-helper';
 })
 export class AddonModAssignSubmissionPluginComponent implements OnInit {
 
-    @ViewChild(CoreDynamicComponent) dynamicComponent!: CoreDynamicComponent;
+    @ViewChild(CoreDynamicComponent) dynamicComponent!: CoreDynamicComponent<AddonModAssignSubmissionPluginBaseComponent>;
 
     @Input() assign!: AddonModAssignAssign; // The assignment.
     @Input() submission!: AddonModAssignSubmission; // The submission.
@@ -42,7 +43,7 @@ export class AddonModAssignSubmissionPluginComponent implements OnInit {
     @Input() edit = false; // Whether the user is editing.
     @Input() allowOffline = false; // Whether to allow offline.
 
-    pluginComponent?: Type<unknown>; // Component to render the plugin.
+    pluginComponent?: Type<AddonModAssignSubmissionPluginBaseComponent>; // Component to render the plugin.
     data?: AddonModAssignSubmissionPluginData; // Data to pass to the component.
 
     // Data to render the plugin if it isn't supported.
@@ -53,7 +54,7 @@ export class AddonModAssignSubmissionPluginComponent implements OnInit {
     pluginLoaded = false;
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         if (!this.plugin) {
@@ -96,10 +97,10 @@ export class AddonModAssignSubmissionPluginComponent implements OnInit {
     /**
      * Invalidate the plugin data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async invalidate(): Promise<void> {
-        await this.dynamicComponent.callComponentFunction('invalidate', []);
+        await this.dynamicComponent.callComponentMethod('invalidate');
     }
 
 }

@@ -28,11 +28,12 @@ import { ActivatedRoute, Params } from '@angular/router';
 import { CorePushNotificationsNotificationBasicData } from '@features/pushnotifications/services/pushnotifications';
 import { CorePushNotificationsDelegate } from '@features/pushnotifications/services/push-delegate';
 import { Subscription } from 'rxjs';
-import { Translate, Platform } from '@singletons';
+import { Translate } from '@singletons';
 import { IonRefresher } from '@ionic/angular';
 import { CoreNavigator } from '@services/navigator';
 import { CoreScreen } from '@services/screen';
 import { CoreMainMenuDeepLinkManager } from '@features/mainmenu/classes/deep-link-manager';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Page that displays the list of discussions.
@@ -114,7 +115,7 @@ export class AddonMessagesDiscussions35Page implements OnInit, OnDestroy {
         );
 
         // Refresh the view when the app is resumed.
-        this.appResumeSubscription = Platform.resume.subscribe(() => {
+        this.appResumeSubscription = CorePlatform.resume.subscribe(() => {
             if (!this.loaded) {
                 return;
             }
@@ -160,7 +161,7 @@ export class AddonMessagesDiscussions35Page implements OnInit, OnDestroy {
      *
      * @param refresher Refresher.
      * @param refreshUnreadCounts Whteher to refresh unread counts.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async refreshData(refresher?: IonRefresher, refreshUnreadCounts: boolean = true): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -180,7 +181,7 @@ export class AddonMessagesDiscussions35Page implements OnInit, OnDestroy {
     /**
      * Fetch discussions.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchData(): Promise<void> {
         this.loadingMessage = this.loadingMessages;
@@ -228,7 +229,7 @@ export class AddonMessagesDiscussions35Page implements OnInit, OnDestroy {
      * Search messages cotaining text.
      *
      * @param query Text to search for.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async searchMessage(query: string): Promise<void> {
         CoreApp.closeKeyboard();
@@ -251,21 +252,17 @@ export class AddonMessagesDiscussions35Page implements OnInit, OnDestroy {
      *
      * @param discussionUserId Discussion Id to load.
      * @param messageId Message to scroll after loading the discussion. Used when searching.
-     * @param onlyWithSplitView Only go to Discussion if split view is on.
      */
     async gotoDiscussion(discussionUserId: number, messageId?: number): Promise<void> {
         this.discussionUserId = discussionUserId;
 
-        const params: Params = {
-            userId: discussionUserId,
-        };
+        const params: Params = {};
 
         if (messageId) {
             params.message = messageId;
         }
 
-        const splitViewLoaded = CoreNavigator.isCurrentPathInTablet('**/messages/index/discussion');
-        const path = (splitViewLoaded ? '../' : '') + 'discussion';
+        const path = CoreNavigator.getRelativePathToParent('/messages/index') + `discussion/user/${discussionUserId}`;
 
         await CoreNavigator.navigate(path, { params });
     }

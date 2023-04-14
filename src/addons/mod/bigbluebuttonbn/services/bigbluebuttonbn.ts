@@ -19,6 +19,8 @@ import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
 import { CoreCourseCommonModWSOptions } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreSites, CoreSitesCommonWSOptions } from '@services/sites';
+import { CoreTextUtils } from '@services/utils/text';
+import { CoreUtils } from '@services/utils/utils';
 import { CoreWSExternalFile, CoreWSExternalWarning } from '@services/ws';
 import { makeSingleton, Translate } from '@singletons';
 
@@ -38,7 +40,7 @@ export class AddonModBBBService {
      * @param id BBB ID.
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async endMeeting(
         id: number,
@@ -61,7 +63,7 @@ export class AddonModBBBService {
      * @param courseId Course ID.
      * @param cmId Course module ID.
      * @param options Other options.
-     * @return Promise resolved when the activity is retrieved.
+     * @returns Promise resolved when the activity is retrieved.
      */
     async getBBB(courseId: number, cmId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModBBBData> {
         const site = await CoreSites.getSite(options.siteId);
@@ -94,7 +96,7 @@ export class AddonModBBBService {
      * Get cache key for get BBB WS call.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getBBBsCacheKey(courseId: number): string {
         return ROOT_CACHE_KEY + 'bbb:' + courseId;
@@ -106,7 +108,7 @@ export class AddonModBBBService {
      * @param cmId Course module ID.
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the list of messages.
+     * @returns Promise resolved with the list of messages.
      */
     async getJoinUrl(
         cmId: number,
@@ -146,13 +148,13 @@ export class AddonModBBBService {
      * @param id BBB ID.
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param options Other options.
-     * @return Promise resolved with the list of messages.
+     * @returns Promise resolved with the list of messages.
      */
     async getMeetingInfo(
         id: number,
         groupId: number = 0,
-        options: CoreCourseCommonModWSOptions = {},
-    ): Promise<AddonModBBBMeetingInfoWSResponse> {
+        options: AddonModBBBGetMeetingInfoOptions = {},
+    ): Promise<AddonModBBBMeetingInfo> {
         const site = await CoreSites.getSite(options.siteId);
 
         const params: AddonModBBBMeetingInfoWSParams = {
@@ -161,16 +163,27 @@ export class AddonModBBBService {
         };
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getMeetingInfoCacheKey(id, groupId),
+            getCacheUsingCacheKey: true,
+            uniqueCacheKey: true,
             component: AddonModBBBService.COMPONENT,
             componentId: options.cmId,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
+        if (options.updateCache) {
+            params.updatecache = true;
+            preSets.getFromCache = false;
+        }
 
-        return await site.read<AddonModBBBMeetingInfoWSResponse>(
+        const meetingInfo = await site.read<AddonModBBBMeetingInfoWSResponse>(
             'mod_bigbluebuttonbn_meeting_info',
             params,
             preSets,
         );
+
+        return {
+            ...meetingInfo,
+            features: meetingInfo.features ? CoreUtils.objectToKeyValueMap(meetingInfo.features, 'name', 'isenabled') : undefined,
+        };
     }
 
     /**
@@ -178,7 +191,7 @@ export class AddonModBBBService {
      *
      * @param id BBB ID.
      * @param groupId Group ID, 0 means that the function will determine the user group.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getMeetingInfoCacheKey(id: number, groupId: number = 0): string {
         return this.getMeetingInfoCacheKeyPrefix(id) + groupId;
@@ -188,10 +201,75 @@ export class AddonModBBBService {
      * Get cache key prefix for meeting info WS call.
      *
      * @param id BBB ID.
-     * @return Cache key prefix.
+     * @returns Cache key prefix.
      */
     protected getMeetingInfoCacheKeyPrefix(id: number): string {
         return ROOT_CACHE_KEY + 'meetingInfo:' + id + ':';
+    }
+
+    /**
+     * Get meeting info for a BBB activity.
+     *
+     * @param id BBB ID.
+     * @param groupId Group ID, 0 means that the function will determine the user group.
+     * @param options Other options.
+     * @returns Promise resolved with the list of messages.
+     */
+    async getRecordings(
+        id: number,
+        groupId: number = 0,
+        options: AddonModBBBGetMeetingInfoOptions = {},
+    ): Promise<AddonModBBBRecordingsTableData> {
+        const site = await CoreSites.getSite(options.siteId);
+
+        const params: AddonModBBBGetRecordingsWSParams = {
+            bigbluebuttonbnid: id,
+            groupid: groupId,
+        };
+        const preSets: CoreSiteWSPreSets = {
+            cacheKey: this.getRecordingsCacheKey(id, groupId),
+            component: AddonModBBBService.COMPONENT,
+            componentId: options.cmId,
+            ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
+        };
+
+        const result = await site.read<AddonModBBBGetRecordingsWSResponse>(
+            'mod_bigbluebuttonbn_get_recordings',
+            params,
+            preSets,
+        );
+
+        if (result.warnings?.length) {
+            throw new CoreWSError(result.warnings[0]);
+        } else if (!result.tabledata) {
+            throw new CoreError('Cannot retrieve recordings.');
+        }
+
+        return {
+            ...result.tabledata,
+            parsedData: CoreTextUtils.parseJSON(result.tabledata?.data, []),
+        };
+    }
+
+    /**
+     * Get cache key for get recordings WS call.
+     *
+     * @param id BBB ID.
+     * @param groupId Group ID, 0 means that the function will determine the user group.
+     * @returns Cache key.
+     */
+    protected getRecordingsCacheKey(id: number, groupId: number = 0): string {
+        return this.getRecordingsCacheKeyPrefix(id) + groupId;
+    }
+
+    /**
+     * Get cache key prefix for get recordings WS call.
+     *
+     * @param id BBB ID.
+     * @returns Cache key prefix.
+     */
+    protected getRecordingsCacheKeyPrefix(id: number): string {
+        return ROOT_CACHE_KEY + 'recordings:' + id + ':';
     }
 
     /**
@@ -200,7 +278,7 @@ export class AddonModBBBService {
      * @param id BBB instance ID.
      * @param name Name of the BBB.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
     async logView(id: number, name?: string, siteId?: string): Promise<void> {
         const params: AddonModBBBViewBigBlueButtonBNWSParams = {
@@ -224,7 +302,7 @@ export class AddonModBBBService {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateBBBs(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -238,7 +316,7 @@ export class AddonModBBBService {
      * @param id BBB ID.
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateMeetingInfo(id: number, groupId: number = 0, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -251,7 +329,7 @@ export class AddonModBBBService {
      *
      * @param id BBB ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateAllGroupsMeetingInfo(id: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -260,10 +338,37 @@ export class AddonModBBBService {
     }
 
     /**
+     * Invalidate recordings for a certain group.
+     *
+     * @param id BBB ID.
+     * @param groupId Group ID, 0 means that the function will determine the user group.
+     * @param siteId Site ID. If not defined, current site.
+     * @returns Promise resolved when the data is invalidated.
+     */
+    async invalidateRecordings(id: number, groupId: number = 0, siteId?: string): Promise<void> {
+        const site = await CoreSites.getSite(siteId);
+
+        await site.invalidateWsCacheForKey(this.getRecordingsCacheKey(id, groupId));
+    }
+
+    /**
+     * Invalidate recordings for all groups.
+     *
+     * @param id BBB ID.
+     * @param siteId Site ID. If not defined, current site.
+     * @returns Promise resolved when the data is invalidated.
+     */
+    async invalidateAllGroupsRecordings(id: number, siteId?: string): Promise<void> {
+        const site = await CoreSites.getSite(siteId);
+
+        await site.invalidateWsCacheForKeyStartingWith(this.getRecordingsCacheKeyPrefix(id));
+    }
+
+    /**
      * Returns whether or not the BBB plugin is enabled for a certain site.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with true if enabled, resolved with false or rejected otherwise.
+     * @returns Promise resolved with true if enabled, resolved with false or rejected otherwise.
      * @since 4.0, but the WebServices were backported to the plugin so it can be supported in older versions.
      */
     async isPluginEnabled(siteId?: string): Promise<boolean> {
@@ -347,6 +452,17 @@ export type AddonModBBBMeetingInfoWSResponse = {
         name: string; // Presentation name.
     }[];
     joinurl: string; // Join URL.
+    features?: { // Enabled features. @since 4.1.
+        name: string;
+        isenabled: boolean;
+    }[];
+};
+
+/**
+ * Meeting info with some calculated data.
+ */
+export type AddonModBBBMeetingInfo = Omit<AddonModBBBMeetingInfoWSResponse, 'features'> & {
+    features?: Record<string, boolean>;
 };
 
 /**
@@ -379,4 +495,56 @@ export type AddonModBBBViewBigBlueButtonBNWSParams = {
 export type AddonModBBBEndMeetingWSParams = {
     bigbluebuttonbnid: number; // Bigbluebuttonbn instance id.
     groupid?: number; // Bigbluebuttonbn group id.
+};
+
+/**
+ * Options for getMeetingInfo.
+ */
+export type AddonModBBBGetMeetingInfoOptions = CoreCourseCommonModWSOptions & {
+    updateCache?: boolean;
+};
+
+/**
+ * Params of mod_bigbluebuttonbn_get_recordings WS.
+ */
+export type AddonModBBBGetRecordingsWSParams = {
+    bigbluebuttonbnid: number; // Bigbluebuttonbn instance id.
+    tools?: string; // A set of enabled tools.
+    groupid?: number; // Group ID.
+};
+
+/**
+ * Data returned by mod_bigbluebuttonbn_get_recordings WS.
+ */
+export type AddonModBBBGetRecordingsWSResponse = {
+    status: boolean; // Whether the fetch was successful.
+    tabledata?: AddonModBBBRecordingsWSTableData;
+    warnings?: CoreWSExternalWarning[];
+};
+
+/**
+ * Table data returned by mod_bigbluebuttonbn_get_recordings WS.
+ */
+export type AddonModBBBRecordingsWSTableData = {
+    activity: string;
+    ping_interval: number; // eslint-disable-line @typescript-eslint/naming-convention
+    locale: string;
+    profile_features: string[]; // eslint-disable-line @typescript-eslint/naming-convention
+    columns: {
+        key: string;
+        label: string;
+        width: string;
+        type?: string; // Column type.
+        sortable?: boolean; // Whether this column is sortable.
+        allowHTML?: boolean; // Whether this column contains HTML.
+        formatter?: string; // Formatter name.
+    }[];
+    data: string;
+};
+
+/**
+ * Recordings table data with some calculated data.
+ */
+export type AddonModBBBRecordingsTableData = AddonModBBBRecordingsWSTableData & {
+    parsedData: Record<string, string|number|boolean>[];
 };

@@ -14,7 +14,7 @@
 
 import { Component, Input, ElementRef, OnInit, OnDestroy, OnChanges, SimpleChange } from '@angular/core';
 
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFilepool } from '@services/filepool';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -26,6 +26,7 @@ import { CoreEvents, CoreEventObserver } from '@singletons/events';
 import { CoreLogger } from '@singletons/logger';
 import { CoreH5P } from '@features/h5p/services/h5p';
 import { CoreH5PDisplayOptions } from '../../classes/core';
+import { BehaviorSubject } from 'rxjs';
 
 /**
  * Component to render an H5P package.
@@ -43,10 +44,10 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
 
     showPackage = false;
     state?: string;
-    canDownload = false;
-    calculating = true;
+    canDownload$ = new BehaviorSubject(false);
+    calculating$ = new BehaviorSubject(true);
     displayOptions?: CoreH5PDisplayOptions;
-    urlParams?: {[name: string]: string};
+    urlParams: {[name: string]: string} = {};
 
     protected site: CoreSite;
     protected siteId: string;
@@ -59,13 +60,13 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
     ) {
 
         this.logger = CoreLogger.getInstance('CoreH5PPlayerComponent');
-        this.site = CoreSites.getCurrentSite()!;
+        this.site = CoreSites.getRequiredCurrentSite();
         this.siteId = this.site.getId();
         this.siteCanDownload = this.site.canDownloadFiles() && !CoreH5P.isOfflineDisabledInSite();
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         this.checkCanDownload();
@@ -93,13 +94,13 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
         this.displayOptions = CoreH5P.h5pPlayer.getDisplayOptionsFromUrlParams(this.urlParams);
         this.showPackage = true;
 
-        if (!this.canDownload || (this.state != CoreConstants.OUTDATED && this.state != CoreConstants.NOT_DOWNLOADED)) {
+        if (!this.canDownload$.getValue() || (this.state != CoreConstants.OUTDATED && this.state != CoreConstants.NOT_DOWNLOADED)) {
             return;
         }
 
         // Download the package in background if the size is low.
         try {
-            this.attemptDownloadInBg();
+            await this.attemptDownloadInBg();
         } catch (error) {
             this.logger.error('Error downloading H5P in background', error);
         }
@@ -108,10 +109,10 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
     /**
      * Download the package.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async download(): Promise<void> {
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal('core.networkerrormsg', true);
 
             return;
@@ -119,12 +120,12 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
 
         try {
             // Get the file size and ask the user to confirm.
-            const size = await CorePluginFileDelegate.getFileSize({ fileurl: this.urlParams!.url }, this.siteId);
+            const size = await CorePluginFileDelegate.getFileSize({ fileurl: this.urlParams.url }, this.siteId);
 
             await CoreDomUtils.confirmDownloadSize({ size: size, total: true });
 
             // User confirmed, add to the queue.
-            await CoreFilepool.addToQueueByUrl(this.siteId, this.urlParams!.url, this.component, this.componentId);
+            await CoreFilepool.addToQueueByUrl(this.siteId, this.urlParams.url, this.component, this.componentId);
 
         } catch (error) {
             if (CoreDomUtils.isCanceledError(error)) {
@@ -140,11 +141,11 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
     /**
      * Download the H5P in background if the size is low.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async attemptDownloadInBg(): Promise<void> {
         if (!this.urlParams || !this.src || !this.siteCanDownload || !CoreH5P.canGetTrustedH5PFileInSite() ||
-                !CoreApp.isOnline()) {
+                !CoreNetwork.isOnline()) {
             return;
         }
 
@@ -160,7 +161,7 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
     /**
      * Check if the package can be downloaded.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async checkCanDownload(): Promise<void> {
         this.observer && this.observer.off();
@@ -181,8 +182,8 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
             }
 
         } else {
-            this.calculating = false;
-            this.canDownload = false;
+            this.calculating$.next(false);
+            this.canDownload$.next(false);
         }
 
     }
@@ -190,22 +191,21 @@ export class CoreH5PPlayerComponent implements OnInit, OnChanges, OnDestroy {
     /**
      * Calculate state of the file.
      *
-     * @param fileUrl The H5P file URL.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async calculateState(): Promise<void> {
-        this.calculating = true;
+        this.calculating$.next(true);
 
         // Get the status of the file.
         try {
-            const state = await CoreFilepool.getFileStateByUrl(this.siteId, this.urlParams!.url);
+            const state = await CoreFilepool.getFileStateByUrl(this.siteId, this.urlParams.url);
 
-            this.canDownload = true;
+            this.canDownload$.next(true);
             this.state = state;
         } catch (error) {
-            this.canDownload = false;
+            this.canDownload$.next(false);
         } finally {
-            this.calculating = false;
+            this.calculating$.next(false);
         }
     }
 

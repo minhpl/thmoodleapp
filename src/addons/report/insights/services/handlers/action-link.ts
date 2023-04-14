@@ -80,7 +80,7 @@ export class AddonReportInsightsActionLinkHandlerService extends CoreContentLink
                         // Cannot be opened in the app, open in browser.
                         const site = await CoreSites.getSite(siteId);
 
-                        await site.openInBrowserWithAutoLoginIfSameSite(forwardUrl);
+                        await site.openInBrowserWithAutoLogin(forwardUrl);
                     }
                 }
             },
@@ -96,7 +96,7 @@ export class AddonReportInsightsActionLinkHandlerService extends CoreContentLink
             return false;
         }
 
-        return await AddonReportInsights.canSendActionInSite(siteId);
+        return AddonReportInsights.canSendActionInSite(siteId);
     }
 
 }

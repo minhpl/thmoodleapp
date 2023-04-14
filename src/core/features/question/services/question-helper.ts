@@ -63,7 +63,7 @@ export class CoreQuestionHelperProvider {
      * @param questions The list of questions.
      * @param component The component the question is related to.
      * @param componentId Component ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async clearTmpData(questions: CoreQuestionQuestionParsed[], component: string, componentId: string | number): Promise<void> {
         questions = questions || [];
@@ -80,7 +80,7 @@ export class CoreQuestionHelperProvider {
      * @param component The component the question is related to.
      * @param componentId Component ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async deleteStoredQuestionFiles(
         question: CoreQuestionQuestionParsed,
@@ -126,7 +126,7 @@ export class CoreQuestionHelperProvider {
      * We don't remove them from HTML because the whole im-controls block will be removed afterwards.
      *
      * @param question Question to treat.
-     * @return Wether the certainty is found.
+     * @returns Wether the certainty is found.
      */
     extractQbehaviourCBM(question: CoreQuestionQuestion): boolean {
         const element = CoreDomUtils.convertToElement(question.html);
@@ -193,7 +193,7 @@ export class CoreQuestionHelperProvider {
      * If so, add the name and value to a "behaviourSeenInput" property and remove the input.
      *
      * @param question Question to treat.
-     * @return Whether the seen input is found.
+     * @returns Whether the seen input is found.
      */
     extractQbehaviourSeenInput(question: CoreQuestionQuestion): boolean {
         const element = CoreDomUtils.convertToElement(question.html);
@@ -291,13 +291,18 @@ export class CoreQuestionHelperProvider {
             return;
         }
 
-        matches.forEach((match: string) => {
+        matches.forEach((scriptCode) => {
+            if (scriptCode.match(/<script[^>]+type="math\/tex"/m)) {
+                // Don't remove math/tex scripts, they're needed to render the math expressions.
+                return;
+            }
+
             // Add the script to scriptsCode and remove it from html.
-            question.scriptsCode += match;
-            question.html = question.html.replace(match, '');
+            question.scriptsCode += scriptCode;
+            question.html = question.html.replace(scriptCode, '');
 
             // Search init_question functions for this type.
-            const initMatches = match.match(new RegExp('M.qtype_' + question.type + '.init_question\\(.*?}\\);', 'mg'));
+            const initMatches = scriptCode.match(new RegExp('M.qtype_' + question.type + '.init_question\\(.*?}\\);', 'mg'));
             if (initMatches) {
                 let initMatch = initMatches.pop()!;
 
@@ -312,7 +317,7 @@ export class CoreQuestionHelperProvider {
             const amdRegExp = new RegExp('require\\(\\[["\']qtype_' + question.type + '/question["\']\\],[^f]*' +
                 'function\\(amd\\)[^\\{]*\\{[^a]*amd\\.init\\((["\'](q|question-' + usageId + '-)' + question.slot +
                 '["\'].*?)\\);', 'm');
-            const amdMatch = match.match(amdRegExp);
+            const amdMatch = scriptCode.match(amdRegExp);
 
             if (amdMatch) {
                 // Try to convert the arguments to an array and add them to the question.
@@ -327,7 +332,7 @@ export class CoreQuestionHelperProvider {
      * This is in order to make this function compatible with other functions like CoreQuestionProvider.getBasicAnswers.
      *
      * @param html HTML code.
-     * @return Object where the keys are the names.
+     * @returns Object where the keys are the names.
      */
     getAllInputNamesFromHtml(html: string): Record<string, boolean> {
         const element = CoreDomUtils.convertToElement('<form>' + html + '</form>');
@@ -354,7 +359,7 @@ export class CoreQuestionHelperProvider {
      * We don't use ngModel because it doesn't detect changes done by JavaScript and some questions might do that.
      *
      * @param form Form.
-     * @return Object with the answers.
+     * @returns Object with the answers.
      */
     getAnswersFromForm(form: HTMLFormElement): CoreQuestionsAnswers {
         if (!form || !form.elements) {
@@ -393,7 +398,7 @@ export class CoreQuestionHelperProvider {
      * an HTML containing only the attachments anchors.
      *
      * @param html HTML code to search in.
-     * @return Attachments.
+     * @returns Attachments.
      */
     getQuestionAttachmentsFromHtml(html: string): CoreWSFile[] {
         const element = CoreDomUtils.convertToElement(html);
@@ -410,7 +415,7 @@ export class CoreQuestionHelperProvider {
 
             // Check anchor is valid.
             if (anchor.href && content) {
-                content = CoreTextUtils.cleanTags(content, true).trim();
+                content = CoreTextUtils.cleanTags(content, { singleLine: true, trim: true });
                 attachments.push({
                     filename: content,
                     fileurl: anchor.href,
@@ -425,7 +430,7 @@ export class CoreQuestionHelperProvider {
      * Get the sequence check from a question HTML.
      *
      * @param html Question's HTML.
-     * @return Object with the sequencecheck name and value.
+     * @returns Object with the sequencecheck name and value.
      */
     getQuestionSequenceCheckFromHtml(html: string): { name: string; value: string } | undefined {
         if (!html) {
@@ -450,7 +455,7 @@ export class CoreQuestionHelperProvider {
      * Get the CSS class for a question based on its state.
      *
      * @param name Question's state name.
-     * @return State class.
+     * @returns State class.
      */
     getQuestionStateClass(name: string): string {
         const state = CoreQuestion.getState(name);
@@ -463,7 +468,7 @@ export class CoreQuestionHelperProvider {
      *
      * @param question Question.
      * @param areaName Name of the area, e.g. 'attachments'.
-     * @return List of files.
+     * @returns List of files.
      */
     getResponseFileAreaFiles(question: CoreQuestionQuestion, areaName: string): CoreWSFile[] {
         if (!question.responsefileareas) {
@@ -482,7 +487,7 @@ export class CoreQuestionHelperProvider {
      * @param component The component the question is related to.
      * @param componentId Component ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the files.
+     * @returns Promise resolved with the files.
      */
     getStoredQuestionFiles(
         question: CoreQuestionQuestion,
@@ -500,7 +505,7 @@ export class CoreQuestionHelperProvider {
      * Get the validation error message from a question HTML if it's there.
      *
      * @param html Question's HTML.
-     * @return Validation error message if present.
+     * @returns Validation error message if present.
      */
     getValidationErrorFromHtml(html: string): string | undefined {
         const element = CoreDomUtils.convertToElement(html);
@@ -512,7 +517,7 @@ export class CoreQuestionHelperProvider {
      * Check if some HTML contains draft file URLs for the current site.
      *
      * @param html Question's HTML.
-     * @return Whether it contains draft files URLs.
+     * @returns Whether it contains draft files URLs.
      */
     hasDraftFileUrls(html: string): boolean {
         let url = CoreSites.getCurrentSite()?.getURL();
@@ -534,7 +539,7 @@ export class CoreQuestionHelperProvider {
      * @param question Question.
      * @param component Component.
      * @param attemptId Attempt ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async loadLocalAnswers(question: CoreQuestionQuestion, component: string, attemptId: number): Promise<void> {
         const answers = await CoreUtils.ignoreErrors(
@@ -619,7 +624,7 @@ export class CoreQuestionHelperProvider {
      * @param componentId An ID to use in conjunction with the component. If not defined, question ID.
      * @param siteId Site ID. If not defined, current site.
      * @param usageId Usage ID. Required in Moodle 3.7+.
-     * @return Promise resolved when all the files have been downloaded.
+     * @returns Promise resolved when all the files have been downloaded.
      */
     async prefetchQuestionFiles(
         question: CoreQuestionQuestion,
@@ -672,7 +677,7 @@ export class CoreQuestionHelperProvider {
      * @param component The component the question is related to.
      * @param componentId Component ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with answers to send to server.
+     * @returns Promise resolved with answers to send to server.
      */
     async prepareAnswers(
         questions: CoreQuestionQuestion[],
@@ -726,7 +731,7 @@ export class CoreQuestionHelperProvider {
      * @param question Question.
      * @param htmlProperty The name of the property containing the HTML to search.
      * @param selector The selector to find the button.
-     * @return Whether the button is found.
+     * @returns Whether the button is found.
      */
     protected searchBehaviourButton(question: CoreQuestionQuestion, htmlProperty: string, selector: string): boolean {
         const element = CoreDomUtils.convertToElement(question[htmlProperty]);
