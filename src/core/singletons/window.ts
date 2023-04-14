@@ -52,9 +52,14 @@ export class CoreWindow {
      * Show a confirm before opening a link in browser, unless the user previously marked to not show again.
      *
      * @param url URL to open.
-     * @return Promise resolved if confirmed, rejected if rejected.
+     * @returns Promise resolved if confirmed, rejected if rejected.
      */
     static async confirmOpenBrowserIfNeeded(url: string): Promise<void> {
+        if (!CoreUrlUtils.isHttpURL(url)) {
+            // Only ask confirm for http(s), other cases usually launch external apps.
+            return;
+        }
+
         // Check if the user decided not to see the warning.
         const dontShowWarning = await CoreConfig.get(CoreConstants.SETTINGS_DONT_SHOW_EXTERNAL_LINK_WARN, 0);
         if (dontShowWarning) {
@@ -83,7 +88,7 @@ export class CoreWindow {
      *
      * @param url URL to open.
      * @param name Name of the browsing context into which to load the URL.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     static async open(url: string, name?: string): Promise<void> {
         if (CoreUrlUtils.isLocalFileUrl(url)) {
@@ -91,7 +96,7 @@ export class CoreWindow {
 
             if (!CoreFileHelper.isOpenableInApp({ filename })) {
                 try {
-                    await CoreFileHelper.showConfirmOpenUnsupportedFile();
+                    await CoreFileHelper.showConfirmOpenUnsupportedFile(false, { filename });
                 } catch (error) {
                     return; // Cancelled, stop.
                 }
@@ -112,7 +117,7 @@ export class CoreWindow {
                     // Not logged in, cannot auto-login.
                     CoreUtils.openInBrowser(url);
                 } else {
-                    await CoreSites.getRequiredCurrentSite().openInBrowserWithAutoLoginIfSameSite(url);
+                    await CoreSites.getRequiredCurrentSite().openInBrowserWithAutoLogin(url);
                 }
             }
         }

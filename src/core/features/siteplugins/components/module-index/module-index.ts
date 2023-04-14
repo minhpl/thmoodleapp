@@ -94,7 +94,7 @@ export class CoreSitePluginsModuleIndexComponent implements OnInit, OnDestroy, C
     displayPrefetch = true;
     displaySize = true;
     displayGrades = false;
-    // @TODO:  // Currently display blogs is not an option since it may change soon adding new summary handlers.
+    // @todo  // Currently display blogs is not an option since it may change soon adding new summary handlers.
     displayBlog = false;
 
     ptrEnabled = true;
@@ -103,7 +103,7 @@ export class CoreSitePluginsModuleIndexComponent implements OnInit, OnDestroy, C
     jsData?: Record<string, unknown>; // Data to pass to the component.
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         if (!this.module) {
@@ -143,15 +143,13 @@ export class CoreSitePluginsModuleIndexComponent implements OnInit, OnDestroy, C
         // Get the data for the context menu.
         this.description = this.module.description;
         this.externalUrl = this.module.url;
-
-        console.log(this.jsData)
     }
 
     /**
      * Refresh the data.
      *
      * @param refresher Refresher.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async doRefresh(refresher?: IonRefresher | null): Promise<void> {
         try {
@@ -216,8 +214,6 @@ export class CoreSitePluginsModuleIndexComponent implements OnInit, OnDestroy, C
             },
         });
 
-        console.log(data)
-
         if (data && data.action == 'refresh' && this.content?.dataLoaded) {
             this.content?.refreshContent(true);
         }
@@ -278,7 +274,7 @@ export class CoreSitePluginsModuleIndexComponent implements OnInit, OnDestroy, C
      *
      * @param name Name of the function to call.
      * @param params List of params to send to the function.
-     * @return Result of the call. Undefined if no component instance or the function doesn't exist.
+     * @returns Result of the call. Undefined if no component instance or the function doesn't exist.
      */
     callComponentFunction(name: string, params?: unknown[]): unknown | undefined {
         return this.content?.callComponentFunction(name, params);

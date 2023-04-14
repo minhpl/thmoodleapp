@@ -18,7 +18,7 @@ import { CoreNetworkError } from '@classes/errors/network-error';
 import { CoreCourseActivitySyncBaseProvider } from '@features/course/classes/activity-sync';
 import { CoreCourse, CoreCourseAnyModuleData } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreSync } from '@services/sync';
 import { CoreUtils } from '@services/utils/utils';
@@ -51,7 +51,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
         courseId: number,
         regex?: RegExp,
         siteId?: string,
-    ): Promise<void> {
+    ): Promise<boolean> {
         regex = regex || /^.*files$|^timers/;
 
         return super.prefetchAfterUpdate(prefetchHandler, module, courseId, regex, siteId);
@@ -62,10 +62,10 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
      *
      * @param siteId Site ID to sync. If not defined, sync all sites.
      * @param force Wether to force sync not depending on last execution.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     syncAllFeedbacks(siteId?: string, force?: boolean): Promise<void> {
-        return this.syncOnSites('all feedbacks', this.syncAllFeedbacksFunc.bind(this, !!force), siteId);
+        return this.syncOnSites('all feedbacks', (siteId) => this.syncAllFeedbacksFunc(!!force, siteId), siteId);
     }
 
     /**
@@ -73,7 +73,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
      *
      * @param force Wether to force sync not depending on last execution.
      * @param siteId Site ID to sync. If not defined, sync all sites.
-     * @param Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     protected async syncAllFeedbacksFunc(force: boolean, siteId?: string): Promise<void> {
         // Sync all new responses.
@@ -108,7 +108,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
      *
      * @param feedbackId Feedback ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the feedback is synced or if it doesn't need to be synced.
+     * @returns Promise resolved when the feedback is synced or if it doesn't need to be synced.
      */
     async syncFeedbackIfNeeded(feedbackId: number, siteId?: string): Promise<AddonModFeedbackSyncResult | undefined> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -125,7 +125,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
      *
      * @param feedbackId Feedback ID to be synced.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     syncFeedback(feedbackId: number, siteId?: string): Promise<AddonModFeedbackSyncResult> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -153,7 +153,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
      *
      * @param feedbackId Feedback ID.
      * @param siteId Site ID.
-     * @return Promise resolved in success.
+     * @returns Promise resolved in success.
      */
     protected async performSyncFeedback(feedbackId: number, siteId: string): Promise<AddonModFeedbackSyncResult> {
         const result: AddonModFeedbackSyncResult = {
@@ -174,7 +174,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
             return result;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // Cannot sync in offline.
             throw new CoreNetworkError();
         }
@@ -213,7 +213,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
         responses.sort((a, b) => a.page - b.page);
 
         const orderedData = responses.map((data) => ({
-            function: this.processPage.bind(this, feedback, data, siteId, timemodified, result),
+            function: () => this.processPage(feedback, data, siteId, timemodified, result),
             blocking: true,
         }));
 
@@ -245,7 +245,7 @@ export class AddonModFeedbackSyncProvider extends CoreCourseActivitySyncBaseProv
      * @param siteId Site Id.
      * @param timemodified Current completed modification time.
      * @param result Result object to be modified.
-     * @return Resolve when done or rejected with error.
+     * @returns Resolve when done or rejected with error.
      */
     protected async processPage(
         feedback: AddonModFeedbackWSFeedback,

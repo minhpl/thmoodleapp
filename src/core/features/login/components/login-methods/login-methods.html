@@ -1,0 +1,7 @@
+<ng-container *ngIf="loginMethods?.length">
+    <ion-button [fill]="'outline'" class="ion-text-wrap ion-margin" *ngFor="let method of loginMethods" (click)="method.action()"
+        [attr.aria-label]="method.name" expand="block">
+        <ion-icon *ngIf="method.icon" [name]="method.icon" slot="start"></ion-icon>
+        <ion-label>{{ method.name }}</ion-label>
+    </ion-button>
+</ng-container>

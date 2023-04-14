@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { NgModule } from '@angular/core';
-import { AddonBlockActivateCoursesModule } from './activatecourses/activatecourses.module';
 
 import { AddonBlockActivityModulesModule } from './activitymodules/activitymodules.module';
 import { AddonBlockActivityResultsModule } from './activityresults/activityresults.module';
@@ -73,8 +72,7 @@ import { AddonBlockCourseStatusModule } from './coursestatus/html.module';
         AddonBlockStarredCoursesModule,
         AddonBlockTagsModule,
         AddonBlockTimelineModule,
-        AddonBlockActivateCoursesModule,
-        AddonBlockCourseStatusModule,
+        AddonBlockCourseStatusModule
     ],
 })
 export class AddonBlockModule { }

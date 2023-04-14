@@ -21,15 +21,15 @@ import { CoreCourse } from '@features/course/services/course';
 import { CoreTag, CoreTagItem } from '@features/tag/services/tag';
 import { CoreUser } from '@features/user/services/user';
 import { IonContent } from '@ionic/angular';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreGroup, CoreGroups } from '@services/groups';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
-import { Network, Translate, NgZone } from '@singletons';
+import { Translate, NgZone } from '@singletons';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 import { Subscription } from 'rxjs';
 import { Md5 } from 'ts-md5';
 import { AddonModWikiPageDBRecord } from '../../services/database/wiki';
@@ -116,13 +116,13 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
     ) {
         super('AddonModLessonIndexComponent', content, courseContentsPage);
 
-        this.isOnline = CoreApp.isOnline();
+        this.isOnline = CoreNetwork.isOnline();
 
         // Refresh online status when changes.
-        this.onlineSubscription = Network.onChange().subscribe(() => {
+        this.onlineSubscription = CoreNetwork.onChange().subscribe(() => {
             // Execute the callback in the Angular zone, so change detection doesn't stop working.
             NgZone.run(() => {
-                this.isOnline = CoreApp.isOnline();
+                this.isOnline = CoreNetwork.isOnline();
             });
         });
     }
@@ -249,6 +249,10 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
                 // Get real groupmode, in case it's forced by the course.
                 const groupInfo = await CoreGroups.getActivityGroupInfo(this.wiki.coursemodule);
 
+                if (groupInfo.separateGroups && !groupInfo.groups.length) {
+                    throw new CoreError(Translate.instant('addon.mod_wiki.cannotviewpage'));
+                }
+
                 await this.createSubwikiList(groupInfo.groups);
             } else {
                 this.subwikiData.count = subwikiList.count;
@@ -281,7 +285,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * Get wiki page contents.
      *
      * @param pageId Page to get.
-     * @return Promise resolved with the page data.
+     * @returns Promise resolved with the page data.
      */
     protected async fetchPageContents(pageId: number): Promise<AddonModWikiPageContents>;
     protected async fetchPageContents(): Promise<AddonModWikiPageDBRecord | undefined>;
@@ -323,8 +327,8 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
 
                     await this.showLoadingAndFetch(true, false);
 
-                    if (this.currentPage) {
-                        CoreUtils.ignoreErrors(AddonModWiki.logPageView(this.currentPage, this.wiki!.id, this.wiki!.name));
+                    if (this.currentPage && this.wiki) {
+                        CoreUtils.ignoreErrors(AddonModWiki.logPageView(this.currentPage, this.wiki.id, this.wiki.name));
                     }
                 }, CoreSites.getCurrentSiteId());
             }
@@ -369,7 +373,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
 
         // If no page specified, search page title in the offline pages.
         if (!this.currentPage) {
-            const searchTitle = this.pageTitle ? this.pageTitle : this.wiki!.firstpagetitle;
+            const searchTitle = this.pageTitle ? this.pageTitle : this.wiki?.firstpagetitle ?? '';
             const pageExists = dbPages.some((page) => page.title == searchTitle);
 
             if (pageExists) {
@@ -401,7 +405,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
     /**
      * Fetch the page to be shown.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchWikiPage(): Promise<void> {
         // Search the current Subwiki.
@@ -460,7 +464,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
     /**
      * Get path to the wiki home view. If cannot determine or it's current view, return undefined.
      *
-     * @return The path of the home view
+     * @returns The path of the home view
      */
     protected getWikiHomeView(): string | undefined {
         if (!this.wiki) {
@@ -478,7 +482,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
             `${AddonModWikiModuleHandlerService.PAGE_NAME}/${this.courseId}/${this.module.id}/edit`,
             {
                 params: {
-                    pageTitle: this.wiki!.firstpagetitle,
+                    pageTitle: this.wiki?.firstpagetitle ?? '',
                     wikiId: this.currentSubwiki?.wikiid,
                     userId: this.currentSubwiki?.userid,
                     groupId: this.currentSubwiki?.groupid,
@@ -582,7 +586,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * Open a page or a subwiki in the current wiki.
      *
      * @param options Options
-     * @return Promise.
+     * @returns Promise.
      */
     protected async openPageOrSubwiki(options: AddonModWikiOpenPageOptions): Promise<void> {
         const hash = <string> Md5.hashAsciiStr(JSON.stringify({
@@ -634,17 +638,13 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * @param subwikiId Subwiki ID.
      * @param userId User ID of the subwiki.
      * @param groupId Group ID of the subwiki.
-     * @param canEdit Whether the subwiki can be edited.
      */
-    goToSubwiki(subwikiId: number, userId: number, groupId: number, canEdit: boolean): void {
-        // Check if the subwiki is disabled.
-        if (subwikiId <= 0 && !canEdit) {
-            return;
-        }
-
-        if (subwikiId != this.currentSubwiki!.id || userId != this.currentSubwiki!.userid ||
-                groupId != this.currentSubwiki!.groupid) {
-
+    goToSubwiki(subwikiId: number, userId: number, groupId: number): void {
+        if (
+            subwikiId !== this.currentSubwiki?.id ||
+            userId !== this.currentSubwiki?.userid ||
+            groupId !== this.currentSubwiki?.groupid
+        ) {
             this.openPageOrSubwiki({
                 subwikiId: subwikiId,
                 userId: userId,
@@ -656,7 +656,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
     /**
      * Checks if there is any subwiki selected.
      *
-     * @return Whether there is any subwiki selected.
+     * @returns Whether there is any subwiki selected.
      */
     protected isAnySubwikiSelected(): boolean {
         return this.subwikiData.subwikiSelected > 0 || this.subwikiData.userSelected > 0 || this.subwikiData.groupSelected > 0;
@@ -666,7 +666,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * Checks if the given subwiki is the one picked on the subwiki picker.
      *
      * @param subwiki Subwiki to check.
-     * @return Whether it's the selected subwiki.
+     * @returns Whether it's the selected subwiki.
      */
     protected isSubwikiSelected(subwiki: AddonModWikiSubwiki): boolean {
         if (subwiki.id > 0 && this.subwikiData.subwikiSelected > 0) {
@@ -680,13 +680,13 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * Replace edit links to have full url.
      *
      * @param content Content to treat.
-     * @return Treated content.
+     * @returns Treated content.
      */
     protected replaceEditLinks(content: string): string {
         content = content.trim();
 
         if (content.length > 0) {
-            const editUrl = CoreText.concatenatePaths(CoreSites.getRequiredCurrentSite().getURL(), '/mod/wiki/edit.php');
+            const editUrl = CorePath.concatenatePaths(CoreSites.getRequiredCurrentSite().getURL(), '/mod/wiki/edit.php');
             content = content.replace(/href="edit\.php/g, 'href="' + editUrl);
         }
 
@@ -710,15 +710,19 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * Checks if sync has succeed from result sync data.
      *
      * @param result Data returned on the sync function.
-     * @return If suceed or not.
+     * @returns If suceed or not.
      */
-    protected hasSyncSucceed(result: AddonModWikiSyncWikiResult): boolean {
-        if (result.updated) {
+    protected hasSyncSucceed(result: AddonModWikiSyncWikiResult | undefined): boolean {
+        if (!result) {
+            return false;
+        }
+
+        if (result.updated && this.wiki) {
             // Trigger event.
             this.ignoreManualSyncEvent = true;
             CoreEvents.trigger(AddonModWikiSyncProvider.MANUAL_SYNCED, {
                 ...result,
-                wikiId: this.wiki!.id,
+                wikiId: this.wiki.id,
             });
         }
 
@@ -824,7 +828,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * @param event Event.
      */
     async showSubwikiPicker(event: MouseEvent): Promise<void> {
-        const popoverData = await CoreDomUtils.openPopover<AddonModWikiSubwiki>({
+        const subwiki = await CoreDomUtils.openPopover<AddonModWikiSubwiki>({
             component: AddonModWikiSubwikiPickerComponent,
             componentProps: {
                 subwikis: this.subwikiData.subwikis,
@@ -833,22 +837,26 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
             event,
         });
 
-        if (popoverData) {
-            this.goToSubwiki(popoverData.id, popoverData.userid, popoverData.groupid, popoverData.canedit);
+        if (subwiki) {
+            this.goToSubwiki(subwiki.id, subwiki.userid, subwiki.groupid);
         }
     }
 
     /**
      * Performs the sync of the activity.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    protected sync(): Promise<AddonModWikiSyncWikiResult> {
-        return AddonModWikiSync.syncWiki(this.wiki!.id, this.courseId, this.wiki!.coursemodule);
+    protected async sync(): Promise<AddonModWikiSyncWikiResult | undefined> {
+        if (!this.wiki) {
+            return;
+        }
+
+        return AddonModWikiSync.syncWiki(this.wiki.id, this.courseId, this.wiki.coursemodule);
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         super.ngOnDestroy();
@@ -865,9 +873,9 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
      * Create the subwiki list for the selector and store it in the cache.
      *
      * @param userGroups Groups.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    protected async createSubwikiList(userGroups?: CoreGroup[]): Promise<void> {
+    protected async createSubwikiList(userGroups: CoreGroup[]): Promise<void> {
         const subwikiList: AddonModWikiSubwikiListSubwiki[] = [];
         let allParticipants = false;
         let showMyGroupsLabel = false;
@@ -895,7 +903,7 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
                     allParticipants = true;
                 }
             } else {
-                if (subwiki.groupid != 0 && userGroups && userGroups.length > 0) {
+                if (subwiki.groupid != 0 && userGroups.length > 0) {
                     // Get groupLabel if it has groupId.
                     const group = userGroups.find(group => group.id == subwiki.groupid);
                     groupLabel = group?.name || '';
@@ -1065,14 +1073,16 @@ export class AddonModWikiIndexComponent extends CoreCourseModuleMainActivityComp
             this.subwikiData.subwikis.push({ label: '', subwikis: subwikiList });
         }
 
-        AddonModWiki.setSubwikiList(
-            this.wiki!.id,
-            this.subwikiData.subwikis,
-            this.subwikiData.count,
-            this.subwikiData.subwikiSelected,
-            this.subwikiData.userSelected,
-            this.subwikiData.groupSelected,
-        );
+        if (this.wiki) {
+            AddonModWiki.setSubwikiList(
+                this.wiki.id,
+                this.subwikiData.subwikis,
+                this.subwikiData.count,
+                this.subwikiData.subwikiSelected,
+                this.subwikiData.userSelected,
+                this.subwikiData.groupSelected,
+            );
+        }
     }
 
 }

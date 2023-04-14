@@ -14,13 +14,15 @@
 
 import { Injectable } from '@angular/core';
 import { CoreLogger } from '@singletons/logger';
-import { CoreSites } from '@services/sites';
+import { CoreSites, CoreSitesCommonWSOptions } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreCourses } from '@features/courses/services/courses';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSite, CoreSiteWSPreSets, WSObservable } from '@classes/site';
 import { CoreStatusWithWarningsWSResponse, CoreWSExternalWarning } from '@services/ws';
 import { makeSingleton } from '@singletons';
 import { CoreError } from '@classes/errors/error';
+import { asyncObservable, firstValueFrom } from '@/core/utils/rxjs';
+import { map } from 'rxjs/operators';
 
 const ROOT_CACHE_KEY = 'mmaCourseCompletion:';
 
@@ -42,7 +44,7 @@ export class AddonCourseCompletionProvider {
      *
      * @param userId User ID.
      * @param completion Course completion.
-     * @return True if user can mark course as self completed, false otherwise.
+     * @returns True if user can mark course as self completed, false otherwise.
      */
     canMarkSelfCompleted(userId: number, completion: AddonCourseCompletionCourseCompletionStatus): boolean {
         if (CoreSites.getCurrentSiteUserId() != userId) {
@@ -67,7 +69,7 @@ export class AddonCourseCompletionProvider {
      * Get completed status text. The language code returned is meant to be translated.
      *
      * @param completion Course completion.
-     * @return Language code of the text to show.
+     * @returns Language code of the text to show.
      */
     getCompletedStatusText(completion: AddonCourseCompletionCourseCompletionStatus): string {
         if (completion.completed) {
@@ -91,43 +93,65 @@ export class AddonCourseCompletionProvider {
      * @param userId User ID. If not defined, use current user.
      * @param preSets Presets to use when calling the WebService.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise to be resolved when the completion is retrieved.
+     * @returns Promise to be resolved when the completion is retrieved.
      */
-    async getCompletion(
+    getCompletion(
         courseId: number,
         userId?: number,
         preSets: CoreSiteWSPreSets = {},
         siteId?: string,
     ): Promise<AddonCourseCompletionCourseCompletionStatus> {
+        return firstValueFrom(this.getCompletionObservable(courseId, {
+            userId,
+            preSets,
+            siteId,
+        }));
+    }
 
-        const site = await CoreSites.getSite(siteId);
-        userId = userId || site.getUserId();
-        this.logger.debug('Get completion for course ' + courseId + ' and user ' + userId);
+    /**
+     * Get course completion status for a certain course and user.
+     *
+     * @param courseId Course ID.
+     * @param options Options.
+     * @returns Observable returning the completion.
+     */
+    getCompletionObservable(
+        courseId: number,
+        options: AddonCourseCompletionGetCompletionOptions = {},
+    ): WSObservable<AddonCourseCompletionCourseCompletionStatus> {
+        return asyncObservable(async () => {
+            const site = await CoreSites.getSite(options.siteId);
 
-        const data: AddonCourseCompletionGetCourseCompletionStatusWSParams = {
-            courseid: courseId,
-            userid: userId,
-        };
+            const userId = options.userId || site.getUserId();
+            this.logger.debug('Get completion for course ' + courseId + ' and user ' + userId);
 
-        preSets.cacheKey = this.getCompletionCacheKey(courseId, userId);
-        preSets.updateFrequency = preSets.updateFrequency || CoreSite.FREQUENCY_SOMETIMES;
-        preSets.cacheErrors = ['notenroled'];
+            const data: AddonCourseCompletionGetCourseCompletionStatusWSParams = {
+                courseid: courseId,
+                userid: userId,
+            };
 
-        const result: AddonCourseCompletionGetCourseCompletionStatusWSResponse =
-            await site.read('core_completion_get_course_completion_status', data, preSets);
-        if (result.completionstatus) {
-            return result.completionstatus;
-        }
+            const preSets = {
+                ...(options.preSets ?? {}),
+                cacheKey: this.getCompletionCacheKey(courseId, userId),
+                updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
+                cacheErrors: ['notenroled'],
+                ...CoreSites.getReadingStrategyPreSets(options.readingStrategy),
+            };
 
-        throw new CoreError('Cannot fetch course completion status');
+            return site.readObservable<AddonCourseCompletionGetCourseCompletionStatusWSResponse>(
+                'core_completion_get_course_completion_status',
+                data,
+                preSets,
+            ).pipe(map(result => result.completionstatus));
+        });
     }
 
     /**
      * Get cache key for get completion WS calls.
      *
      * @param courseId Course ID.
-     * @param useIid User ID.
-     * @return Cache key.
+     * @param userId User ID.
+     * @returns Cache key.
      */
     protected getCompletionCacheKey(courseId: number, userId: number): string {
         return ROOT_CACHE_KEY + 'view:' + courseId + ':' + userId;
@@ -139,7 +163,7 @@ export class AddonCourseCompletionProvider {
      * @param courseId Course ID.
      * @param userId User ID. If not defined, use current user.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise resolved when the list is invalidated.
+     * @returns Promise resolved when the list is invalidated.
      */
     async invalidateCourseCompletion(courseId: number, userId?: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -151,7 +175,7 @@ export class AddonCourseCompletionProvider {
     /**
      * Returns whether or not the view course completion plugin is enabled for the current site.
      *
-     * @return True if plugin enabled, false otherwise.
+     * @returns True if plugin enabled, false otherwise.
      */
     isPluginViewEnabled(): boolean {
         return CoreSites.isLoggedIn();
@@ -162,7 +186,7 @@ export class AddonCourseCompletionProvider {
      *
      * @param courseId Course ID.
      * @param preferCache True if shouldn't call WS if data is cached, false otherwise.
-     * @return Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
      */
     async isPluginViewEnabledForCourse(courseId?: number, preferCache: boolean = true): Promise<boolean> {
         if (!courseId) {
@@ -192,7 +216,7 @@ export class AddonCourseCompletionProvider {
      * @param courseId Course ID.
      * @param userId User ID. If not defined, use current user.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
      */
     async isPluginViewEnabledForUser(courseId: number, userId?: number, siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -200,7 +224,7 @@ export class AddonCourseCompletionProvider {
 
         // Check if user wants to view his own completion.
         try {
-            if (!userId || userId == currentUserId) {
+            if (!userId || userId === currentUserId) {
                 // Viewing own completion. Get the course to check if it has completion criteria.
                 const course = await CoreCourses.getUserCourse(courseId, true);
 
@@ -249,7 +273,7 @@ export class AddonCourseCompletionProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise resolved on success.
+     * @returns Promise resolved on success.
      */
     async markCourseAsSelfCompleted(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -311,4 +335,12 @@ export type AddonCourseCompletionGetCourseCompletionStatusWSResponse = {
  */
 export type AddonCourseCompletionMarkCourseSelfCompletedWSParams = {
     courseid: number; // Course ID.
+};
+
+/**
+ * Options for getCompletionObservable.
+ */
+export type AddonCourseCompletionGetCompletionOptions = CoreSitesCommonWSOptions & {
+    userId?: number; // Id of the user, default to current user.
+    preSets?: CoreSiteWSPreSets; // Presets to use when calling the WebService.
 };

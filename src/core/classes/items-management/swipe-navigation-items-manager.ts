@@ -51,6 +51,8 @@ export class CoreSwipeNavigationItemsManager<
 
     /**
      * Has a next item.
+     *
+     * @returns If has next item.
      */
     async hasNextItem(): Promise<boolean> {
         const item = await this.getItemBy(1);
@@ -60,6 +62,8 @@ export class CoreSwipeNavigationItemsManager<
 
     /**
      * Has a previous item.
+     *
+     * @returns If has previous item.
      */
     async hasPreviousItem(): Promise<boolean> {
         const item = await this.getItemBy(-1);
@@ -113,6 +117,7 @@ export class CoreSwipeNavigationItemsManager<
      * Get item by an offset.
      *
      * @param delta Index offset.
+     * @returns The item or null if none.
      */
     protected async getItemBy(delta: number): Promise<Item | null> {
         const items = this.getSource().getItems();
@@ -129,7 +134,11 @@ export class CoreSwipeNavigationItemsManager<
         while (deltaMoved !== delta) {
             nextIndex += deltaStep;
 
-            if (nextIndex < 0 || nextIndex >= items.length) {
+            if (nextIndex < 0) {
+                return null;
+            }
+
+            if (nextIndex >= items.length) {
                 break;
             }
 

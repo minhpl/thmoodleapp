@@ -32,10 +32,7 @@ import { JitCompilerFactory } from '@angular/platform-browser-dynamic';
 import { CoreCronDelegate } from '@services/cron';
 import { CoreSiteInfoCronHandler } from '@services/handlers/site-info-cron';
 import { moodleTransitionAnimation } from '@classes/page-transition';
-import { IonicStorageModule } from '@ionic/storage-angular';
-import { HTTP } from '@ionic-native/http/ngx';
-import {NgxCopyPasteModule} from 'ngx-copypaste';
-import { Geolocation } from '@ionic-native/geolocation/ngx';
+import { TestingModule } from '@/testing/testing.module';
 
 // For translate loader. AoT requires an exported function for factories.
 export function createTranslateLoader(http: HttpClient): TranslateHttpLoader {
@@ -45,9 +42,7 @@ export function createTranslateLoader(http: HttpClient): TranslateHttpLoader {
 @NgModule({
     declarations: [AppComponent],
     imports: [
-        IonicStorageModule.forRoot(),
         BrowserModule,
-        NgxCopyPasteModule,
         BrowserAnimationsModule,
         IonicModule.forRoot(
             {
@@ -65,7 +60,7 @@ export function createTranslateLoader(http: HttpClient): TranslateHttpLoader {
         AppRoutingModule,
         CoreModule,
         AddonsModule,
-        NgxCopyPasteModule
+        TestingModule,
     ],
     providers: [
         { provide: RouteReuseStrategy, useClass: IonicRouteStrategy },
@@ -78,7 +73,6 @@ export function createTranslateLoader(http: HttpClient): TranslateHttpLoader {
                 CoreCronDelegate.register(CoreSiteInfoCronHandler.instance);
             },
         },
-        HTTP,
     ],
     bootstrap: [AppComponent],
 })

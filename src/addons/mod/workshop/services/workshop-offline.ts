@@ -20,7 +20,7 @@ import { CoreTextUtils } from '@services/utils/text';
 import { CoreTimeUtils } from '@services/utils/time';
 import { makeSingleton } from '@singletons';
 import { CoreFormFields } from '@singletons/form';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 import {
     AddonModWorkshopAssessmentDBRecord,
     AddonModWorkshopEvaluateAssessmentDBRecord,
@@ -43,7 +43,7 @@ export class AddonModWorkshopOfflineProvider {
      * Get all the workshops ids that have something to be synced.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with workshops id that have something to be synced.
+     * @returns Promise resolved with workshops id that have something to be synced.
      */
     async getAllWorkshops(siteId?: string): Promise<number[]> {
         const promiseResults = await Promise.all([
@@ -71,7 +71,7 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId Workshop ID to remove.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: true if has offline data, false otherwise.
+     * @returns Promise resolved with boolean: true if has offline data, false otherwise.
      */
     async hasWorkshopOfflineData(workshopId: number, siteId?: string): Promise<boolean> {
         try {
@@ -93,10 +93,9 @@ export class AddonModWorkshopOfflineProvider {
      * Delete workshop submission action.
      *
      * @param workshopId Workshop ID.
-     * @param submissionId Submission ID.
      * @param action Action to be done.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async deleteSubmissionAction(
         workshopId: number,
@@ -118,7 +117,7 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId Workshop ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async deleteAllSubmissionActions(workshopId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -134,14 +133,14 @@ export class AddonModWorkshopOfflineProvider {
      * Get the all the submissions to be synced.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the objects to be synced.
+     * @returns Promise resolved with the objects to be synced.
      */
     async getAllSubmissions(siteId?: string): Promise<AddonModWorkshopOfflineSubmission[]> {
         const site = await CoreSites.getSite(siteId);
 
         const records = await site.getDb().getRecords<AddonModWorkshopSubmissionDBRecord>(SUBMISSIONS_TABLE);
 
-        return records.map(this.parseSubmissionRecord.bind(this));
+        return records.map((record) => this.parseSubmissionRecord(record));
     }
 
     /**
@@ -149,7 +148,7 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId ID of the workshop.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getSubmissions(workshopId: number, siteId?: string): Promise<AddonModWorkshopOfflineSubmission[]> {
         const site = await CoreSites.getSite(siteId);
@@ -160,7 +159,7 @@ export class AddonModWorkshopOfflineProvider {
 
         const records = await site.getDb().getRecords<AddonModWorkshopSubmissionDBRecord>(SUBMISSIONS_TABLE, conditions);
 
-        return records.map(this.parseSubmissionRecord.bind(this));
+        return records.map((record) => this.parseSubmissionRecord(record));
     }
 
     /**
@@ -169,7 +168,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId ID of the workshop.
      * @param action Action to be done.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getSubmissionAction(
         workshopId: number,
@@ -200,7 +199,7 @@ export class AddonModWorkshopOfflineProvider {
      *                     If set to 0, current time is used.
      * @param action Action to be done. ['add', 'update', 'delete']
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when submission action is successfully saved.
+     * @returns Promise resolved when submission action is successfully saved.
      */
     async saveSubmission(
         workshopId: number,
@@ -235,6 +234,7 @@ export class AddonModWorkshopOfflineProvider {
      * Parse "attachments" column of a submission record.
      *
      * @param record Submission record, modified in place.
+     * @returns The offline submission parsed.
      */
     protected parseSubmissionRecord(record: AddonModWorkshopSubmissionDBRecord): AddonModWorkshopOfflineSubmission {
         return {
@@ -249,7 +249,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId Workshop ID.
      * @param assessmentId Assessment ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async deleteAssessment(workshopId: number, assessmentId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -266,14 +266,14 @@ export class AddonModWorkshopOfflineProvider {
      * Get the all the assessments to be synced.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the objects to be synced.
+     * @returns Promise resolved with the objects to be synced.
      */
     async getAllAssessments(siteId?: string): Promise<AddonModWorkshopOfflineAssessment[]> {
         const site = await CoreSites.getSite(siteId);
 
         const records = await site.getDb().getRecords<AddonModWorkshopAssessmentDBRecord>(ASSESSMENTS_TABLE);
 
-        return records.map(this.parseAssessmentRecord.bind(this));
+        return records.map((record) => this.parseAssessmentRecord(record));
     }
 
     /**
@@ -281,7 +281,7 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId ID of the workshop.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getAssessments(workshopId: number, siteId?: string): Promise<AddonModWorkshopOfflineAssessment[]> {
         const site = await CoreSites.getSite(siteId);
@@ -292,7 +292,7 @@ export class AddonModWorkshopOfflineProvider {
 
         const records = await site.getDb().getRecords<AddonModWorkshopAssessmentDBRecord>(ASSESSMENTS_TABLE, conditions);
 
-        return records.map(this.parseAssessmentRecord.bind(this));
+        return records.map((record) => this.parseAssessmentRecord(record));
     }
 
     /**
@@ -301,7 +301,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId ID of the workshop.
      * @param assessmentId Assessment ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getAssessment(workshopId: number, assessmentId: number, siteId?: string): Promise<AddonModWorkshopOfflineAssessment> {
         const site = await CoreSites.getSite(siteId);
@@ -324,7 +324,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param courseId Course ID the workshop belongs to.
      * @param inputData Assessment data.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when assessment is successfully saved.
+     * @returns Promise resolved when assessment is successfully saved.
      */
     async saveAssessment(
         workshopId: number,
@@ -350,6 +350,7 @@ export class AddonModWorkshopOfflineProvider {
      * Parse "inpudata" column of an assessment record.
      *
      * @param record Assessnent record, modified in place.
+     * @returns The offline assessment parsed.
      */
     protected parseAssessmentRecord(record: AddonModWorkshopAssessmentDBRecord): AddonModWorkshopOfflineAssessment {
         return {
@@ -364,7 +365,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId Workshop ID.
      * @param submissionId Submission ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async deleteEvaluateSubmission(workshopId: number, submissionId: number, siteId?: string): Promise<void> {
         const conditions: Partial<AddonModWorkshopEvaluateSubmissionDBRecord> = {
@@ -381,14 +382,14 @@ export class AddonModWorkshopOfflineProvider {
      * Get the all the evaluate submissions to be synced.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the objects to be synced.
+     * @returns Promise resolved with the objects to be synced.
      */
     async getAllEvaluateSubmissions(siteId?: string): Promise<AddonModWorkshopOfflineEvaluateSubmission[]> {
         const site = await CoreSites.getSite(siteId);
 
         const records = await site.getDb().getRecords<AddonModWorkshopEvaluateSubmissionDBRecord>(EVALUATE_SUBMISSIONS_TABLE);
 
-        return records.map(this.parseEvaluateSubmissionRecord.bind(this));
+        return records.map((record) => this.parseEvaluateSubmissionRecord(record));
     }
 
     /**
@@ -396,7 +397,7 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId ID of the workshop.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getEvaluateSubmissions(workshopId: number, siteId?: string): Promise<AddonModWorkshopOfflineEvaluateSubmission[]> {
         const site = await CoreSites.getSite(siteId);
@@ -408,7 +409,7 @@ export class AddonModWorkshopOfflineProvider {
         const records =
             await site.getDb().getRecords<AddonModWorkshopEvaluateSubmissionDBRecord>(EVALUATE_SUBMISSIONS_TABLE, conditions);
 
-        return records.map(this.parseEvaluateSubmissionRecord.bind(this));
+        return records.map((record) => this.parseEvaluateSubmissionRecord(record));
     }
 
     /**
@@ -417,7 +418,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId ID of the workshop.
      * @param submissionId Submission ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getEvaluateSubmission(
         workshopId: number,
@@ -447,7 +448,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param published Whether to publish the submission for other users.
      * @param gradeOver The new submission grade (empty for no overriding the grade).
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when submission evaluation is successfully saved.
+     * @returns Promise resolved when submission evaluation is successfully saved.
      */
     async saveEvaluateSubmission(
         workshopId: number,
@@ -477,6 +478,7 @@ export class AddonModWorkshopOfflineProvider {
      * Parse "published" and "gradeover" columns of an evaluate submission record.
      *
      * @param record Evaluate submission record, modified in place.
+     * @returns The offline evaluate submission parsed.
      */
     protected parseEvaluateSubmissionRecord(
         record: AddonModWorkshopEvaluateSubmissionDBRecord,
@@ -494,7 +496,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId Workshop ID.
      * @param assessmentId Assessment ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async deleteEvaluateAssessment(workshopId: number, assessmentId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -511,14 +513,14 @@ export class AddonModWorkshopOfflineProvider {
      * Get the all the evaluate assessments to be synced.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the objects to be synced.
+     * @returns Promise resolved with the objects to be synced.
      */
     async getAllEvaluateAssessments(siteId?: string): Promise<AddonModWorkshopOfflineEvaluateAssessment[]> {
         const site = await CoreSites.getSite(siteId);
 
         const records = await site.getDb().getRecords<AddonModWorkshopEvaluateAssessmentDBRecord>(EVALUATE_ASSESSMENTS_TABLE);
 
-        return records.map(this.parseEvaluateAssessmentRecord.bind(this));
+        return records.map((record) => this.parseEvaluateAssessmentRecord(record));
     }
 
     /**
@@ -526,7 +528,7 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId ID of the workshop.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getEvaluateAssessments(workshopId: number, siteId?: string): Promise<AddonModWorkshopOfflineEvaluateAssessment[]> {
         const site = await CoreSites.getSite(siteId);
@@ -538,7 +540,7 @@ export class AddonModWorkshopOfflineProvider {
         const records =
             await site.getDb().getRecords<AddonModWorkshopEvaluateAssessmentDBRecord>(EVALUATE_ASSESSMENTS_TABLE, conditions);
 
-        return records.map(this.parseEvaluateAssessmentRecord.bind(this));
+        return records.map((record) => this.parseEvaluateAssessmentRecord(record));
     }
 
     /**
@@ -547,7 +549,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId ID of the workshop.
      * @param assessmentId Assessment ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the object to be synced.
+     * @returns Promise resolved with the object to be synced.
      */
     async getEvaluateAssessment(
         workshopId: number,
@@ -577,7 +579,7 @@ export class AddonModWorkshopOfflineProvider {
      * @param weight The new weight for the assessment.
      * @param gradingGradeOver The new grading grade (empty for no overriding the grade).
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when assessment evaluation is successfully saved.
+     * @returns Promise resolved when assessment evaluation is successfully saved.
      */
     async saveEvaluateAssessment(
         workshopId: number,
@@ -607,6 +609,7 @@ export class AddonModWorkshopOfflineProvider {
      * Parse "gradinggradeover" column of an evaluate assessment record.
      *
      * @param record Evaluate assessment record, modified in place.
+     * @returns The offline evaluate assessment parsed.
      */
     protected parseEvaluateAssessmentRecord(
         record: AddonModWorkshopEvaluateAssessmentDBRecord,
@@ -622,7 +625,7 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId Workshop ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the path.
+     * @returns Promise resolved with the path.
      */
     async getWorkshopFolder(workshopId: number, siteId?: string): Promise<string> {
         const site = await CoreSites.getSite(siteId);
@@ -630,7 +633,7 @@ export class AddonModWorkshopOfflineProvider {
         const siteFolderPath = CoreFile.getSiteFolder(site.getId());
         const workshopFolderPath = 'offlineworkshop/' + workshopId + '/';
 
-        return CoreText.concatenatePaths(siteFolderPath, workshopFolderPath);
+        return CorePath.concatenatePaths(siteFolderPath, workshopFolderPath);
     }
 
     /**
@@ -638,12 +641,12 @@ export class AddonModWorkshopOfflineProvider {
      *
      * @param workshopId Workshop ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the path.
+     * @returns Promise resolved with the path.
      */
     async getSubmissionFolder(workshopId: number, siteId?: string): Promise<string> {
         const folderPath = await this.getWorkshopFolder(workshopId, siteId);
 
-        return CoreText.concatenatePaths(folderPath, 'submission');
+        return CorePath.concatenatePaths(folderPath, 'submission');
     }
 
     /**
@@ -652,14 +655,14 @@ export class AddonModWorkshopOfflineProvider {
      * @param workshopId Workshop ID.
      * @param assessmentId Assessment ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the path.
+     * @returns Promise resolved with the path.
      */
     async getAssessmentFolder(workshopId: number, assessmentId: number, siteId?: string): Promise<string> {
         let folderPath = await this.getWorkshopFolder(workshopId, siteId);
 
         folderPath += 'assessment/';
 
-        return CoreText.concatenatePaths(folderPath, String(assessmentId));
+        return CorePath.concatenatePaths(folderPath, String(assessmentId));
     }
 
 }

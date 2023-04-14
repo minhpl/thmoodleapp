@@ -23,6 +23,9 @@
             </ion-item>
         </core-course-module-info>
 
+        <core-group-selector *ngIf="supportsChangeGroup" [groupInfo]="groupInfo" [(selected)]="groupId" (selectedChange)="groupChanged()">
+        </core-group-selector>
+
         <!-- Cut-off date or due date message -->
         <ion-card class="core-info-card" *ngIf="availabilityMessage">
             <ion-item>
@@ -39,17 +42,33 @@
             </ion-item>
         </ion-card>
 
-        <ng-container *ngIf="forum">
-            <core-empty-box *ngIf="!discussions || !discussions.hasDiscussions" icon="far-comments"
-                [message]="'addon.mod_forum.forumnodiscussionsyet' | translate">
-            </core-empty-box>
+        <!-- Cannot add discussion to group messages. -->
+        <ion-card class="core-info-card" *ngIf="usesGroups && canAddDiscussion && !canAddDiscussionToGroup">
+            <ion-item>
+                <ion-icon name="fas-info-circle" slot="start" aria-hidden="true"></ion-icon>
+                <ion-label>
+                    <span *ngIf="groupId <= 0">{{ 'addon.mod_forum.cannotadddiscussionall' | translate }}</span>
+                    <span *ngIf="groupId > 0">{{ 'addon.mod_forum.cannotadddiscussion' | translate }}</span>
+                </ion-label>
+            </ion-item>
+        </ion-card>
 
-            <div *ngIf="discussions?.hasDiscussions && sortingAvailable && selectedSortOrder" class="ion-text-wrap">
+        <ng-container *ngIf="forum">
+            <div *ngIf="discussions && sortingAvailable && selectedSortOrder" class="ion-text-wrap">
                 <core-combobox [modalOptions]="sortOrderSelectorModalOptions" listboxId="addon-mod-forum-sort-selector"
                     [label]="('core.sort' | translate)" (onChange)="setSortOrder($event)" [selection]="selectedSortOrder.label | translate"
                     interface="modal">
                 </core-combobox>
             </div>
+
+            <core-empty-box *ngIf="!discussions || (!discussions.hasDiscussions && !errorLoadingDiscussions)" icon="far-comments"
+                [message]="'addon.mod_forum.forumnodiscussionsyet' | translate">
+            </core-empty-box>
+
+            <core-empty-box *ngIf="errorLoadingDiscussions" icon="fas-exclamation-triangle"
+                [message]="'addon.mod_forum.errorloadingsortingorder' | translate">
+                <p>{{ 'addon.mod_forum.errorloadingsortingorderdetails' | translate }}</p>
+            </core-empty-box>
 
             <ion-item *ngFor="let discussion of discussionsItems" class="addon-mod-forum-discussion" detail="true"
                 [lines]="discussion.groupname && 'none'" [attr.aria-current]="discussions?.getItemAriaCurrent(discussion)"
@@ -128,7 +147,7 @@
     <core-course-module-navigation collapsible-footer [hidden]="showLoading" [courseId]="courseId" [currentModuleId]="module.id">
     </core-course-module-navigation>
 
-    <ion-fab slot="fixed" core-fab vertical="bottom" horizontal="end" *ngIf="forum && canAddDiscussion">
+    <ion-fab slot="fixed" core-fab vertical="bottom" horizontal="end" *ngIf="canAddDiscussionToGroup">
         <ion-fab-button (click)="openNewDiscussion()" [attr.aria-label]="addDiscussionText">
             <ion-icon name="fas-plus" aria-hidden="true"></ion-icon>
             <span class="sr-only">{{ addDiscussionText }}</span>

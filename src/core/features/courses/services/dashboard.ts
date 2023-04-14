@@ -13,12 +13,14 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { CoreSites } from '@services/sites';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSites, CoreSitesCommonWSOptions } from '@services/sites';
+import { CoreSite, CoreSiteWSPreSets, WSObservable } from '@classes/site';
 import { CoreCourseBlock } from '@features/course/services/course';
 import { CoreStatusWithWarningsWSResponse } from '@services/ws';
 import { makeSingleton } from '@singletons';
 import { CoreError } from '@classes/errors/error';
+import { map } from 'rxjs/operators';
+import { asyncObservable, firstValueFrom } from '@/core/utils/rxjs';
 
 const ROOT_CACHE_KEY = 'CoreCoursesDashboard:';
 
@@ -36,7 +38,7 @@ export class CoreCoursesDashboardProvider {
      *
      * @param myPage What my page to return blocks of. Default MY_PAGE_DEFAULT.
      * @param userId User ID. Default, 0 means current user.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getDashboardBlocksCacheKey(myPage = CoreCoursesDashboardProvider.MY_PAGE_DEFAULT, userId: number = 0): string {
         return ROOT_CACHE_KEY + 'blocks:' + myPage + ':' + userId;
@@ -48,43 +50,69 @@ export class CoreCoursesDashboardProvider {
      * @param myPage What my page to return blocks of. Default MY_PAGE_DEFAULT.
      * @param userId User ID. Default, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the list of blocks.
+     * @returns Promise resolved with the list of blocks.
      * @since 3.6
      */
-    async getDashboardBlocksFromWS(
+    getDashboardBlocksFromWS(
         myPage = CoreCoursesDashboardProvider.MY_PAGE_DEFAULT,
         userId?: number,
         siteId?: string,
     ): Promise<CoreCourseBlock[]> {
-        const site = await CoreSites.getSite(siteId);
+        return firstValueFrom(this.getDashboardBlocksFromWSObservable({
+            myPage,
+            userId,
+            siteId,
+        }));
+    }
 
-        const params: CoreBlockGetDashboardBlocksWSParams = {
-            returncontents: true,
-        };
-        if (CoreSites.getRequiredCurrentSite().isVersionGreaterEqualThan('4.0')) {
-            params.mypage = myPage;
-        } else if (myPage != CoreCoursesDashboardProvider.MY_PAGE_DEFAULT) {
-            throw new CoreError('mypage param is no accessible on core_block_get_dashboard_blocks');
-        }
+    /**
+     * Get dashboard blocks from WS.
+     *
+     * @param options Options.
+     * @returns Observable that returns the list of blocks.
+     * @since 3.6
+     */
+    getDashboardBlocksFromWSObservable(options: GetDashboardBlocksOptions = {}): WSObservable<CoreCourseBlock[]> {
+        return asyncObservable(async () => {
+            const site = await CoreSites.getSite(options.siteId);
 
-        const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getDashboardBlocksCacheKey(myPage, userId),
-            updateFrequency: CoreSite.FREQUENCY_RARELY,
-        };
-        if (userId) {
-            params.userid = userId;
-        }
-        const result = await site.read<CoreBlockGetDashboardBlocksWSResponse>('core_block_get_dashboard_blocks', params, preSets);
+            const myPage = options.myPage ?? CoreCoursesDashboardProvider.MY_PAGE_DEFAULT;
+            const params: CoreBlockGetDashboardBlocksWSParams = {
+                returncontents: true,
+            };
+            if (CoreSites.getRequiredCurrentSite().isVersionGreaterEqualThan('4.0')) {
+                params.mypage = myPage;
+            } else if (myPage != CoreCoursesDashboardProvider.MY_PAGE_DEFAULT) {
+                throw new CoreError('mypage param is no accessible on core_block_get_dashboard_blocks');
+            }
 
-        if (site.isVersionGreaterEqualThan('4.0')) {
-            // Temporary hack to have course overview on 3.9.5 but not on 4.0 onwards.
-            // To be removed in a near future.
-            // Remove myoverview when is forced. See MDL-72092.
-            result.blocks = result.blocks.filter((block) =>
-                block.instanceid != 0 || block.name != 'myoverview' || block.region != 'forced');
-        }
+            const preSets: CoreSiteWSPreSets = {
+                cacheKey: this.getDashboardBlocksCacheKey(myPage, options.userId),
+                updateFrequency: CoreSite.FREQUENCY_RARELY,
+                ...CoreSites.getReadingStrategyPreSets(options.readingStrategy),
+            };
+            if (options.userId) {
+                params.userid = options.userId;
+            }
 
-        return result.blocks || [];
+            const observable = site.readObservable<CoreBlockGetDashboardBlocksWSResponse>(
+                'core_block_get_dashboard_blocks',
+                params,
+                preSets,
+            );
+
+            return observable.pipe(map(result => {
+                if (site.isVersionGreaterEqualThan('4.0')) {
+                    // Temporary hack to have course overview on 3.9.5 but not on 4.0 onwards.
+                    // To be removed in a near future.
+                    // Remove myoverview when is forced. See MDL-72092.
+                    result.blocks = result.blocks.filter((block) =>
+                        block.instanceid != 0 || block.name != 'myoverview' || block.region != 'forced');
+                }
+
+                return result.blocks || [];
+            }));
+        });
     }
 
     /**
@@ -93,41 +121,54 @@ export class CoreCoursesDashboardProvider {
      * @param userId User ID. Default, current user.
      * @param siteId Site ID. If not defined, current site.
      * @param myPage What my page to return blocks of. Default MY_PAGE_DEFAULT.
-     * @return Promise resolved with the list of blocks.
+     * @returns Promise resolved with the list of blocks.
      */
-    async getDashboardBlocks(
+    getDashboardBlocks(
         userId?: number,
         siteId?: string,
         myPage = CoreCoursesDashboardProvider.MY_PAGE_DEFAULT,
     ): Promise<CoreCoursesDashboardBlocks> {
-        const blocks = await this.getDashboardBlocksFromWS(myPage, userId, siteId);
+        return firstValueFrom(this.getDashboardBlocksObservable({
+            myPage,
+            userId,
+            siteId,
+        }));
+    }
 
-        let mainBlocks: CoreCourseBlock[] = [];
-        let sideBlocks: CoreCourseBlock[] = [];
-
-        blocks.forEach((block) => {
-            if (block.region == 'content' || block.region == 'main') {
-                mainBlocks.push(block);
-            } else {
-                sideBlocks.push(block);
-            }
-        });
-
-        if (mainBlocks.length == 0) {
-            mainBlocks = [];
-            sideBlocks = [];
+    /**
+     * Get dashboard blocks.
+     *
+     * @param options Options.
+     * @returns observable that returns the list of blocks.
+     */
+    getDashboardBlocksObservable(options: GetDashboardBlocksOptions = {}): WSObservable<CoreCoursesDashboardBlocks> {
+        return this.getDashboardBlocksFromWSObservable(options).pipe(map(blocks => {
+            let mainBlocks: CoreCourseBlock[] = [];
+            let sideBlocks: CoreCourseBlock[] = [];
 
             blocks.forEach((block) => {
-                if (block.region.match('side')) {
-                    sideBlocks.push(block);
-                } else {
+                if (block.region == 'content' || block.region == 'main') {
                     mainBlocks.push(block);
+                } else {
+                    sideBlocks.push(block);
                 }
             });
-        }
 
-        return { mainBlocks, sideBlocks };
+            if (mainBlocks.length == 0) {
+                mainBlocks = [];
+                sideBlocks = [];
 
+                blocks.forEach((block) => {
+                    if (block.region.match('side')) {
+                        sideBlocks.push(block);
+                    } else {
+                        mainBlocks.push(block);
+                    }
+                });
+            }
+
+            return { mainBlocks, sideBlocks };
+        }));
     }
 
     /**
@@ -136,7 +177,7 @@ export class CoreCoursesDashboardProvider {
      * @param myPage What my page to return blocks of. Default MY_PAGE_DEFAULT.
      * @param userId User ID. Default, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateDashboardBlocks(
         myPage = CoreCoursesDashboardProvider.MY_PAGE_DEFAULT,
@@ -145,14 +186,14 @@ export class CoreCoursesDashboardProvider {
     ): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
-        return await site.invalidateWsCacheForKey(this.getDashboardBlocksCacheKey(myPage, userId));
+        return site.invalidateWsCacheForKey(this.getDashboardBlocksCacheKey(myPage, userId));
     }
 
     /**
      * Returns whether or not block based Dashboard is available for a certain site.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with true if available, resolved with false or rejected otherwise.
+     * @returns Promise resolved with true if available, resolved with false or rejected otherwise.
      * @since 3.6
      */
     async isAvailable(siteId?: string): Promise<boolean> {
@@ -165,7 +206,7 @@ export class CoreCoursesDashboardProvider {
      * Check if Site Home is disabled in a certain site.
      *
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved with true if disabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if disabled, rejected or resolved with false otherwise.
      */
     async isDisabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -177,7 +218,7 @@ export class CoreCoursesDashboardProvider {
      * Check if Dashboard is disabled in a certain site.
      *
      * @param site Site. If not defined, use current site.
-     * @return Whether it's disabled.
+     * @returns Whether it's disabled.
      */
     isDisabledInSite(site?: CoreSite): boolean {
         site = site || CoreSites.getCurrentSite();
@@ -192,6 +233,14 @@ export const CoreCoursesDashboard = makeSingleton(CoreCoursesDashboardProvider);
 export type CoreCoursesDashboardBlocks = {
     mainBlocks: CoreCourseBlock[];
     sideBlocks: CoreCourseBlock[];
+};
+
+/**
+ * Options for some get dashboard blocks calls.
+ */
+export type GetDashboardBlocksOptions = CoreSitesCommonWSOptions & {
+    userId?: number; // User ID. If not defined, current user.
+    myPage?: string; // Page to get. If not defined, CoreCoursesDashboardProvider.MY_PAGE_DEFAULT.
 };
 
 /**

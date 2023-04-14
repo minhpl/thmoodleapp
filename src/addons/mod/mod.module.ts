@@ -37,7 +37,6 @@ import { AddonModSurveyModule } from './survey/survey.module';
 import { AddonModUrlModule } from './url/url.module';
 import { AddonModWikiModule } from './wiki/wiki.module';
 import { AddonModWorkshopModule } from './workshop/workshop.module';
-import { AddonModQaaModule } from './qaa/page.module'
 
 @NgModule({
     imports: [
@@ -64,7 +63,6 @@ import { AddonModQaaModule } from './qaa/page.module'
         AddonModUrlModule,
         AddonModWikiModule,
         AddonModWorkshopModule,
-        AddonModQaaModule
     ],
 })
 export class AddonModModule { }

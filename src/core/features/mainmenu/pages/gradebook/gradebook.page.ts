@@ -19,8 +19,7 @@ export class GradebookPage implements OnInit {
   constructor(public navController:NavController) { }
 
   async ngOnInit() {
-    this.title =  Translate.instant('core.gradebook');
-    //this.savelogoutinfotosite();
+    this.title =  Translate.instant('core.mainmenu.gradebook');
 
     const site = await CoreSites.getSite();
 

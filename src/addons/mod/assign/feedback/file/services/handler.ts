@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { IAddonModAssignFeedbackPluginComponent } from '@addons/mod/assign/classes/base-feedback-plugin-component';
 import {
     AddonModAssignPlugin,
     AddonModAssignAssign,
@@ -37,9 +38,9 @@ export class AddonModAssignFeedbackFileHandlerService implements AddonModAssignF
      * Return the Component to use to display the plugin data.
      * It's recommended to return the class of the component, but you can also return an instance of the component.
      *
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @returns The component (or promise resolved with component) to use, undefined if not found.
      */
-    getComponent(): Type<unknown> {
+    getComponent(): Type<IAddonModAssignFeedbackPluginComponent> {
         return AddonModAssignFeedbackFileComponent;
     }
 
@@ -50,7 +51,7 @@ export class AddonModAssignFeedbackFileHandlerService implements AddonModAssignF
      * @param assign The assignment.
      * @param submission The submission.
      * @param plugin The plugin object.
-     * @return The files (or promise resolved with the files).
+     * @returns The files (or promise resolved with the files).
      */
     getPluginFiles(
         assign: AddonModAssignAssign,
@@ -63,7 +64,7 @@ export class AddonModAssignFeedbackFileHandlerService implements AddonModAssignF
     /**
      * Whether or not the handler is enabled on a site level.
      *
-     * @return True or promise resolved with true if enabled.
+     * @returns True or promise resolved with true if enabled.
      */
     async isEnabled(): Promise<boolean> {
         return true;

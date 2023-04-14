@@ -42,11 +42,10 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
 
     constructor(@Optional() courseContentsPage?: CoreCourseContentsPage) {
         super('AddonModPageIndexComponent', courseContentsPage);
-        //console.log(this.module.id)
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         super.ngOnInit();
@@ -57,7 +56,7 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         await AddonModPage.invalidateContent(this.module.id, this.courseId);
@@ -85,7 +84,7 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
     /**
      * Load page data from WS.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadPageData(): Promise<void> {
         // Get latest title, description and some extra data. Data should've been updated in download.

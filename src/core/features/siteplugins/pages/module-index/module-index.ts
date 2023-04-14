@@ -42,8 +42,6 @@ export class CoreSitePluginsModuleIndexPage implements OnInit, CanLeave {
         this.title = CoreNavigator.getRouteParam('title');
         this.module = CoreNavigator.getRouteParam('module');
         this.courseId = CoreNavigator.getRouteNumberParam('courseId');
-
-        console.log(this.title)
     }
 
     /**
@@ -95,7 +93,7 @@ export class CoreSitePluginsModuleIndexPage implements OnInit, CanLeave {
     /**
      * Check if we can leave the page or not.
      *
-     * @return Resolved if we can leave it, rejected if not.
+     * @returns Resolved if we can leave it, rejected if not.
      */
     async canLeave(): Promise<boolean> {
         if (!this.content) {

@@ -17,7 +17,7 @@ import { CoreSyncBaseProvider, CoreSyncBlockedError } from '@classes/base-sync';
 import { CoreNetworkError } from '@classes/errors/network-error';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreFileUploaderStoreFilesResult } from '@features/fileuploader/services/fileuploader';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFileEntry } from '@services/file-helper';
 import { CoreSites } from '@services/sites';
 import { CoreSync } from '@services/sync';
@@ -59,7 +59,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      *
      * @param workshopId Workshop ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: true if has data to sync, false otherwise.
+     * @returns Promise resolved with boolean: true if has data to sync, false otherwise.
      */
     hasDataToSync(workshopId: number, siteId?: string): Promise<boolean> {
         return AddonModWorkshopOffline.hasWorkshopOfflineData(workshopId, siteId);
@@ -70,10 +70,10 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      *
      * @param siteId Site ID to sync. If not defined, sync all sites.
      * @param force Wether to force sync not depending on last execution.
-     * @return Promise resolved when the sync is done.
+     * @returns Promise resolved when the sync is done.
      */
     syncAllWorkshops(siteId?: string, force?: boolean): Promise<void> {
-        return this.syncOnSites('all workshops', this.syncAllWorkshopsFunc.bind(this, !!force), siteId);
+        return this.syncOnSites('all workshops', (siteId) => this.syncAllWorkshopsFunc(!!force, siteId), siteId);
     }
 
     /**
@@ -81,7 +81,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      *
      * @param force Wether to force sync not depending on last execution.
      * @param siteId Site ID to sync.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     protected async syncAllWorkshopsFunc(force: boolean, siteId: string): Promise<void> {
         const workshopIds = await AddonModWorkshopOffline.getAllWorkshops(siteId);
@@ -109,7 +109,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      *
      * @param workshopId Workshop ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the workshop is synced or if it doesn't need to be synced.
+     * @returns Promise resolved when the workshop is synced or if it doesn't need to be synced.
      */
     async syncWorkshopIfNeeded(workshopId: number, siteId?: string): Promise<AddonModWorkshopSyncResult | undefined> {
         const needed = await this.isSyncNeeded(workshopId, siteId);
@@ -124,7 +124,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      *
      * @param workshopId Workshop ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     syncWorkshop(workshopId: number, siteId?: string): Promise<AddonModWorkshopSyncResult> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -154,7 +154,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      *
      * @param workshopId Workshop ID.
      * @param siteId Site ID.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     protected async performSyncWorkshop(workshopId: number, siteId: string): Promise<AddonModWorkshopSyncResult> {
         const result: AddonModWorkshopSyncResult = {
@@ -195,7 +195,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
             return result;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // Cannot sync in offline.
             throw new CoreNetworkError();
         }
@@ -269,7 +269,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      * @param submissionActions Submission actions offline data.
      * @param result Object with the result of the sync.
      * @param siteId Site ID.
-     * @return Promise resolved if success, rejected otherwise.
+     * @returns Promise resolved if success, rejected otherwise.
      */
     protected async syncSubmission(
         workshop: AddonModWorkshopData,
@@ -409,10 +409,10 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      * Synchronize an assessment.
      *
      * @param workshop Workshop.
-     * @param assessment Assessment offline data.
+     * @param assessmentData Assessment offline data.
      * @param result Object with the result of the sync.
      * @param siteId Site ID.
-     * @return Promise resolved if success, rejected otherwise.
+     * @returns Promise resolved if success, rejected otherwise.
      */
     protected async syncAssessment(
         workshop: AddonModWorkshopData,
@@ -498,7 +498,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      * @param evaluate Submission evaluation offline data.
      * @param result Object with the result of the sync.
      * @param siteId Site ID.
-     * @return Promise resolved if success, rejected otherwise.
+     * @returns Promise resolved if success, rejected otherwise.
      */
     protected async syncEvaluateSubmission(
         workshop: AddonModWorkshopData,
@@ -570,7 +570,7 @@ export class AddonModWorkshopSyncProvider extends CoreSyncBaseProvider<AddonModW
      * @param evaluate Assessment evaluation offline data.
      * @param result Object with the result of the sync.
      * @param siteId Site ID.
-     * @return Promise resolved if success, rejected otherwise.
+     * @returns Promise resolved if success, rejected otherwise.
      */
     protected async syncEvaluateAssessment(
         workshop: AddonModWorkshopData,
