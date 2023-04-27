@@ -1,0 +1,16 @@
+{
+    "errorwhileloadingthepage": "Error while loading the page content.",
+    "modulenameplural": "Pages",
+    "Answered": "Answered",
+    "Unanswered": "Unanswered",
+    "Week": "Week",
+    "Answer": "Answer",
+    "EditAnswer" : "Edit answer",
+    "SeeDetails" : "See details",
+    "AddNewQuestion" : "Add new question",
+    "EditQuestion" : "Edit question",
+    "SubmitQuestionToQ&A" : "Submit a question to Q&A",
+    "SubmitAnswerToQ&A": "Submit your answer to Q&A",
+    "ContentQuestions": "Content Questions",
+    "ContentTheAnswer": "Content of the answer"
+}

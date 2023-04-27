@@ -1,0 +1,93 @@
+ion-header {
+    ion-title {
+        font-size: 1.1rem;
+    }
+
+    ion-buttons {
+        font-size: 1.5rem;
+        margin-left: 12px;
+    }
+
+}
+
+ion-content {
+    .week_title_answered {
+        border: 1px;
+        width: 100%;
+        border-radius: 10px;
+        margin-bottom: 20px;
+        background-color: #f1f3f4;
+        padding: 10px 5px 10px 10px;
+    }
+
+    .content_number {
+        display: flex;
+    }
+
+
+    .number {
+        font-weight: 600;
+    }
+
+    .time-week-question {
+        font-weight: 600;
+        font-size: 14px;
+        margin-top: 5px;
+    }
+
+    .time-week-answer {
+        font-weight: 600;
+        font-size: 14px;
+        margin-top: -20px;
+    }
+
+    .question {
+        margin-left: 10px;
+        font-size: 14px;
+        margin-bottom: 30px;
+        margin-top: -5px;
+    }
+
+    .answered {
+        margin-left: 10px;
+        font-size: 14px;
+    }
+
+    .btn_edit {
+        display: flex;
+        justify-content: space-between;
+        margin-top: -5px;
+    }
+
+    .icon_answer {
+        display: flex;
+        margin-right: 7px;
+
+        ion-icon {
+            font-size: 1.5rem;
+            margin-left: 10px;
+            margin-top: 5px;
+            color: #3a78e7;
+        }
+
+        p {
+            margin-top: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #3a78e7;
+        }
+    }
+
+    .see_details {
+        display: flex;
+        color: #3a78e7;
+        font-size: 14px;
+        font-weight: 600;
+        margin-right: 7px;
+        align-items: center;
+        ion-icon {
+            font-size: 17px;
+            margin-right: 3px;
+        }
+    }
+}

@@ -1,0 +1,16 @@
+<ion-header>
+    <ion-toolbar>
+        <ion-buttons (click)="back()" slot="start">
+            <ion-icon name="arrow-back-outline"></ion-icon>
+        </ion-buttons>
+        <ion-title>{{ 'addon.mod_qaa.EditQuestion' | translate }}</ion-title>
+    </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+    <div class="add_question">
+        <p><label for="w3review">{{ 'addon.mod_qaa.ContentQuestions' | translate }}</label></p>
+        <quill-editor [(ngModel)]="textareaValue" [styles]="{height: '235px'}"></quill-editor>
+        <button (click)="edit_question()" class="btn_add_question">{{ 'addon.mod_qaa.SubmitQuestionToQ&A' | translate }}</button>
+    </div>
+</ion-content>

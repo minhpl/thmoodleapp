@@ -1,0 +1,31 @@
+<ion-header>
+    <ion-toolbar>
+        <ion-buttons (click)="back()" slot="start">
+            <ion-icon name="arrow-back-outline"></ion-icon>
+        </ion-buttons>
+        <ion-title>{{ 'addon.mod_qaa.SeeDetails' | translate }}</ion-title>
+    </ion-toolbar>
+</ion-header>
+
+<ion-content class="ion-padding">
+    <div class="week_title_answered content">
+        <p class="time-week-question" *ngIf="qapp.weekquestion">{{qapp.weekquestion}}:</p>
+        <p class="question" [innerHTML]="sanitizer.bypassSecurityTrustHtml(qapp.question)"></p>
+        <p class="time-week-answer" *ngIf="qapp.weekanswer">{{qapp.weekanswer}}:</p>
+        <p class="answered" *ngIf="qapp.weekanswer" [innerHTML]="sanitizer.bypassSecurityTrustHtml(qapp.answer)"></p>
+        <div class="btn_edit">
+            <div class="icon_answer" *ngIf="questionquest" (click)="edit_question()">
+                <ion-icon name="people-outline"></ion-icon>
+                <p>{{ 'addon.mod_qaa.EditQuestion' | translate }}</p>
+            </div>
+            <div class="icon_answer" *ngIf="answerquest" (click)="answer()">
+                <ion-icon name="people-outline"></ion-icon>
+                <p>{{ 'addon.mod_qaa.Answer' | translate }}</p>
+            </div>
+            <div class="see_details" (click)="edit_answewed()" *ngIf="edit_answerquest">
+                <ion-icon name="people-outline"></ion-icon>
+                <p>{{ 'addon.mod_qaa.EditAnswer' | translate }}</p>
+            </div>
+        </div>
+    </div>
+</ion-content>

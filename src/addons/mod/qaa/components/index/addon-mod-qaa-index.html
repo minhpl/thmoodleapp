@@ -1,0 +1,76 @@
+<!-- Buttons to add to the header. -->
+<core-navbar-buttons slot="end">
+    <ion-button fill="clear" (click)="openModuleSummary()" aria-haspopup="true" [attr.aria-label]="'core.info' | translate">
+        <ion-icon name="fas-info-circle" slot="icon-only" aria-hidden="true"></ion-icon>
+    </ion-button>
+</core-navbar-buttons>
+
+<!-- Content. -->
+<core-loading [hideUntil]="!showLoading">
+    <div *ngIf="answered">
+        <h3>{{ 'addon.mod_qaa.Answered' | translate }} {{number_answered}}</h3>
+        <div *ngFor="let answered of list_answered">
+            <ion-label>
+                <p class="time-week">{{ 'addon.mod_qaa.Week' | translate }}:{{answered.weekbegin_humandate}}->
+                    {{answered.weekend_humandate}}</p>
+                <div class="week_title_answered content" *ngFor="let qaap of answered.qaap">
+                    <div (click)="answewed(qaap)" *ngIf="qaap">
+                        <div class="content_number">
+                            <p class="number">{{qaap.number}}</p>
+                            <p>.</p>
+                            <p class="time-week-question">{{qaap.weekquestion}}:</p>
+                        </div>
+                        <p class="question" [innerHTML]="sanitizer.bypassSecurityTrustHtml(qaap.question)"></p>
+                        <p class="time-week-answer">{{qaap.weekanswer}}:</p>
+                        <p class="question" [innerHTML]="sanitizer.bypassSecurityTrustHtml(qaap.answer)"></p>
+                    </div>
+                    <div class="btn_edit">
+                        <div class="icon_answer" (click)="edit_answewed(qaap)" *ngIf="answerquest">
+                            <ion-icon name="people-outline"></ion-icon>
+                            <p>{{ 'addon.mod_qaa.EditAnswer' | translate }}</p>
+                        </div>
+                        <div class="see_details" (click)="answewed(qaap)">
+                            <p>{{ 'addon.mod_qaa.SeeDetails' | translate }}</p>
+                            <ion-icon name="arrow-forward-sharp"></ion-icon>
+                        </div>
+                    </div>
+                </div>
+            </ion-label>
+        </div>
+    </div>
+
+    <div *ngIf="unanswered">
+        <h3>{{ 'addon.mod_qaa.Unanswered' | translate }} {{number_unanswered}}</h3>
+        <div *ngFor="let answered of list_unanswered">
+            <ion-label>
+                <p class="time-week">{{ 'addon.mod_qaa.Week' | translate }}:{{answered.weekbegin_humandate}}->
+                    {{answered.weekend_humandate}}</p>
+                <div class="week_title_answered content" *ngFor="let qaap of answered.qaap">
+                    <div (click)="answewed(qaap)">
+                        <div class="content_number">
+                            <p class="number">{{qaap.number}}</p>
+                            <p>.</p>
+                            <p class="time-week-question">{{qaap.weekquestion}}:</p>
+                        </div>
+                        <p class="question" [innerHTML]="sanitizer.bypassSecurityTrustHtml(qaap.question)"></p>
+                    </div>
+                    <div class="btn_edit">
+                        <div class="icon_answer" *ngIf="answerquest" (click)="answer(qaap)">
+                            <ion-icon name="people-outline"></ion-icon>
+                            <p>{{ 'addon.mod_qaa.Answer' | translate }}</p>
+                        </div>
+                        <div class="see_details" (click)="answewed(qaap)">
+                            <p>{{ 'addon.mod_qaa.SeeDetails' | translate }}</p>
+                            <ion-icon name="arrow-forward-sharp"></ion-icon>
+                        </div>
+                    </div>
+                </div>
+            </ion-label>
+        </div>
+    </div>
+
+    <button (click)="add_question()" color="success" class="btn_add_question" *ngIf="makequest">+</button>
+</core-loading>
+
+<core-course-module-navigation collapsible-footer appearOnBottom [hidden]="showLoading" [courseId]="courseId" [currentModuleId]="module.id">
+</core-course-module-navigation>
