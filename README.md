@@ -1,6 +1,6 @@
 # Tài liệu Build App và Đẩy app lên cửa hàng Demo UAT-e
 
-1. **Tên tính năng**: Build App Demo UAT-e
+1. **Tên tính năng**: Build App và Đẩy app lên cửa hàng Demo UAT-e
 2. **Project**:
 3. **Người phát triển**: huytq72@wru.vn
 4. **Người yêu cầu**: minhpl@aum.edu.vn
@@ -27,9 +27,15 @@ Build App và đẩy app demo lên cửa hàng Demo UAT-e
 
 **Hình ảnh giao diện ứng dụng  App UAT-e**:
 
++ Hình 1:
+
 ![image](https://user-images.githubusercontent.com/58178423/236096095-20f7e351-cad2-4b2f-852f-8f2543050cfa.jpeg)
 
++ Hình 2:
+
 ![image](https://user-images.githubusercontent.com/58178423/236095637-f22c0f12-c1d1-4980-8a92-9f713c70cfbd.png)
+
++ Hình 3:
 
 ![image](https://user-images.githubusercontent.com/58178423/236095642-675013a2-d13c-4b6d-8858-a1a0735509e4.png)
 
