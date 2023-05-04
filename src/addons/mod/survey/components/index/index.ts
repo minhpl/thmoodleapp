@@ -79,7 +79,7 @@ export class AddonModSurveyIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -96,7 +96,7 @@ export class AddonModSurveyIndexComponent extends CoreCourseModuleMainActivityCo
      * Compares sync event data with current data to check if refresh content is needed.
      *
      * @param syncEventData Data receiven on sync observer.
-     * @return True if refresh is needed, false otherwise.
+     * @returns True if refresh is needed, false otherwise.
      */
     protected isRefreshSyncNeeded(syncEventData: AddonModSurveyAutoSyncData): boolean {
         if (this.survey && syncEventData.surveyId == this.survey.id && syncEventData.userId == this.currentUserId) {
@@ -137,7 +137,7 @@ export class AddonModSurveyIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * Convenience function to get survey questions.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchQuestions(): Promise<void> {
         const questions = await AddonModSurvey.getQuestions(this.survey!.id, { cmId: this.module.id });
@@ -172,7 +172,7 @@ export class AddonModSurveyIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * Check if answers are valid to be submitted.
      *
-     * @return If answers are valid
+     * @returns If answers are valid
      */
     isValidResponse(): boolean {
         return !this.questions.some((question) => question.required && question.name &&
@@ -205,21 +205,23 @@ export class AddonModSurveyIndexComponent extends CoreCourseModuleMainActivityCo
             if (online && this.isPrefetched()) {
                 // The survey is downloaded, update the data.
                 try {
-                    await AddonModSurveySync.prefetchAfterUpdate(
+                    const prefetched = await AddonModSurveySync.prefetchAfterUpdate(
                         AddonModSurveyPrefetchHandler.instance,
                         this.module,
                         this.courseId,
                     );
 
                     // Update the view.
-                    this.showLoadingAndFetch(false, false);
+                    prefetched ?
+                        this.showLoadingAndFetch(false, false) :
+                        this.showLoadingAndRefresh(false);
                 } catch {
                     // Prefetch failed, refresh the data.
-                    await this.showLoadingAndRefresh(false);
+                    this.showLoadingAndRefresh(false);
                 }
             } else {
                 // Not downloaded, refresh the data.
-                await this.showLoadingAndRefresh(false);
+                this.showLoadingAndRefresh(false);
             }
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'addon.mod_survey.cannotsubmitsurvey', true);
@@ -231,7 +233,7 @@ export class AddonModSurveyIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * Performs the sync of the activity.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected sync(): Promise<AddonModSurveySyncResult> {
         return AddonModSurveySync.syncSurvey(this.survey!.id, this.currentUserId);
@@ -241,7 +243,7 @@ export class AddonModSurveyIndexComponent extends CoreCourseModuleMainActivityCo
      * Checks if sync has succeed from result sync data.
      *
      * @param result Data returned on the sync function.
-     * @return If suceed or not.
+     * @returns If suceed or not.
      */
     protected hasSyncSucceed(result: AddonModSurveySyncResult): boolean {
         return result.answersSent;

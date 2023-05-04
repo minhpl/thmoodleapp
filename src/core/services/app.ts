@@ -16,10 +16,9 @@ import { Injectable } from '@angular/core';
 
 import { CoreDB } from '@services/db';
 import { CoreEvents } from '@singletons/events';
-import { CoreUtils, PromiseDefer } from '@services/utils/utils';
 import { SQLiteDB, SQLiteDBTableSchema } from '@classes/sqlitedb';
 
-import { makeSingleton, Keyboard, Network, StatusBar, Platform, Device } from '@singletons';
+import { makeSingleton, Keyboard, StatusBar, Device } from '@singletons';
 import { CoreLogger } from '@singletons/logger';
 import { CoreColors } from '@singletons/colors';
 import { DBNAME, SCHEMA_VERSIONS_TABLE_NAME, SCHEMA_VERSIONS_TABLE_SCHEMA, SchemaVersionsDBEntry } from '@services/database/app';
@@ -28,6 +27,10 @@ import { CoreRedirectPayload } from './navigator';
 import { CoreDatabaseCachingStrategy, CoreDatabaseTableProxy } from '@classes/database/database-table-proxy';
 import { asyncInstance } from '../utils/async-instance';
 import { CoreDatabaseTable } from '@classes/database/database-table';
+import { CorePromisedValue } from '@classes/promised-value';
+import { Subscription } from 'rxjs';
+import { CorePlatform } from '@services/platform';
+import { CoreNetwork, CoreNetworkConnection } from '@services/network';
 
 /**
  * Factory to provide some global functionalities, like access to the global app database.
@@ -47,11 +50,10 @@ export class CoreAppProvider {
 
     protected db?: SQLiteDB;
     protected logger: CoreLogger;
-    protected ssoAuthenticationDeferred?: PromiseDefer<void>;
+    protected ssoAuthenticationDeferred?: CorePromisedValue<void>;
     protected isKeyboardShown = false;
     protected keyboardOpening = false;
     protected keyboardClosing = false;
-    protected forceOffline = false;
     protected redirect?: CoreRedirectData;
     protected schemaVersionsTable = asyncInstance<CoreDatabaseTable<SchemaVersionsDBEntry, 'name'>>();
 
@@ -62,10 +64,22 @@ export class CoreAppProvider {
     /**
      * Returns whether the user agent is controlled by automation. I.e. Behat testing.
      *
-     * @return True if the user agent is controlled by automation, false otherwise.
+     * @returns True if the user agent is controlled by automation, false otherwise.
      */
     static isAutomated(): boolean {
         return !!navigator.webdriver;
+    }
+
+    /**
+     * Returns the forced timezone to use. Timezone is forced for automated tests.
+     *
+     * @returns Timezone. Undefined to use the user's timezone.
+     */
+    static getForcedTimezone(): string | undefined {
+        if (CoreAppProvider.isAutomated()) {
+            // Use the same timezone forced for LMS in tests.
+            return 'Australia/Perth';
+        }
     }
 
     /**
@@ -91,7 +105,7 @@ export class CoreAppProvider {
     /**
      * Check if the browser supports mediaDevices.getUserMedia.
      *
-     * @return Whether the function is supported.
+     * @returns Whether the function is supported.
      */
     canGetUserMedia(): boolean {
         return !!(navigator && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
@@ -100,7 +114,7 @@ export class CoreAppProvider {
     /**
      * Check if the browser supports MediaRecorder.
      *
-     * @return Whether the function is supported.
+     * @returns Whether the function is supported.
      */
     canRecordMedia(): boolean {
         return !!window.MediaRecorder;
@@ -110,7 +124,7 @@ export class CoreAppProvider {
      * Closes the keyboard.
      */
     closeKeyboard(): void {
-        if (this.isMobile()) {
+        if (CorePlatform.isMobile()) {
             Keyboard.hide();
         }
     }
@@ -119,7 +133,7 @@ export class CoreAppProvider {
      * Install and upgrade a certain schema.
      *
      * @param schema The schema to create.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async createTablesFromSchema(schema: CoreAppSchema): Promise<void> {
         this.logger.debug(`Apply schema to app DB: ${schema.name}`);
@@ -135,6 +149,9 @@ export class CoreAppProvider {
 
         if (schema.tables) {
             await this.getDB().createTablesFromSchema(schema.tables);
+        }
+        if (schema.install && oldVersion === 0) {
+            await schema.install(this.getDB());
         }
         if (schema.migrate && oldVersion > 0) {
             await schema.migrate(this.getDB(), oldVersion);
@@ -156,7 +173,7 @@ export class CoreAppProvider {
     /**
      * Get the application global database.
      *
-     * @return App's DB.
+     * @returns App's DB.
      */
     getDB(): SQLiteDB {
         if (!this.db) {
@@ -169,7 +186,7 @@ export class CoreAppProvider {
     /**
      * Get an ID for a main menu.
      *
-     * @return Main menu ID.
+     * @returns Main menu ID.
      * @deprecated since 3.9.5. No longer supported.
      */
     getMainMenuId(): number {
@@ -180,7 +197,7 @@ export class CoreAppProvider {
      * Get app store URL.
      *
      * @param storesConfig Config params to send the user to the right place.
-     * @return Store URL.
+     * @returns Store URL.
      */
     getAppStoreUrl(storesConfig: CoreStoreConfig): string | undefined {
         if (this.isIOS() && storesConfig.ios) {
@@ -191,7 +208,7 @@ export class CoreAppProvider {
             return 'market://details?id=' + storesConfig.android;
         }
 
-        if (this.isMobile() && storesConfig.mobile) {
+        if (CorePlatform.isMobile() && storesConfig.mobile) {
             return storesConfig.mobile;
         }
 
@@ -200,9 +217,11 @@ export class CoreAppProvider {
 
     /**
      * Get platform major version number.
+     *
+     * @returns The platform major number.
      */
     getPlatformMajorVersion(): number {
-        if (!this.isMobile()) {
+        if (!CorePlatform.isMobile()) {
             return 0;
         }
 
@@ -212,7 +231,7 @@ export class CoreAppProvider {
     /**
      * Checks if the app is running in a 64 bits desktop environment (not browser).
      *
-     * @return false.
+     * @returns false.
      * @deprecated since 3.9.5 Desktop support has been removed.
      */
     is64Bits(): boolean {
@@ -222,16 +241,16 @@ export class CoreAppProvider {
     /**
      * Checks if the app is running in an Android mobile or tablet device.
      *
-     * @return Whether the app is running in an Android mobile or tablet device.
+     * @returns Whether the app is running in an Android mobile or tablet device.
      */
     isAndroid(): boolean {
-        return this.isMobile() && Platform.is('android');
+        return CorePlatform.isMobile() && CorePlatform.is('android');
     }
 
     /**
      * Checks if the app is running in a desktop environment (not browser).
      *
-     * @return false.
+     * @returns false.
      * @deprecated since 3.9.5 Desktop support has been removed.
      */
     isDesktop(): boolean {
@@ -241,16 +260,16 @@ export class CoreAppProvider {
     /**
      * Checks if the app is running in an iOS mobile or tablet device.
      *
-     * @return Whether the app is running in an iOS mobile or tablet device.
+     * @returns Whether the app is running in an iOS mobile or tablet device.
      */
     isIOS(): boolean {
-        return this.isMobile() && !Platform.is('android');
+        return CorePlatform.isMobile() && !CorePlatform.is('android');
     }
 
     /**
      * Check if the keyboard is closing.
      *
-     * @return Whether keyboard is closing (animating).
+     * @returns Whether keyboard is closing (animating).
      */
     isKeyboardClosing(): boolean {
         return this.keyboardClosing;
@@ -259,7 +278,7 @@ export class CoreAppProvider {
     /**
      * Check if the keyboard is being opened.
      *
-     * @return Whether keyboard is opening (animating).
+     * @returns Whether keyboard is opening (animating).
      */
     isKeyboardOpening(): boolean {
         return this.keyboardOpening;
@@ -268,7 +287,7 @@ export class CoreAppProvider {
     /**
      * Check if the keyboard is visible.
      *
-     * @return Whether keyboard is visible.
+     * @returns Whether keyboard is visible.
      */
     isKeyboardVisible(): boolean {
         return this.isKeyboardShown;
@@ -277,7 +296,7 @@ export class CoreAppProvider {
     /**
      * Check if the app is running in a Linux environment.
      *
-     * @return false.
+     * @returns false.
      * @deprecated since 3.9.5 Desktop support has been removed.
      */
     isLinux(): boolean {
@@ -287,7 +306,7 @@ export class CoreAppProvider {
     /**
      * Check if the app is running in a Mac OS environment.
      *
-     * @return false.
+     * @returns false.
      * @deprecated since 3.9.5 Desktop support has been removed.
      */
     isMac(): boolean {
@@ -297,7 +316,7 @@ export class CoreAppProvider {
     /**
      * Check if the main menu is open.
      *
-     * @return Whether the main menu is open.
+     * @returns Whether the main menu is open.
      * @deprecated since 3.9.5. No longer supported.
      */
     isMainMenuOpen(): boolean {
@@ -307,79 +326,56 @@ export class CoreAppProvider {
     /**
      * Checks if the app is running in a mobile or tablet device (Cordova).
      *
-     * @return Whether the app is running in a mobile or tablet device.
+     * @returns Whether the app is running in a mobile or tablet device.
+     * @deprecated since 4.1. use CorePlatform instead.
      */
     isMobile(): boolean {
-        return Platform.is('cordova');
+        return CorePlatform.isMobile();
     }
 
     /**
      * Checks if the current window is wider than a mobile.
      *
-     * @return Whether the app the current window is wider than a mobile.
+     * @returns Whether the app the current window is wider than a mobile.
      */
     isWide(): boolean {
-        return Platform.width() > 768;
+        return CorePlatform.width() > 768;
     }
 
     /**
      * Returns whether we are online.
      *
-     * @return Whether the app is online.
+     * @returns Whether the app is online.
+     * @deprecated since 4.1.0. Use CoreNetwork instead.
      */
     isOnline(): boolean {
-        if (this.forceOffline) {
-            return false;
-        }
-
-        if (!this.isMobile()) {
-            return navigator.onLine;
-        }
-
-        let online = Network.type !== null && Network.type != Network.Connection.NONE &&
-            Network.type != Network.Connection.UNKNOWN;
-
-        // Double check we are not online because we cannot rely 100% in Cordova APIs.
-        if (!online && navigator.onLine) {
-            online = true;
-        }
-
-        return online;
+        return CoreNetwork.isOnline();
     }
 
     /**
      * Check if device uses a limited connection.
      *
-     * @return Whether the device uses a limited connection.
+     * @returns Whether the device uses a limited connection.
+     * @deprecated since 4.1.0. Use CoreNetwork instead.
      */
     isNetworkAccessLimited(): boolean {
-        if (!this.isMobile()) {
-            return false;
-        }
-
-        const limited = [
-            Network.Connection.CELL_2G,
-            Network.Connection.CELL_3G,
-            Network.Connection.CELL_4G,
-            Network.Connection.CELL,
-        ];
-
-        return limited.indexOf(Network.type) > -1;
+        return CoreNetwork.isNetworkAccessLimited();
     }
 
     /**
      * Check if device uses a wifi connection.
      *
-     * @return Whether the device uses a wifi connection.
+     * @returns Whether the device uses a wifi connection.
+     * @deprecated since 4.1.0. Use CoreNetwork instead.
      */
     isWifi(): boolean {
-        return this.isOnline() && !this.isNetworkAccessLimited();
+        return CoreNetwork.isWifi();
     }
 
     /**
      * Check if the app is running in a Windows environment.
      *
-     * @return false.
+     * @returns false.
      * @deprecated since 3.9.5 Desktop support has been removed.
      */
     isWindows(): boolean {
@@ -451,14 +447,14 @@ export class CoreAppProvider {
      * NOT when the browser is opened.
      */
     startSSOAuthentication(): void {
-        this.ssoAuthenticationDeferred = CoreUtils.promiseDefer<void>();
+        this.ssoAuthenticationDeferred = new CorePromisedValue();
 
         // Resolve it automatically after 10 seconds (it should never take that long).
         const cancelTimeout = setTimeout(() => this.finishSSOAuthentication(), 10000);
 
         // If the promise is resolved because finishSSOAuthentication is called, stop the cancel promise.
         // eslint-disable-next-line promise/catch-or-return
-        this.ssoAuthenticationDeferred.promise.then(() => clearTimeout(cancelTimeout));
+        this.ssoAuthenticationDeferred.then(() => clearTimeout(cancelTimeout));
     }
 
     /**
@@ -474,7 +470,7 @@ export class CoreAppProvider {
     /**
      * Check if there's an ongoing SSO authentication process.
      *
-     * @return Whether there's a SSO authentication ongoing.
+     * @returns Whether there's a SSO authentication ongoing.
      */
     isSSOAuthenticationOngoing(): boolean {
         return !!this.ssoAuthenticationDeferred;
@@ -483,12 +479,10 @@ export class CoreAppProvider {
     /**
      * Returns a promise that will be resolved once SSO authentication finishes.
      *
-     * @return Promise resolved once SSO authentication finishes.
+     * @returns Promise resolved once SSO authentication finishes.
      */
     async waitForSSOAuthentication(): Promise<void> {
-        const promise = this.ssoAuthenticationDeferred?.promise;
-
-        await promise;
+        await this.ssoAuthenticationDeferred;
     }
 
     /**
@@ -497,7 +491,9 @@ export class CoreAppProvider {
      * @param timeout Maximum time to wait, use null to wait forever.
      */
     async waitForResume(timeout: number | null = null): Promise<void> {
-        let deferred: PromiseDefer<void> | null = CoreUtils.promiseDefer<void>();
+        let deferred: CorePromisedValue<void> | null = new CorePromisedValue();
+        let resumeSubscription: Subscription | null = null;
+        let timeoutId: number | null = null;
 
         const stopWaiting = () => {
             if (!deferred) {
@@ -505,16 +501,16 @@ export class CoreAppProvider {
             }
 
             deferred.resolve();
-            resumeSubscription.unsubscribe();
+            resumeSubscription?.unsubscribe();
             timeoutId && clearTimeout(timeoutId);
 
             deferred = null;
         };
 
-        const resumeSubscription = Platform.resume.subscribe(stopWaiting);
-        const timeoutId = timeout ? setTimeout(stopWaiting, timeout) : false;
+        resumeSubscription = CorePlatform.resume.subscribe(stopWaiting);
+        timeoutId = timeout ? window.setTimeout(stopWaiting, timeout) : null;
 
-        await deferred.promise;
+        await deferred;
     }
 
     /**
@@ -550,7 +546,7 @@ export class CoreAppProvider {
     /**
      * Retrieve and forget redirect data.
      *
-     * @return Redirect data if any.
+     * @returns Redirect data if any.
      */
     consumeMemoryRedirect(): CoreRedirectData | null {
         const redirect = this.getRedirect();
@@ -578,7 +574,7 @@ export class CoreAppProvider {
     /**
      * Retrieve redirect data.
      *
-     * @return Redirect data if any.
+     * @returns Redirect data if any.
      */
     getRedirect(): CoreRedirectData | null {
         return this.redirect || null;
@@ -615,7 +611,7 @@ export class CoreAppProvider {
      *
      * @param callback Called when the back button is pressed.
      * @param priority Priority.
-     * @return A function that, when called, will unregister the back button action.
+     * @returns A function that, when called, will unregister the back button action.
      * @deprecated since 3.9.5
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -629,7 +625,7 @@ export class CoreAppProvider {
      * @param color RGB color to use as status bar background. If not set the css variable will be read.
      */
     setStatusBarColor(color?: string): void {
-        if (!this.isMobile()) {
+        if (!CorePlatform.isMobile()) {
             return;
         }
 
@@ -665,9 +661,10 @@ export class CoreAppProvider {
      * Set value of forceOffline flag. If true, the app will think the device is offline.
      *
      * @param value Value to set.
+     * @deprecated since 4.1.0. Use CoreNetwork.setForceConnectionMode instead.
      */
     setForceOffline(value: boolean): void {
-        this.forceOffline = !!value;
+        CoreNetwork.setForceConnectionMode(value ? CoreNetworkConnection.NONE : CoreNetworkConnection.WIFI);
     }
 
     /**
@@ -682,7 +679,7 @@ export class CoreAppProvider {
             const entry = await this.schemaVersionsTable.getOneByPrimaryKey({ name: schema.name });
 
             return entry.version;
-        } catch (error) {
+        } catch {
             // No installed version yet.
             return 0;
         }
@@ -747,11 +744,21 @@ export type CoreAppSchema = {
     /**
      * Migrates the schema to the latest version.
      *
-     * Called when installing and upgrading the schema, after creating the defined tables.
+     * Called when upgrading the schema, after creating the defined tables.
      *
      * @param db The affected DB.
      * @param oldVersion Old version of the schema or 0 if not installed.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     migrate?(db: SQLiteDB, oldVersion: number): Promise<void>;
+
+    /**
+     * Make changes to install the schema.
+     *
+     * Called when installing the schema, after creating the defined tables.
+     *
+     * @param db Site database.
+     * @returns Promise resolved when done.
+     */
+    install?(db: SQLiteDB): Promise<void> | void;
 };

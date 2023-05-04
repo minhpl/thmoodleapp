@@ -15,15 +15,15 @@
 import { Injectable } from '@angular/core';
 import { Params } from '@angular/router';
 
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreEvents } from '@singletons/events';
 import { CoreLogger } from '@singletons/logger';
 import { CoreSitesCommonWSOptions, CoreSites, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreTimeUtils } from '@services/utils/time';
 import { CoreUtils } from '@services/utils/utils';
-import { CoreSiteWSPreSets, CoreSite } from '@classes/site';
+import { CoreSiteWSPreSets, CoreSite, WSObservable } from '@classes/site';
 import { CoreConstants } from '@/core/constants';
-import { makeSingleton, Platform, Translate } from '@singletons';
+import { makeSingleton, Translate } from '@singletons';
 import { CoreStatusWithWarningsWSResponse, CoreWSExternalFile, CoreWSExternalWarning } from '@services/ws';
 
 import {
@@ -52,6 +52,9 @@ import { asyncInstance, AsyncInstance } from '@/core/utils/async-instance';
 import { CoreDatabaseTable } from '@classes/database/database-table';
 import { CoreDatabaseCachingStrategy } from '@classes/database/database-table-proxy';
 import { SQLiteDB } from '@classes/sqlitedb';
+import { CorePlatform } from '@services/platform';
+import { asyncObservable, firstValueFrom } from '@/core/utils/rxjs';
+import { map } from 'rxjs/operators';
 
 const ROOT_CACHE_KEY = 'mmCourse:';
 
@@ -173,10 +176,12 @@ export class CoreCourseProvider {
      * Initialize.
      */
     initialize(): void {
-        Platform.resume.subscribe(() => {
+        CorePlatform.resume.subscribe(() => {
             // Run the handler the app is open to keep user in online status.
             setTimeout(() => {
-                CoreCronDelegate.forceCronHandlerExecution(CoreCourseLogCronHandler.name);
+                CoreUtils.ignoreErrors(
+                    CoreCronDelegate.forceCronHandlerExecution(CoreCourseLogCronHandler.name),
+                );
             }, 1000);
         });
 
@@ -194,7 +199,7 @@ export class CoreCourseProvider {
      * Check if the get course blocks WS is available in current site.
      *
      * @param site Site to check. If not defined, current site.
-     * @return Whether it's available.
+     * @returns Whether it's available.
      * @since 3.7
      */
     canGetCourseBlocks(site?: CoreSite): boolean {
@@ -207,7 +212,7 @@ export class CoreCourseProvider {
      * Check whether the site supports requesting stealth modules.
      *
      * @param site Site. If not defined, current site.
-     * @return Whether the site supports requesting stealth modules.
+     * @returns Whether the site supports requesting stealth modules.
      * @since 3.5.3, 3.6
      */
     canRequestStealthModules(site?: CoreSite): boolean {
@@ -224,8 +229,7 @@ export class CoreCourseProvider {
      * @param completion Completion status of the module.
      */
     checkModuleCompletion(courseId: number, completion?: CoreCourseModuleCompletionData): void {
-        if (completion && completion.tracking === CoreCourseModuleCompletionTracking.COMPLETION_TRACKING_AUTOMATIC &&
-            completion.state === CoreCourseModuleCompletionStatus.COMPLETION_INCOMPLETE) {
+        if (completion && this.isIncompleteAutomaticCompletion(completion)) {
             this.invalidateSections(courseId).finally(() => {
                 CoreEvents.trigger(CoreEvents.COMPLETION_MODULE_VIEWED, {
                     courseId: courseId,
@@ -236,10 +240,21 @@ export class CoreCourseProvider {
     }
 
     /**
+     * Given some completion data, return whether it's an automatic completion that hasn't been completed yet.
+     *
+     * @param completion Completion data.
+     * @returns Whether it's an automatic completion that hasn't been completed yet.
+     */
+    isIncompleteAutomaticCompletion(completion: CoreCourseModuleCompletionData): boolean {
+        return completion.tracking === CoreCourseModuleCompletionTracking.COMPLETION_TRACKING_AUTOMATIC &&
+            completion.state === CoreCourseModuleCompletionStatus.COMPLETION_INCOMPLETE;
+    }
+
+    /**
      * Clear all courses status in a site.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when all status are cleared.
+     * @returns Promise resolved when all status are cleared.
      */
     async clearAllCoursesStatus(siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -253,7 +268,7 @@ export class CoreCourseProvider {
      * Check if the current view is a certain course initial page.
      *
      * @param courseId Course ID.
-     * @return Whether the current view is a certain course.
+     * @returns Whether the current view is a certain course.
      */
     currentViewIsCourse(courseId: number): boolean {
         const route = CoreNavigator.getCurrentRoute({ routeData: { isCourseIndex: true } });
@@ -274,7 +289,7 @@ export class CoreCourseProvider {
      * @param forceCache True if it should return cached data. Has priority over ignoreCache.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
      * @param includeOffline True if it should load offline data in the completion status.
-     * @return Promise resolved with the completion statuses: object where the key is module ID.
+     * @returns Promise resolved with the completion statuses: object where the key is module ID.
      */
     async getActivitiesCompletionStatus(
         courseId: number,
@@ -349,7 +364,7 @@ export class CoreCourseProvider {
      *
      * @param courseId Course ID.
      * @param userId User ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getActivitiesCompletionCacheKey(courseId: number, userId: number): string {
         return ROOT_CACHE_KEY + 'activitiescompletion:' + courseId + ':' + userId;
@@ -360,7 +375,7 @@ export class CoreCourseProvider {
      *
      * @param ids Module IDs.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with map of last module viewed data.
+     * @returns Promise resolved with map of last module viewed data.
      */
     async getCertainModulesViewed(ids: number[] = [], siteId?: string): Promise<Record<number, CoreCourseViewedModulesDBRecord>> {
         if (!ids.length) {
@@ -385,29 +400,46 @@ export class CoreCourseProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the list of blocks.
+     * @returns Promise resolved with the list of blocks.
      * @since 3.7
      */
-    async getCourseBlocks(courseId: number, siteId?: string): Promise<CoreCourseBlock[]> {
-        const site = await CoreSites.getSite(siteId);
-        const params: CoreBlockGetCourseBlocksWSParams = {
-            courseid: courseId,
-            returncontents: true,
-        };
-        const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getCourseBlocksCacheKey(courseId),
-            updateFrequency: CoreSite.FREQUENCY_RARELY,
-        };
-        const result = await site.read<CoreCourseBlocksWSResponse>('core_block_get_course_blocks', params, preSets);
+    getCourseBlocks(courseId: number, siteId?: string): Promise<CoreCourseBlock[]> {
+        return firstValueFrom(this.getCourseBlocksObservable(courseId, { siteId }));
+    }
 
-        return result.blocks || [];
+    /**
+     * Get course blocks.
+     *
+     * @param courseId Course ID.
+     * @param options Options.
+     * @returns Observable that returns the blocks.
+     * @since 3.7
+     */
+    getCourseBlocksObservable(courseId: number, options: CoreSitesCommonWSOptions = {}): WSObservable<CoreCourseBlock[]> {
+        return asyncObservable(async () => {
+            const site = await CoreSites.getSite(options.siteId);
+
+            const params: CoreBlockGetCourseBlocksWSParams = {
+                courseid: courseId,
+                returncontents: true,
+            };
+            const preSets: CoreSiteWSPreSets = {
+                cacheKey: this.getCourseBlocksCacheKey(courseId),
+                updateFrequency: CoreSite.FREQUENCY_RARELY,
+                ...CoreSites.getReadingStrategyPreSets(options.readingStrategy),
+            };
+
+            return site.readObservable<CoreCourseBlocksWSResponse>('core_block_get_course_blocks', params, preSets).pipe(
+                map(result => result.blocks),
+            );
+        });
     }
 
     /**
      * Get cache key for course blocks WS calls.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCourseBlocksCacheKey(courseId: number): string {
         return ROOT_CACHE_KEY + 'courseblocks:' + courseId;
@@ -418,7 +450,7 @@ export class CoreCourseProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the data.
+     * @returns Promise resolved with the data.
      */
     async getCourseStatusData(courseId: number, siteId?: string): Promise<CoreCourseStatusDBRecord> {
         const site = await CoreSites.getSite(siteId);
@@ -435,7 +467,7 @@ export class CoreCourseProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the status.
+     * @returns Promise resolved with the status.
      */
     async getCourseStatus(courseId: number, siteId?: string): Promise<string> {
         try {
@@ -451,7 +483,7 @@ export class CoreCourseProvider {
      * Obtain ids of downloaded courses.
      *
      * @param siteId Site id.
-     * @return Resolves with an array containing downloaded course ids.
+     * @returns Resolves with an array containing downloaded course ids.
      */
     async getDownloadedCourseIds(siteId?: string): Promise<number[]> {
         const downloadedStatuses = [CoreConstants.DOWNLOADED, CoreConstants.DOWNLOADING, CoreConstants.OUTDATED];
@@ -470,7 +502,7 @@ export class CoreCourseProvider {
      *
      * @param id Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with last module viewed data, undefined if none.
+     * @returns Promise resolved with last module viewed data, undefined if none.
      */
     async getLastModuleViewed(id: number, siteId?: string): Promise<CoreCourseViewedModulesDBRecord | undefined> {
         const viewedModules = await this.getViewedModules(id, siteId);
@@ -489,7 +521,7 @@ export class CoreCourseProvider {
      * @param siteId Site ID. If not defined, current site.
      * @param modName If set, the app will retrieve all modules of this type with a single WS call. This reduces the
      *                number of WS calls, but it isn't recommended for modules that can return a lot of contents.
-     * @return Promise resolved with the module.
+     * @returns Promise resolved with the module.
      */
     async getModule(
         moduleId: number,
@@ -554,7 +586,7 @@ export class CoreCourseProvider {
                 return sections;
             } catch {
                 // The module might still be cached by a request with different parameters.
-                if (!ignoreCache && !CoreApp.isOnline()) {
+                if (!ignoreCache && !CoreNetwork.isOnline()) {
                     if (includeStealth) {
                         // Older versions didn't include the includestealthmodules option.
                         return doRequest(site, courseId, moduleId, modName, false, true);
@@ -627,7 +659,7 @@ export class CoreCourseProvider {
      * @param module Module.
      * @param courseId Course ID of the module.
      * @param sectionId Section ID of the module.
-     * @return Module with additional info.
+     * @returns Module with additional info.
      */
     protected addAdditionalModuleData(
         module: CoreCourseGetContentsWSModule,
@@ -658,7 +690,7 @@ export class CoreCourseProvider {
      *
      * @param moduleId Module ID.
      * @param options Comon site WS options.
-     * @return Promise resolved with the module's info.
+     * @returns Promise resolved with the module's info.
      */
     async getModuleBasicInfo(moduleId: number, options: CoreSitesCommonWSOptions = {}): Promise<CoreCourseModuleBasicInfo> {
         const site = await CoreSites.getSite(options.siteId);
@@ -684,7 +716,7 @@ export class CoreCourseProvider {
      *
      * @param moduleId Module ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the module's grade info.
+     * @returns Promise resolved with the module's grade info.
      */
     async getModuleBasicGradeInfo(moduleId: number, siteId?: string): Promise<CoreCourseModuleGradeInfo | undefined> {
         const info = await this.getModuleBasicInfo(moduleId, { siteId });
@@ -712,7 +744,7 @@ export class CoreCourseProvider {
      * @param instanceId Instance ID.
      * @param moduleName Name of the module. E.g. 'glossary'.
      * @param options Comon site WS options.
-     * @return Promise resolved with the module's info.
+     * @returns Promise resolved with the module's info.
      */
     async getModuleBasicInfoByInstance(
         instanceId: number,
@@ -749,7 +781,7 @@ export class CoreCourseProvider {
      *
      * @param instanceId Instance ID.
      * @param moduleName Name of the module. E.g. 'glossary'.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getModuleBasicInfoByInstanceCacheKey(instanceId: number, moduleName: string): string {
         return ROOT_CACHE_KEY + 'moduleByInstance:' + moduleName + ':' + instanceId;
@@ -759,7 +791,7 @@ export class CoreCourseProvider {
      * Get cache key for module WS calls.
      *
      * @param moduleId Module ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getModuleCacheKey(moduleId: number): string {
         return ROOT_CACHE_KEY + 'module:' + moduleId;
@@ -769,7 +801,7 @@ export class CoreCourseProvider {
      * Get cache key for module by modname WS calls.
      *
      * @param modName Name of the module.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getModuleByModNameCacheKey(modName: string): string {
         return ROOT_CACHE_KEY + 'module:modName:' + modName;
@@ -780,9 +812,9 @@ export class CoreCourseProvider {
      *
      * @param moduleName The module name.
      * @param modicon The mod icon string to use in case we are not using a core activity.
-     * @return The IMG src.
+     * @returns The IMG src.
      */
-    async getModuleIconSrc(moduleName: string, modicon?: string, mimetypeIcon = ''): Promise<string> {
+    getModuleIconSrc(moduleName: string, modicon?: string, mimetypeIcon = ''): string {
         if (mimetypeIcon) {
             return mimetypeIcon;
         }
@@ -811,7 +843,7 @@ export class CoreCourseProvider {
      * @deprecated since 4.0.
      * @param moduleId The module ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the section ID.
+     * @returns Promise resolved with the section ID.
      */
     async getModuleSectionId(moduleId: number, siteId?: string): Promise<number> {
         // Try to get the section using getModuleBasicInfo.
@@ -831,7 +863,7 @@ export class CoreCourseProvider {
      * @param excludeModules Do not return modules, return only the sections structure.
      * @param excludeContents Do not return module contents (i.e: files inside a resource).
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the section.
+     * @returns Promise resolved with the section.
      */
     async getSection(
         courseId: number,
@@ -864,9 +896,9 @@ export class CoreCourseProvider {
      * @param preSets Presets to use.
      * @param siteId Site ID. If not defined, current site.
      * @param includeStealthModules Whether to include stealth modules. Defaults to true.
-     * @return The reject contains the error message, else contains the sections.
+     * @returns The reject contains the error message, else contains the sections.
      */
-    async getSections(
+    getSections(
         courseId: number,
         excludeModules: boolean = false,
         excludeContents: boolean = false,
@@ -874,68 +906,88 @@ export class CoreCourseProvider {
         siteId?: string,
         includeStealthModules: boolean = true,
     ): Promise<CoreCourseWSSection[]> {
-
-        const site = await CoreSites.getSite(siteId);
-        preSets = preSets || {};
-        preSets.cacheKey = this.getSectionsCacheKey(courseId);
-        preSets.updateFrequency = preSets.updateFrequency || CoreSite.FREQUENCY_RARELY;
-
-        const params: CoreCourseGetContentsParams = {
-            courseid: courseId,
-        };
-        params.options = [
-            {
-                name: 'excludemodules',
-                value: excludeModules,
-            },
-            {
-                name: 'excludecontents',
-                value: excludeContents,
-            },
-        ];
-
-        if (this.canRequestStealthModules(site)) {
-            params.options.push({
-                name: 'includestealthmodules',
-                value: includeStealthModules,
-            });
-        }
-
-        let sections: CoreCourseGetContentsWSSection[];
-        try {
-            sections = await site.read('core_course_get_contents', params, preSets);
-        } catch {
-            // Error getting the data, it could fail because we added a new parameter and the call isn't cached.
-            // Retry without the new parameter and forcing cache.
-            preSets.omitExpires = true;
-            params.options.splice(-1, 1);
-            sections = await site.read('core_course_get_contents', params, preSets);
-        }
-
-        const siteHomeId = site.getSiteHomeId();
-        let showSections = true;
-        if (courseId == siteHomeId) {
-            const storedNumSections = site.getStoredConfig('numsections');
-            showSections = storedNumSections !== undefined && !!storedNumSections;
-        }
-
-        if (showSections !== undefined && !showSections && sections.length > 0) {
-            // Get only the last section (Main menu block section).
-            sections.pop();
-        }
-
-        // Add course to all modules.
-        return sections.map((section) => ({
-            ...section,
-            modules: section.modules.map((module) => this.addAdditionalModuleData(module, courseId, section.id)),
+        return firstValueFrom(this.getSectionsObservable(courseId, {
+            excludeModules,
+            excludeContents,
+            includeStealthModules,
+            preSets,
+            siteId,
         }));
+    }
+
+    /**
+     * Get the course sections.
+     *
+     * @param courseId The course ID.
+     * @param options Options.
+     * @returns Observable that returns the sections.
+     */
+    getSectionsObservable(
+        courseId: number,
+        options: CoreCourseGetSectionsOptions = {},
+    ): WSObservable<CoreCourseWSSection[]> {
+        options.includeStealthModules = options.includeStealthModules ?? true;
+
+        return asyncObservable(async () => {
+            const site = await CoreSites.getSite(options.siteId);
+
+            const preSets: CoreSiteWSPreSets = {
+                ...options.preSets,
+                cacheKey: this.getSectionsCacheKey(courseId),
+                updateFrequency: CoreSite.FREQUENCY_RARELY,
+                ...CoreSites.getReadingStrategyPreSets(options.readingStrategy),
+            };
+
+            const params: CoreCourseGetContentsParams = {
+                courseid: courseId,
+            };
+            params.options = [
+                {
+                    name: 'excludemodules',
+                    value: !!options.excludeModules,
+                },
+                {
+                    name: 'excludecontents',
+                    value: !!options.excludeContents,
+                },
+            ];
+
+            if (this.canRequestStealthModules(site)) {
+                params.options.push({
+                    name: 'includestealthmodules',
+                    value: !!options.includeStealthModules,
+                });
+            }
+
+            return site.readObservable<CoreCourseGetContentsWSSection[]>('core_course_get_contents', params, preSets).pipe(
+                map(sections => {
+                    const siteHomeId = site.getSiteHomeId();
+                    let showSections = true;
+                    if (courseId == siteHomeId) {
+                        const storedNumSections = site.getStoredConfig('numsections');
+                        showSections = storedNumSections !== undefined && !!storedNumSections;
+                    }
+
+                    if (showSections !== undefined && !showSections && sections.length > 0) {
+                        // Get only the last section (Main menu block section).
+                        sections.pop();
+                    }
+
+                    // Add course to all modules.
+                    return sections.map((section) => ({
+                        ...section,
+                        modules: section.modules.map((module) => this.addAdditionalModuleData(module, courseId, section.id)),
+                    }));
+                }),
+            );
+        });
     }
 
     /**
      * Get cache key for section WS call.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getSectionsCacheKey(courseId: number): string {
         return ROOT_CACHE_KEY + 'sections:' + courseId;
@@ -945,7 +997,7 @@ export class CoreCourseProvider {
      * Given a list of sections, returns the list of modules in the sections.
      *
      * @param sections Sections.
-     * @return Modules.
+     * @returns Modules.
      */
     getSectionsModules(sections: CoreCourseWSSection[]): CoreCourseModuleData[] {
         if (!sections || !sections.length) {
@@ -960,12 +1012,12 @@ export class CoreCourseProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the list of viewed modules.
+     * @returns Promise resolved with the list of viewed modules.
      */
     async getViewedModules(courseId: number, siteId?: string): Promise<CoreCourseViewedModulesDBRecord[]> {
         const site = await CoreSites.getSite(siteId);
 
-        return await this.viewedModulesTables[site.getId()].getMany({ courseId }, {
+        return this.viewedModulesTables[site.getId()].getMany({ courseId }, {
             sorting: [
                 { timeaccess: 'desc' },
             ],
@@ -977,7 +1029,7 @@ export class CoreCourseProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateCourseBlocks(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -991,7 +1043,7 @@ export class CoreCourseProvider {
      * @param moduleId Module ID.
      * @param siteId Site ID. If not defined, current site.
      * @param modName Module name. E.g. 'label', 'url', ...
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateModule(moduleId: number, siteId?: string, modName?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -1010,7 +1062,7 @@ export class CoreCourseProvider {
      * @param id Instance ID.
      * @param module Name of the module. E.g. 'glossary'.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateModuleByInstance(id: number, module: string, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -1024,7 +1076,7 @@ export class CoreCourseProvider {
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined, current user.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateSections(courseId: number, siteId?: string, userId?: number): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -1051,7 +1103,7 @@ export class CoreCourseProvider {
      * @param siteId Site ID. If not defined, current site.
      * @param modName If set, the app will retrieve all modules of this type with a single WS call. This reduces the
      *                number of WS calls, but it isn't recommended for modules that can return a lot of contents.
-     * @return Promise resolved when loaded.
+     * @returns Promise resolved when loaded.
      */
     async loadModuleContents(
         module: CoreCourseAnyModuleData,
@@ -1089,7 +1141,7 @@ export class CoreCourseProvider {
      * @param siteId Site ID. If not defined, current site.
      * @param modName If set, the app will retrieve all modules of this type with a single WS call. This reduces the
      *                number of WS calls, but it isn't recommended for modules that can return a lot of contents.
-     * @return Promise resolved when loaded.
+     * @returns Promise resolved when loaded.
      */
     async getModuleContents(
         module: CoreCourseModuleData,
@@ -1117,7 +1169,7 @@ export class CoreCourseProvider {
      * @param sectionNumber Section number.
      * @param siteId Site ID. If not defined, current site.
      * @param name Name of the course.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
     async logView(courseId: number, sectionNumber?: number, siteId?: string, name?: string): Promise<void> {
         const params: CoreCourseViewCourseWSParams = {
@@ -1151,7 +1203,7 @@ export class CoreCourseProvider {
      * @param courseId Course ID the module belongs to.
      * @param courseName Not used since 4.0.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when completion is successfully sent or stored.
+     * @returns Promise resolved when completion is successfully sent or stored.
      */
     async markCompletedManually(
         cmId: number,
@@ -1168,7 +1220,7 @@ export class CoreCourseProvider {
             CoreCourseOffline.markCompletedManually(cmId, completed, courseId, undefined, siteId);
 
         // The offline function requires a courseId and it could be missing because it's a calculated field.
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // App is offline, store the action.
             return storeOffline();
         }
@@ -1201,7 +1253,7 @@ export class CoreCourseProvider {
      * @param cmId The module ID.
      * @param completed Whether the module is completed or not.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when completion is successfully sent.
+     * @returns Promise resolved when completion is successfully sent.
      */
     async markCompletedManuallyOnline(
         cmId: number,
@@ -1234,7 +1286,7 @@ export class CoreCourseProvider {
      * Check if a module has a view page. E.g. labels don't have a view page.
      *
      * @param module The module object.
-     * @return Whether the module has a view page.
+     * @returns Whether the module has a view page.
      */
     moduleHasView(module: CoreCourseModuleSummary | CoreCourseModuleData): boolean {
         if ('modname' in module) {
@@ -1260,7 +1312,7 @@ export class CoreCourseProvider {
      *
      * @param course Course to open
      * @param navOptions Navigation options that includes params to pass to the page.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async openCourse(
         course: CoreCourseAnyCourseData | { id: number },
@@ -1304,16 +1356,15 @@ export class CoreCourseProvider {
             }
 
             // Wait for plugins to be loaded.
-            const deferred = CoreUtils.promiseDefer<void>();
+            await new Promise((resolve, reject) => {
+                const observer = CoreEvents.on(CoreEvents.SITE_PLUGINS_LOADED, () => {
+                    observer?.off();
 
-            const observer = CoreEvents.on(CoreEvents.SITE_PLUGINS_LOADED, () => {
-                observer?.off();
-
-                CoreCourseFormatDelegate.openCourse(<CoreCourseAnyCourseData> course, navOptions)
-                    .then(deferred.resolve).catch(deferred.reject);
+                    CoreCourseFormatDelegate.openCourse(<CoreCourseAnyCourseData> course, navOptions).then(resolve).catch(reject);
+                });
             });
 
-            return deferred.promise;
+            return;
         } catch (error) {
             // The site plugin failed to load. The user needs to restart the app to try loading it again.
             const message = Translate.instant('core.courses.errorloadplugins');
@@ -1345,7 +1396,7 @@ export class CoreCourseProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the status is changed. Resolve param: new status.
+     * @returns Promise resolved when the status is changed. Resolve param: new status.
      */
     async setCoursePreviousStatus(courseId: number, siteId?: string): Promise<string> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -1378,7 +1429,7 @@ export class CoreCourseProvider {
      * @param courseId Course ID.
      * @param status New course status.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the status is stored.
+     * @returns Promise resolved when the status is stored.
      */
     async setCourseStatus(courseId: number, status: string, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -1416,7 +1467,7 @@ export class CoreCourseProvider {
                 id: courseId,
                 status: status,
                 previous: previousStatus,
-                updated: new Date().getTime(),
+                updated: Date.now(),
                 downloadTime: downloadTime,
                 previousDownloadTime: previousDownloadTime,
             });
@@ -1432,7 +1483,7 @@ export class CoreCourseProvider {
      * @param courseId Chapter ID.
      * @param cmId Module ID.
      * @param options Other options.
-     * @return Promise resolved with last chapter viewed, undefined if none.
+     * @returns Promise resolved with last chapter viewed, undefined if none.
      */
     async storeModuleViewed(courseId: number, cmId: number, options: CoreCourseStoreModuleViewedOptions = {}): Promise<void> {
         const site = await CoreSites.getSite(options.siteId);
@@ -1458,7 +1509,7 @@ export class CoreCourseProvider {
      * Translate a module name to current language.
      *
      * @param moduleName The module name.
-     * @return Translated name.
+     * @returns Translated name.
      */
     translateModuleName(moduleName: string): string {
         if (this.CORE_MODULES.indexOf(moduleName) < 0) {
@@ -1884,4 +1935,14 @@ export type CoreCourseStoreModuleViewedOptions = {
     sectionId?: number;
     timeaccess?: number;
     siteId?: string;
+};
+
+/**
+ * Options for getSections.
+ */
+export type CoreCourseGetSectionsOptions = CoreSitesCommonWSOptions & {
+    excludeModules?: boolean;
+    excludeContents?: boolean;
+    includeStealthModules?: boolean; // Defaults to true.
+    preSets?: CoreSiteWSPreSets;
 };

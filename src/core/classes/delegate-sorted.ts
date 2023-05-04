@@ -15,8 +15,8 @@
 import { BehaviorSubject, Subject } from 'rxjs';
 import { CoreEvents } from '@singletons/events';
 import { CoreDelegate, CoreDelegateDisplayHandler, CoreDelegateToDisplay } from './delegate';
-import { CoreUtils } from '@services/utils/utils';
 import { CoreSites } from '@services/sites';
+import { CorePromisedValue } from '@classes/promised-value';
 
 /**
  * Superclass to help creating sorted delegates.
@@ -34,12 +34,11 @@ export class CoreSortedDelegate<
      * Constructor of the Delegate.
      *
      * @param delegateName Delegate name used for logging purposes.
-     * @param listenSiteEvents Whether to update the handler when a site event occurs (login, site updated, ...).
      */
     constructor(delegateName: string) {
         super(delegateName, true);
 
-        CoreEvents.on(CoreEvents.LOGOUT, this.clearSortedHandlers.bind(this));
+        CoreEvents.on(CoreEvents.LOGOUT, () => this.clearSortedHandlers());
         CoreEvents.on(CoreEvents.SITE_POLICY_AGREED, (data) => {
             if (data.siteId === CoreSites.getCurrentSiteId()) {
                 // Clear loaded handlers when policy is agreed. The CoreDelegate class will load them again.
@@ -47,13 +46,13 @@ export class CoreSortedDelegate<
             }
         });
         // Clear loaded handlers on login, there could be an invalid list loaded when user reconnects after token expired.
-        CoreEvents.on(CoreEvents.LOGIN, this.clearSortedHandlers.bind(this));
+        CoreEvents.on(CoreEvents.LOGIN, () => this.clearSortedHandlers());
     }
 
     /**
      * Check if handlers are loaded.
      *
-     * @return True if handlers are loaded, false otherwise.
+     * @returns True if handlers are loaded, false otherwise.
      */
     areHandlersLoaded(): boolean {
         return this.loaded;
@@ -71,7 +70,7 @@ export class CoreSortedDelegate<
     /**
      * Get the handlers for the current site.
      *
-     * @return An observable that will receive the handlers.
+     * @returns An observable that will receive the handlers.
      */
     getHandlers(): DisplayType[] {
         return this.sortedHandlers;
@@ -80,7 +79,7 @@ export class CoreSortedDelegate<
     /**
      * Get the handlers for the current site.
      *
-     * @return An observable that will receive the handlers.
+     * @returns An observable that will receive the handlers.
      */
     getHandlersObservable(): Subject<DisplayType[]> {
         return this.sortedHandlersRxJs;
@@ -89,25 +88,24 @@ export class CoreSortedDelegate<
     /**
      * Get the handlers for the current site once they're loaded.
      *
-     * @return Promise resolved with the handlers.
+     * @returns Promise resolved with the handlers.
      */
     async getHandlersWhenLoaded(): Promise<DisplayType[]> {
         if (this.loaded) {
             return this.sortedHandlers;
         }
 
-        const deferred = CoreUtils.promiseDefer<DisplayType[]>();
-
+        const promisedHandlers = new CorePromisedValue<DisplayType[]>();
         const subscription = this.getHandlersObservable().subscribe((handlers) => {
             if (this.loaded) {
                 subscription?.unsubscribe();
 
                 // Return main handlers.
-                deferred.resolve(handlers);
+                promisedHandlers.resolve(handlers);
             }
         });
 
-        return deferred.promise;
+        return promisedHandlers;
     }
 
     /**

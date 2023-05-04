@@ -60,7 +60,7 @@ export class AddonRemoteThemesHandlerService implements CoreStyleHandler {
             }
 
             // Config received, it's a temp site.
-            return await this.getRemoteStyles(config.mobilecssurl);
+            return this.getRemoteStyles(config.mobilecssurl);
         }
 
         const site = await CoreSites.getSite(siteId);
@@ -101,14 +101,14 @@ export class AddonRemoteThemesHandlerService implements CoreStyleHandler {
      * Get styles from the url.
      *
      * @param url Url to get the code from.
-     * @return The styles.
+     * @returns The styles.
      */
     protected async getRemoteStyles(url?: string): Promise<string> {
         if (!url) {
             return '';
         }
 
-        return await CoreWS.getText(url);
+        return CoreWS.getText(url);
     }
 
     /**
@@ -116,7 +116,7 @@ export class AddonRemoteThemesHandlerService implements CoreStyleHandler {
      *
      * @param siteId Site ID.
      * @param url File URL.
-     * @return Promise resolved when the file is downloaded.
+     * @returns Promise resolved when the file is downloaded.
      */
     protected async downloadFileAndRemoveOld(siteId: string, url: string): Promise<string> {
 

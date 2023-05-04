@@ -26,7 +26,7 @@
         </ion-buttons>
     </ion-toolbar>
 </ion-header>
-<ion-content>
+<ion-content [core-swipe-navigation]="events">
     <ion-refresher slot="fixed" [disabled]="!eventLoaded" (ionRefresh)="doRefresh($event.target)">
         <ion-refresher-content pullingText="{{ 'core.pulltorefresh' | translate }}"></ion-refresher-content>
     </ion-refresher>
@@ -42,7 +42,7 @@
         <ion-list *ngIf="event">
             <ion-item class="ion-text-wrap addon-calendar-event" collapsible [ngClass]="['addon-calendar-eventtype-'+event.eventtype]">
                 <core-mod-icon *ngIf="event.moduleIcon" [modicon]="event.moduleIcon" [showAlt]="false" [modname]="event.modulename"
-                    [componentId]="event.instance" slot="start"></core-mod-icon>
+                    [componentId]="event.instance" slot="start" [purpose]="event.purpose"></core-mod-icon>
                 <ion-icon *ngIf=" event.eventIcon && !event.moduleIcon" [name]="event.eventIcon" aria-hidden="true" slot="start">
                 </ion-icon>
                 <ion-label>
@@ -58,7 +58,7 @@
                     </h1>
                 </ion-label>
             </ion-item>
-            <ion-item>
+            <ion-item class="ion-text-wrap">
                 <ion-label>
                     <h2>{{ 'addon.calendar.when' | translate }}</h2>
                     <core-format-text [text]="event.formattedtime" [contextLevel]="event.contextLevel"
@@ -127,7 +127,7 @@
             </ion-item>
         </ion-list>
 
-        <ion-card *ngIf="notificationsEnabled && event">
+        <ion-card *ngIf="remindersEnabled && event">
             <ion-item>
                 <ion-label>
                     <h2>{{ 'addon.calendar.reminders' | translate }}</h2>
@@ -139,7 +139,7 @@
                         <p class="item-heading">{{ reminder.label }}</p>
                         <p *ngIf="reminder.sublabel">{{ reminder.sublabel }}</p>
                     </ion-label>
-                    <ion-button fill="clear" (click)="cancelNotification(reminder.id, $event)" [attr.aria-label]="'core.delete' | translate"
+                    <ion-button fill="clear" (click)="deleteReminder(reminder.id, $event)" [attr.aria-label]="'core.delete' | translate"
                         slot="end">
                         <ion-icon name="fas-trash" color="danger" slot="icon-only" aria-hidden="true"></ion-icon>
                     </ion-button>

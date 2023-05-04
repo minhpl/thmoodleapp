@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import moment from 'moment';
+import moment from 'moment-timezone';
 
 import { CoreConstants } from '@/core/constants';
 
@@ -64,7 +64,7 @@ export class CoreLogger {
      * Get a logger instance for a certain class, service or component.
      *
      * @param className Name to use in the messages.
-     * @return Instance.
+     * @returns Instance.
      */
     static getInstance(className: string): CoreLogger {
         // Disable log on production and testing.
@@ -86,15 +86,15 @@ export class CoreLogger {
 
         return new CoreLogger(
             // eslint-disable-next-line no-console
-            CoreLogger.prepareLogFn(console.log.bind(console), className),
+            CoreLogger.prepareLogFn((...data) => console.log(...data), className),
             // eslint-disable-next-line no-console
-            CoreLogger.prepareLogFn(console.info.bind(console), className),
+            CoreLogger.prepareLogFn((...data) => console.info(...data), className),
             // eslint-disable-next-line no-console
-            CoreLogger.prepareLogFn(console.warn.bind(console), className),
+            CoreLogger.prepareLogFn((...data) => console.warn(...data), className),
             // eslint-disable-next-line no-console
-            CoreLogger.prepareLogFn(console.debug.bind(console), className),
+            CoreLogger.prepareLogFn((...data) => console.debug(...data), className),
             // eslint-disable-next-line no-console
-            CoreLogger.prepareLogFn(console.error.bind(console), className),
+            CoreLogger.prepareLogFn((...data) => console.error(...data), className),
         );
     }
 
@@ -103,7 +103,7 @@ export class CoreLogger {
      *
      * @param logFn Log function to use.
      * @param className Name to use in the messages.
-     * @return Prepared function.
+     * @returns Prepared function.
      */
     private static prepareLogFn(logFn: LogFunction, className: string): LogFunction {
         // Return our own function that will call the logging function with the treated message.

@@ -181,7 +181,7 @@ export class CoreNavBarButtonsComponent implements OnInit, OnDestroy {
     /**
      * Create a new and empty context menu to be used as a "parent".
      *
-     * @return Created component.
+     * @returns Created component.
      */
     protected createMainContextMenu(): CoreContextMenuComponent {
         const factory = this.factoryResolver.resolveComponentFactory(CoreContextMenuComponent);
@@ -195,7 +195,7 @@ export class CoreNavBarButtonsComponent implements OnInit, OnDestroy {
     /**
      * Search the ion-header where the buttons should be added.
      *
-     * @return Promise resolved with the header element.
+     * @returns Promise resolved with the header element.
      */
     protected async searchHeader(): Promise<HTMLIonHeaderElement> {
         await CoreDom.waitToBeInDOM(this.element);
@@ -208,10 +208,17 @@ export class CoreNavBarButtonsComponent implements OnInit, OnDestroy {
                 await content.componentOnReady();
             }
 
-            parentPage = parentPage.parentElement.closest('.ion-page');
+            parentPage = parentPage.parentElement.closest('.ion-page, .ion-page-hidden, .ion-page-invisible');
 
             // Check if the page has a header. If it doesn't, search the next parent page.
-            const header  = parentPage?.querySelector<HTMLIonHeaderElement>(':scope > ion-header');
+            let header  = parentPage?.querySelector<HTMLIonHeaderElement>(':scope > ion-header');
+
+            if (header && getComputedStyle(header).display !== 'none') {
+                return header;
+            }
+
+            // Find using content if any.
+            header = content?.parentElement?.querySelector<HTMLIonHeaderElement>(':scope > ion-header');
 
             if (header && getComputedStyle(header).display !== 'none') {
                 return header;

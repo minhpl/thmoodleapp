@@ -50,11 +50,13 @@ export class CoreGradesCoursePage implements AfterViewInit, OnDestroy {
     collapseLabel!: string;
     title?: string;
     courses?: CoreSwipeNavigationItemsManager;
-    columns?: CoreGradesFormattedTableColumn[];
-    rows?: CoreGradesFormattedTableRow[];
+    columns: CoreGradesFormattedTableColumn[] = [];
+    rows: CoreGradesFormattedTableRow[] = [];
+    rowsOnView = 0;
     totalColumnsSpan?: number;
     withinSplitView?: boolean;
 
+    protected useLegacyLayout?: boolean; // Whether to use the layout before 4.1.
     protected fetchSuccess = false;
 
     constructor(
@@ -68,6 +70,7 @@ export class CoreGradesCoursePage implements AfterViewInit, OnDestroy {
 
             this.expandLabel = Translate.instant('core.expand');
             this.collapseLabel = Translate.instant('core.collapse');
+            this.useLegacyLayout = !CoreSites.getRequiredCurrentSite().isVersionGreaterEqualThan('4.1');
 
             if (route.snapshot.data.swipeEnabled ?? true) {
                 const source = CoreRoutedItemsManagerSourcesTracker.getOrCreateSource(CoreGradesCoursesSource, []);
@@ -133,11 +136,22 @@ export class CoreGradesCoursePage implements AfterViewInit, OnDestroy {
 
         row.expanded = expand ?? !row.expanded;
 
-        let colspan: number = this.columns.length + (row.colspan ?? 0) - 1;
+        let colspan: number = this.columns.length + (row.colspan ?? 0);
+
+        if (this.useLegacyLayout) {
+            colspan--;
+        }
+
         for (let i = this.rows.indexOf(row) - 1; i >= 0; i--) {
             const previousRow = this.rows[i];
 
-            if (previousRow.expandable || !previousRow.colspan || !previousRow.rowspan || previousRow.colspan !== colspan) {
+            if (
+                !previousRow.rowspan ||
+                !previousRow.colspan ||
+                previousRow.colspan !== colspan ||
+                (!this.useLegacyLayout && previousRow.itemtype !== 'leader') ||
+                (this.useLegacyLayout && previousRow.expandable)
+            ) {
                 continue;
             }
 
@@ -183,6 +197,7 @@ export class CoreGradesCoursePage implements AfterViewInit, OnDestroy {
 
             this.columns = [];
             this.rows = [];
+            this.rowsOnView = 0;
         }
     }
 
@@ -191,17 +206,37 @@ export class CoreGradesCoursePage implements AfterViewInit, OnDestroy {
      */
     private async fetchGrades(): Promise<void> {
         const table = await CoreGrades.getCourseGradesTable(this.courseId, this.userId);
-        const formattedTable = await CoreGradesHelper.formatGradesTable(table);
+        const formattedTable = CoreGradesHelper.formatGradesTable(table);
 
         this.title = formattedTable.rows[0]?.gradeitem ?? Translate.instant('core.grades.grades');
         this.columns = formattedTable.columns;
         this.rows = formattedTable.rows;
+        this.rowsOnView = this.getRowsOnHeight();
         this.totalColumnsSpan = formattedTable.columns.reduce((total, column) => total + column.colspan, 0);
 
         if (!this.fetchSuccess) {
             this.fetchSuccess = true;
             await CoreGrades.logCourseGradesView(this.courseId, this.userId);
         }
+    }
+
+    /**
+     * Function to get the number of rows that can be shown on the screen.
+     *
+     * @returns The number of rows.
+     */
+    protected getRowsOnHeight(): number {
+        return Math.floor(window.innerHeight / 44);
+    }
+
+    /**
+     * Function to load more rows.
+     *
+     * @param infiniteComplete Infinite scroll complete function. Only used from core-infinite-loading.
+     */
+    loadMore(infiniteComplete?: () => void): void {
+        this.rowsOnView += this.getRowsOnHeight();
+        infiniteComplete && infiniteComplete();
     }
 
 }

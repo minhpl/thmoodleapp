@@ -17,6 +17,7 @@ const appConfig = {
         'prettier',
         'plugin:@angular-eslint/recommended',
         'plugin:promise/recommended',
+        'plugin:jsdoc/recommended',
     ],
     parser: '@typescript-eslint/parser',
     parserOptions: {
@@ -103,12 +104,22 @@ const appConfig = {
             'error',
             {
                 selector: 'property',
-                modifiers: ['readonly'],
+                format: ['camelCase'],
+            },
+            {
+                selector: 'property',
+                modifiers: ['public', 'readonly'],
                 format: ['UPPER_CASE'],
             },
             {
                 selector: 'property',
-                format: ['camelCase'],
+                modifiers: ['protected', 'readonly'],
+                format: ['UPPER_CASE'],
+            },
+            {
+                selector: 'property',
+                modifiers: ['private', 'readonly'],
+                format: ['UPPER_CASE'],
             },
             {
                 selector: 'property',
@@ -189,6 +200,10 @@ const appConfig = {
         'id-match': 'error',
         'jsdoc/check-alignment': 'error',
         'jsdoc/newline-after-description': 'error',
+        'jsdoc/require-param-type': 'off',
+        'jsdoc/require-returns-type': 'off',
+        'jsdoc/require-param': 'off',
+        'jsdoc/check-values': 'off',
         'linebreak-style': [
             'error',
             'unix',
@@ -276,6 +291,7 @@ testsConfig['rules']['padded-blocks'] = [
     },
 ];
 testsConfig['rules']['jest/expect-expect'] = 'off';
+testsConfig['rules']['jest/no-done-callback'] = 'off';
 testsConfig['plugins'].push('jest');
 testsConfig['extends'].push('plugin:jest/recommended');
 

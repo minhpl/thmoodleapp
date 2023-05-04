@@ -52,7 +52,7 @@ export class CoreContextMenuPopoverComponent {
      *
      * @param event Click event.
      * @param item Item clicked.
-     * @return Return true if success, false if error.
+     * @returns Return true if success, false if error.
      */
     itemClicked(event: Event, item: CoreContextMenuItemComponent): boolean {
         if (item.iconAction == 'toggle' && !event.defaultPrevented) {
@@ -73,7 +73,7 @@ export class CoreContextMenuPopoverComponent {
                 this.closeMenu(item);
             }
 
-            item.action.emit(this.closeMenu.bind(this, item));
+            item.action.emit(() => this.closeMenu(item));
         } else if (item.closeOnClick && (item.href || (!!item.onClosed && item.onClosed.observers.length > 0))) {
             this.closeMenu(item);
         }

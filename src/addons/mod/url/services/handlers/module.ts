@@ -55,7 +55,7 @@ export class AddonModUrlModuleHandlerService extends CoreModuleHandlerBase imple
     /**
      * @inheritdoc
      */
-    async getData(module: CoreCourseModuleData): Promise<CoreCourseModuleHandlerData> {
+    getData(module: CoreCourseModuleData): CoreCourseModuleHandlerData {
 
         /**
          * Open the URL.
@@ -80,7 +80,7 @@ export class AddonModUrlModuleHandlerService extends CoreModuleHandlerBase imple
         };
 
         const handlerData: CoreCourseModuleHandlerData = {
-            icon: await CoreCourse.getModuleIconSrc(module.modname, module.modicon),
+            icon: CoreCourse.getModuleIconSrc(module.modname, module.modicon),
             title: module.name,
             class: 'addon-mod_url-handler',
             showDownloadButton: false,
@@ -109,7 +109,7 @@ export class AddonModUrlModuleHandlerService extends CoreModuleHandlerBase imple
             }],
         };
 
-        this.hideLinkButton(module).then(async (hideButton) => {
+        this.hideLinkButton(module).then((hideButton) => {
             if (!handlerData.buttons) {
                 return;
             }
@@ -120,7 +120,7 @@ export class AddonModUrlModuleHandlerService extends CoreModuleHandlerBase imple
                 const icon = AddonModUrl.guessIcon(module.contents[0].fileurl);
 
                 // Calculate the icon to use.
-                handlerData.icon = await CoreCourse.getModuleIconSrc(module.modname, module.modicon, icon);
+                handlerData.icon = CoreCourse.getModuleIconSrc(module.modname, module.modicon, icon);
             }
 
             return;
@@ -135,8 +135,7 @@ export class AddonModUrlModuleHandlerService extends CoreModuleHandlerBase imple
      * Returns if contents are loaded to show link button.
      *
      * @param module The module object.
-     * @param courseId The course ID.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async hideLinkButton(module: CoreCourseModuleData): Promise<boolean> {
         try {
@@ -161,7 +160,7 @@ export class AddonModUrlModuleHandlerService extends CoreModuleHandlerBase imple
      * Check whether the link should be opened directly.
      *
      * @param module Module.
-     * @return Promise resolved with boolean.
+     * @returns Promise resolved with boolean.
      */
     protected async shouldOpenLink(module: CoreCourseModuleData): Promise<boolean> {
         try {

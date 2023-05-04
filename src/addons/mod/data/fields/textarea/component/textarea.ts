@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Component } from '@angular/core';
-import { AddonModDataFieldPluginComponent } from '../../../classes/field-plugin-component';
+import { AddonModDataFieldPluginBaseComponent } from '../../../classes/base-field-plugin-component';
 import { AddonModDataEntryField, AddonModDataProvider } from '@addons/mod/data/services/data';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreWSFile } from '@services/ws';
@@ -25,7 +25,7 @@ import { CoreWSFile } from '@services/ws';
     selector: 'addon-mod-data-field-textarea',
     templateUrl: 'addon-mod-data-field-textarea.html',
 })
-export class AddonModDataFieldTextareaComponent extends AddonModDataFieldPluginComponent {
+export class AddonModDataFieldTextareaComponent extends AddonModDataFieldPluginBaseComponent {
 
     component?: string;
     componentId?: number;
@@ -34,7 +34,7 @@ export class AddonModDataFieldTextareaComponent extends AddonModDataFieldPluginC
      * Format value to be shown. Replacing plugin file Urls.
      *
      * @param value Value to replace.
-     * @return Replaced string to be rendered.
+     * @returns Replaced string to be rendered.
      */
     format(value?: Partial<AddonModDataEntryField>): string {
         const files: CoreWSFile[] = (value && <CoreWSFile[]>value.files) || [];
