@@ -29,15 +29,12 @@ Build App và Đẩy App Demo UAT-e lên cửa hàng.
 
 + Hình 1:
 
-![image](https://user-images.githubusercontent.com/58178423/236096095-20f7e351-cad2-4b2f-852f-8f2543050cfa.jpeg)
+![236095637-f22c0f12-c1d1-4980-8a92-9f713c70cfbd](https://user-images.githubusercontent.com/58178423/236098669-636f7f3b-0a26-4108-a498-1ca9ca4cecd9.png)
 
 + Hình 2:
 
-![image](https://user-images.githubusercontent.com/58178423/236095637-f22c0f12-c1d1-4980-8a92-9f713c70cfbd.png)
+![33a1cbb2-ae01-4324-ab56-14bee4277d95](https://user-images.githubusercontent.com/58178423/236098532-c723c5d8-9fe8-464b-a0b5-76f620c8c910.png)
 
-+ Hình 3:
-
-![image](https://user-images.githubusercontent.com/58178423/236095642-675013a2-d13c-4b6d-8858-a1a0735509e4.png)
 
 
 # 3. Phân tích thiết kế (database, cách viết functions, method call flowchart nếu cần)
