@@ -6,8 +6,8 @@
 4. **Người yêu cầu**: minhpl@aum.edu.vn
 5. **Tham chiếu ERP:**
 6. **Mã nguồn:**
-	1. **branch**: https://github.com/minhpl/thmoodleapp/tree/31-feature_chuc_nang_hoi_dap_tren_app
-	2. **Bắt đầu từ commit:** https://github.com/minhpl/thmoodleapp/tree/main-TUAF
+	1. **branch**: https://github.com/minhpl/thmoodleapp/tree/33-feature_xay_dung_giao_dien_xem_khoa_hoc_tai_trang_mua_hang_tren_App_VMC
+	2. **Bắt đầu từ commit:** https://github.com/minhpl/thmoodleapp
 
 # 1. Yêu cầu:
 
@@ -103,7 +103,7 @@ Ta khai báo static readonly MORE_PAGE_NAME3 = 'discover' ở file src\core\feat
 
 # 4. Mã nguồn (nếu cần hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này)
 
-https://github.com/minhpl/thmoodleapp/compare/main-TUAF...31-feature_chuc_nang_hoi_dap_tren_app
+https://github.com/minhpl/thmoodleapp/compare/main...33-feature_xay_dung_giao_dien_xem_khoa_hoc_tai_trang_mua_hang_tren_App_VMC
 
 # 5. Kiểm thử (nếu cần)
 
