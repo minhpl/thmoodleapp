@@ -1,0 +1,32 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons (click)="back()" slot="start">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+    </ion-buttons>
+    <ion-title>Tìm kiếm</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content padding>
+  <div class="searchbar">
+    <ion-searchbar [(ngModel)]="pet" (ionChange)="onChange()"></ion-searchbar>
+    <button class="btn-search" (click)="onClick()">Tìm kiếm</button>
+  </div>
+  <ion-grid>
+    <h4 *ngIf="boolean2">Không tìm thấy sản phẩm</h4>
+    <ion-row *ngIf="boolean">
+      <ion-col size="6" *ngFor="let product of products" (click)="openProductPage(product)">
+        <div>
+          <ion-card>
+            <img src={{product.images[0].src}} alt="">
+            <h2 class="product-name">{{product.name1}}</h2>
+            <div class="product_price">
+              <p class="sale_price">{{product.sale_price | currency :'VND' :true: '1.0-3'}}</p>
+              <p style="margin-top: 1px;">{{product.regular_price | currency :'VND' :true: '1.0-3'}}</p>
+            </div>
+          </ion-card>
+        </div>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+</ion-content>
