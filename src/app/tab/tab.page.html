@@ -1,0 +1,16 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-title>Ngành</ion-title>
+    <ion-icon class="prouct_icon_cart" (click)="view_cart(product)" name="cart-outline"></ion-icon>
+  </ion-toolbar>
+</ion-header>
+<ion-content>
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+  <ion-card *ngFor="let category of categories" padding (click)="openCategoryPage(category)">
+    <ion-card-title>{{category.name}}</ion-card-title>
+    <div class="ion-card-subtitle">{{category.description}}</div>
+    <span class="ion-card-course">{{category.count}} sản phẩm</span>
+  </ion-card>
+</ion-content>

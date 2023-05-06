@@ -44,6 +44,18 @@ function buildRoutes(injector: Injector): Routes {
                     path: CoreMainMenuProvider.MORE_PAGE_NAME,
                     loadChildren: () => import('./pages/more/more.module').then(m => m.CoreMainMenuMorePageModule),
                 },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME0,
+                    loadChildren: () => import('../../../app/tab/tab.module').then( m => m.TabPageModule)
+                },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME3,
+                    loadChildren: () => import('../../../app/discover/discover.module').then( m => m.DiscoverPageModule)
+                },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME9,
+                    loadChildren: () => import('../../../app/category/category.module').then( m => m.CategoryPageModule)
+                },
                 ...routes.children,
             ],
         },
