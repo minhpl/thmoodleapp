@@ -31,6 +31,7 @@ Người dùng bấm vào nút xem ngành học trên tab thanh menu. Sau khi li
 # 3. Phân tích thiết kế (database, cách viết functions, method call flowchart nếu cần)
 
 Trong file src\app\tab\tab.page.ts gọi hàm getProduct() call dữ liệu tất cả các ngành học để hiển thị ra giao diện
+
      async getProduct() {
        const loading = await this.loadingController.create({
          message: 'Vui lòng chờ...',
