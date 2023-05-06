@@ -6,7 +6,7 @@
 4. **Người yêu cầu**: minhpl@aum.edu.vn
 5. **Tham chiếu ERP:**
 6. **Mã nguồn:**
-	1. **branch**: https://github.com/minhpl/thmoodleapp/tree/38-feature_xay_dung_giao_dien_xem__khoa_hoc_theo_tung_nganh_tai_trang_mua_hang_tren_app_vmc
+	1. **branch**: https://github.com/minhpl/thmoodleapp/tree/40-feature_xay_dung_giao_dien_xem_chi_tiet_khoa_hoc_tai_trang_mua_hang_tren_app_vmc
 	2. **Bắt đầu từ commit:** https://github.com/minhpl/thmoodleapp/tree/main
 
 # 1. Yêu cầu:
@@ -43,7 +43,7 @@ Trong file src\app\app-routing.module.ts ta khai báo loadChildren để khi cli
 
 # 4. Mã nguồn (nếu cần hướng dẫn viết mã nguồn chi tiết, những thay đổi mã nguồn cần để viết tính năng này)
 
-https://github.com/minhpl/thmoodleapp/compare/main-TUAF...38-feature_xay_dung_giao_dien_xem__khoa_hoc_theo_tung_nganh_tai_trang_mua_hang_tren_app_vmc
+https://github.com/minhpl/thmoodleapp/compare/main-TUAF...40-feature_xay_dung_giao_dien_xem_chi_tiet_khoa_hoc_tai_trang_mua_hang_tren_app_vmc
 
 # 5. Kiểm thử (nếu cần)
 
