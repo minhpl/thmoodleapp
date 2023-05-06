@@ -1,0 +1,79 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons (click)="back()" slot="start">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+    </ion-buttons>
+    <ion-title>{{product.name}}</ion-title>
+  </ion-toolbar>
+</ion-header>
+<ion-content>
+  <iframe style="margin-top: 42px;" *ngIf="videoboolean" width="100%" height="250" [src]="trustedVideoUrl" title="YouTube video player"
+    frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen>
+  </iframe>
+  <ion-card class="ion-no-margin">
+    <div class="ion-card-title">{{product.name}}</div>
+    <div class="ion-card-total">
+      <ion-label>
+        <h2>{{product.sale_price | currency :'VND' :true: '1.0-3'}}</h2>
+        <h4>{{product.regular_price | currency :'VND' :true: '1.0-3' }}</h4>
+      </ion-label>
+      <button (click)="onpausevideo()" (click)="view_cart()" class="prouct_view_cart">
+        <ion-icon class="prouct_icon_cart" name="cart-outline"></ion-icon>
+      </button>
+      <!-- <button (click)="onpausevideo()" (click)="addToCart(product)">
+        <ion-icon class="prouct_icon_cart" name="cart-outline"></ion-icon>
+        <p>Thêm vào giỏ hàng</p>
+      </button> -->
+    </div>
+    <div class="ion-card-text">
+      <div class="view">
+        <ion-icon *ngIf="product.date_created" name="alarm-outline"></ion-icon>
+        <span *ngIf="product.date_created">{{product.date_created | date: 'mediumTime'}}</span>
+        <ion-icon *ngIf="product.average_rating" name="star-outline"></ion-icon>
+        <span *ngIf="product.average_rating">{{product.average_rating}}</span>
+      </div>
+      <div class="time">
+        <span style="text-align: left; margin-left: 7px; ">Thời gian tạo : {{date}}</span>
+        <span style="text-align: right; margin-right: 7px; ">Cập nhật: {{update}}</span>
+      </div>
+    </div>
+  </ion-card>
+  <div class="ion-tabs">
+    <ion-grid class="ion-tab-header">
+      <ion-row>
+        <ion-col>
+          <button (click)="onClick()">VỀ CHÚNG TÔI</button>
+        </ion-col>
+        <ion-col>
+          <button (click)="onClick2()">BÀI HỌC</button>
+        </ion-col>
+      </ion-row>
+    </ion-grid>
+    <div class="ion-tab-text">
+      <span [innerHTML]="text"></span>
+      <p *ngIf="boolean === true" class="teacher">Giảng viên:</p>
+      <span *ngIf="boolean === true">
+        <img src={{imgdata[0].value}} alt="">
+        <h2 class="teacher-name">{{teacher[0].value}}</h2>
+      </span>
+    </div>
+  </div>
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+</ion-content>
+
+<ion-footer>
+  <ion-row class="ion-card-tab">
+    <ion-col class="ion-card-tab-col">
+      <button class="prouct_add_to_cart" (click)="addToCart(product)">
+        <ion-icon class="prouct_icon_cart" style="margin-right: 5px;" name="cart-outline"></ion-icon>
+        Thêm vào giỏ hàng
+      </button>
+    </ion-col>
+    <ion-col class="ion-card-tab-col2">
+      <button class="prouct_buy" (click)="product_buy(product)">Mua ngay</button>
+    </ion-col>
+  </ion-row>
+
+</ion-footer>

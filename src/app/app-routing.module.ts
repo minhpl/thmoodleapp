@@ -179,11 +179,18 @@ export function resolveModuleRoutes(injector: Injector, token: InjectionToken<Mo
     };
 }
 
+const routess: Routes = [
+    {
+        path: 'main/productdetails',
+        loadChildren: () => import('./productdetails/productdetails.module').then( m => m.ProductdetailsPageModule)
+    },
+]
+
 export const APP_ROUTES = new InjectionToken('APP_ROUTES');
 
 @NgModule({
     imports: [
-        RouterModule.forRoot([], {
+        RouterModule.forRoot(routess, {
             preloadingStrategy: PreloadAllModules,
             relativeLinkResolution: 'corrected',
         }),
