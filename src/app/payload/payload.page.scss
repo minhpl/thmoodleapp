@@ -1,0 +1,135 @@
+
+    // .toolbar-background, .toolbar-background-md, .toolbar-background-ios {
+    //     background-image: linear-gradient(to bottom, #55128a, #5e28d6) !important;
+    //     width: 102%;
+    // }
+    ion-header {
+        ion-title {
+            font-size: 1.1rem;
+        }
+
+        ion-buttons {
+            font-size: 1.5rem;
+            margin-left: 12px;
+        }
+    }
+
+    ion-content {
+        margin-top: 3px;
+        background-color: #fff !important;
+        text-align: center;
+
+
+        input {
+            width: 90%;
+            margin-left: 20px;
+            margin-top: -6px;
+            height: 30px;
+            border: 1px;
+            background-color: #f5f5f5;
+            border-radius: 3px;
+            color: #333;
+            font-weight: 400;
+            font-size: 1rem;
+            padding: 12px 10px;
+        }
+
+
+        ion-list {
+            text-align: left;
+        }
+
+
+        h2 {
+            font-size: 1.2rem;
+            font-weight: 700;
+            margin-left: 13px;
+            color: #333 !important;
+
+        }
+
+        h3 {
+            font-size: 1rem;
+            font-weight: 700;
+            margin-left: 13px;
+            color: #333 !important;
+
+        }
+
+        ion-item {
+            ion-label, ion-input {
+                color: #333 !important;
+                font-size: 1.5rem;
+                font-weight: 700;
+            }
+        }
+
+        .information_payment {
+            ion-input {
+                position: relative;
+                 left: -25px;
+            }
+
+            ion-label {
+                width: 120px;
+            }
+        }
+
+        button {
+            color: #fff;
+            width: 76px;
+            height: 28px;
+            border-radius: 6px;
+            background-image: -webkit-gradient(linear, left top, left bottom, from(#55128a), to(#5e28d6)) !important;
+            background-image: linear-gradient(to bottom, #55128a, #5e28d6) !important;
+            margin-left: 5px;
+        }
+
+        .information-stk {
+            width: 100%;
+            height: 30px;
+            border: 1px;
+            background-color: #f5f5f5;
+            border-radius: 3px;
+        }
+
+        .item-inner {
+            border-bottom-color: transparent !important;
+        }
+
+        .item-md.item-input.ng-valid.item-input-has-value:not(.input-has-focus):not(.item-input-has-focus) .item-inner, .item-md.item-input.ng-valid.input-has-value:not(.input-has-focus):not(.item-input-has-focus) .item-inner {
+            border-bottom-color: #e7dbf4 !important;
+            -webkit-box-shadow: inset 0 -1px 0 0 #e7dbf4 !important;
+            box-shadow: inset 0 -1px 0 0 #e7dbf4 !important;
+        }
+
+        p {
+            color: #333 !important;
+            font-size: 1rem;
+            font-weight: 400;
+            margin: 30px 3px;
+        }
+    }
+
+    button .btn-submit {
+        text-decoration: none;
+        color: #ffffff;
+        font-size: 1rem;
+        width: 215px;
+        height: 35px;
+        border-radius: 15px;
+        background-image: -webkit-gradient(linear, left top, left bottom, from(#401188), to(#770bc4));
+        background-image: linear-gradient(to bottom, #401188, #770bc4);
+        margin-bottom: 30px !important;
+        margin-top: -10px;
+    }
+
+    ion-footer {
+        bottom: -4px;
+        position: absolute;
+        background-image: linear-gradient(to bottom, #55128a, #5e28d6) !important;
+        button {
+            background-image: linear-gradient(to bottom, #55128a, #5e28d6) !important;
+        }
+
+    }
