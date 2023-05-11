@@ -31,7 +31,7 @@ import { CoreArray } from '@singletons/array';
  * Build app routes.
  *
  * @param injector Module injector.
- * @return App routes.
+ * @returns App routes.
  */
 function buildAppRoutes(injector: Injector): Routes {
     return CoreArray.flatten(injector.get<Routes[]>(APP_ROUTES, []));
@@ -42,7 +42,7 @@ function buildAppRoutes(injector: Injector): Routes {
  *
  * @param pathOrMatcher Original path or matcher configured in the route.
  * @param condition Condition.
- * @return Conditional url matcher.
+ * @returns Conditional url matcher.
  */
 function buildConditionalUrlMatcher(pathOrMatcher: string | UrlMatcher, condition: () => boolean): UrlMatcher {
     // Create a matcher based on Angular's default matcher.
@@ -136,7 +136,7 @@ export type ModuleRoutesConfig = Routes | Partial<ModuleRoutes>;
  *
  * @param routes Routes.
  * @param condition Condition to determine if routes should be activated or not.
- * @return Conditional routes.
+ * @returns Conditional routes.
  */
 export function conditionalRoutes(routes: Routes, condition: () => boolean): Routes {
     return routes.map(route => {
@@ -155,7 +155,7 @@ export function conditionalRoutes(routes: Routes, condition: () => boolean): Rou
  *
  * @param injector Module injector.
  * @param token Routes injection token.
- * @return Routes.
+ * @returns Routes.
  */
 export function resolveModuleRoutes(injector: Injector, token: InjectionToken<ModuleRoutesConfig[]>): ModuleRoutes {
     const configs = injector.get(token, []);
@@ -179,11 +179,32 @@ export function resolveModuleRoutes(injector: Injector, token: InjectionToken<Mo
     };
 }
 
+const routess: Routes = [
+    {
+        path: 'main/payment',
+        loadChildren: () => import('./payment/payment.module').then(m => m.PaymentPageModule)
+    },
+
+    {
+        path: 'main/productdetails',
+        loadChildren: () => import('./productdetails/productdetails.module').then( m => m.ProductdetailsPageModule)
+    },
+
+    {
+        path: 'main/payload',
+        loadChildren: () => import('./payload/payload.module').then(m => m.PayloadPageModule)
+    },
+    {
+        path: 'main/cart',
+        loadChildren: () => import('./cart/cart.module').then(m => m.CartPageModule)
+    },
+]
+
 export const APP_ROUTES = new InjectionToken('APP_ROUTES');
 
 @NgModule({
     imports: [
-        RouterModule.forRoot([], {
+        RouterModule.forRoot(routess, {
             preloadingStrategy: PreloadAllModules,
             relativeLinkResolution: 'corrected',
         }),
