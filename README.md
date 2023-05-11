@@ -234,6 +234,4 @@ https://github.com/minhpl/thmoodleapp/compare/main-TUAF...43-feature_xay_dung_gi
 
 # 5. Kiểm thử (nếu cần)
 
-![image](https://github.com/minhpl/thmoodleapp/assets/58178423/2aa7f1f8-8ab9-41bb-0-2da850cb2022)
-
 # 6. Triển khai (Hướng dẫn triển khai, lưu ý khi upload nên appstore. nếu cần)
