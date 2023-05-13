@@ -44,6 +44,10 @@ function buildRoutes(injector: Injector): Routes {
                     path: CoreMainMenuProvider.MORE_PAGE_NAME,
                     loadChildren: () => import('./pages/more/more.module').then(m => m.CoreMainMenuMorePageModule),
                 },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME11,
+                    loadChildren: () => import('../../../app/purchase-history/purchase-history.module').then( m => m.PurchasehistoryModule)
+                },
                 ...routes.children,
             ],
         },

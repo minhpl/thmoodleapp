@@ -1,0 +1,30 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons (click)="back()" slot="start">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+    </ion-buttons>
+    <ion-title>{{title}}</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content fullscreen>
+  <ion-refresher slot="fixed" (ionRefresh)="doRefresh($event)">
+    <ion-refresher-content></ion-refresher-content>
+  </ion-refresher>
+  <ion-grid>
+    <h4 *ngIf="boolean2">Lịch sử mua hàng trống</h4>
+    <ion-row *ngIf="boolean">
+      <ion-col ion-card size="12" *ngFor="let product of products" (click)="openProductPage(product)">
+        <ion-card *ngFor="let item of product.line_items">
+          <h2 class="product-name">{{item.name}}</h2><br>
+          <div class="product_price">
+            <p class="sale_price">{{item.price | currency :'VND' :true: '1.0-3'}}</p>
+          </div>
+          <p>Thời gian: {{product.date_created | date:'short'}}</p>
+          <button *ngIf="boolean3" class="btn-sucess">{{status1}}</button>
+          <button *ngIf="!boolean3">{{status}}</button>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+</ion-content>
