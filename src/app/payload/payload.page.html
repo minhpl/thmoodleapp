@@ -1,0 +1,64 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons (click)="onBack()" slot="start">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+    </ion-buttons>
+    <ion-title>Phương thức thanh toán</ion-title>
+  </ion-toolbar>
+</ion-header>
+<ion-content>
+  <ion-list>
+    <h2 *ngIf="numbercontact">Điền thông tin khách hàng</h2>
+    <div *ngIf="numbercontact">
+      <div *ngIf="hasContact">
+        <div text-wrap *ngIf="theuser.fullname">
+          <h3>Tên Khách Hàng</h3><br>
+          <input type="text" readonly [(ngModel)]="theuser.fullname">
+        </div>
+        <div text-wrap *ngIf="theuser.email">
+          <h3>Email</h3><br>
+          <input readonly type="email" [(ngModel)]="theuser.email">
+        </div>
+        <div text-wrap>
+          <h3>Nhập Số Điện Thoại đã đăng ký</h3><br>
+          <input type="tel" clearInput [(ngModel)]="theuser.phone1" (blur)="checkphone()">
+        </div>
+      </div>
+    </div>
+
+    <h2>Chọn phương thức thanh toán</h2>
+    <h3 style="margin-top: 20px">Thông tin chuyển khoản: </h3>
+    <div class="information_payment">
+      <h3>Tên chủ khoản</h3><br>
+      <input readonly type="text" [(ngModel)]="name">
+    </div>
+    <div class="information_payment">
+      <h3>Ngân hàng</h3><br>
+      <input readonly type="text" [(ngModel)]="bank">
+    </div>
+    <div class="information_payment" style="border-bottom: 0.55px solid transparent;">
+      <h3>Số tài khoản</h3><br>
+      <input readonly type="text" [(ngModel)]="stk" ngxCopyPaste #cp="copy" style="width:70%">
+      <button (click)="cp.copy()" (click)="copy()">Sao chép</button>
+    </div>
+    <div class="information_payment">
+      <h3>Số tiền thanh toán</h3> <br>
+      <input readonly type="text" [(ngModel)]="price_new">
+    </div>
+  </ion-list>
+  <p style="margin-left: 17px!important; width: 90%;">Lưu ý: Chỉ bấm xác nhận thanh toán sau khi đã chuyển khoản,trong phần nội dung
+    chuyển khoản quý
+    khách vui lòng ghi đủ họ tên-số điện thoại </p>
+  <button class="btn-submit" style="width: 60%; height: 5%;margin-bottom: 40px; font-size: 1rem;" (click)="placeOrder()">Xác nhận thanh
+    toán</button>
+  <!-- <button class="btn-submit" style="width: 60%; height: 5%;margin-bottom: 40px; font-size: 1rem;" (click)="Onepay()">Thanh toán
+    Onepay</button>
+  <button class="btn-submit" style="width: 60%; height: 5%;margin-bottom: 40px; font-size: 1rem;" (click)="Onepay1()">Thanh toán
+    Onepay1</button>
+  <button class="btn-submit" style="width: 60%; height: 5%;margin-bottom: 40px; font-size: 1rem;" (click)="Onepay2()">Thanh toán
+    Onepay2</button> -->
+</ion-content>
+
+<!-- <ion-footer>
+  <button ion-button block color="danger" (click)="placeOrder()">Xác nhận thanh toán</button>
+</ion-footer> -->

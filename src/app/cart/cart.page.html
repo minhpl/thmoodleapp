@@ -1,0 +1,53 @@
+<ion-header>
+  <ion-toolbar>
+    <ion-buttons (click)="onBack()" slot="start">
+      <ion-icon name="arrow-back-outline"></ion-icon>
+    </ion-buttons>
+    <ion-title>Giỏ Hàng</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content>
+  <p class="product_title_cart" *ngIf="boolean1">Chưa có sản phẩm trong giỏ hàng!</p>
+  <ion-list *ngIf="boolean">
+    <ion-list-header> Thông tin đơn hàng </ion-list-header>
+    <ion-item *ngFor="let item of cartItems; let i = index">
+      <img src={{item.product.images[0].src}} alt="">
+      <div class="product_cart_info">
+        <h2>{{item.product.name}}</h2>
+        <div class="product_cart_price">
+          <p class="sale_price">{{item.product.sale_price | currency :'VND' :true: '1.0-3'}}</p>
+          <p class="regular_price">{{item.product.regular_price | currency :'VND' :true: '1.0-3'}}</p>
+        </div>
+      </div>
+      <button class="product_cart_remove" (click)="removeFromCart(item,i)">
+        <ion-icon name="close-outline"></ion-icon>
+      </button>
+    </ion-item>
+    <!-- <ion-item class="product_payment_method">
+      <ion-label>Chọn phương thức</ion-label>
+      <ion-select [interfaceOptions]="customAlertOptions" interface="alert" placeholder="Vui lòng chọn" (ionChange)="handleChange($event)">
+        <ion-select-option value="bacon">Chuyển khoản</ion-select-option>
+        <ion-select-option value="onions">OnePay</ion-select-option>
+      </ion-select>
+    </ion-item> -->
+    <ion-item class="product_cart_codesale">
+      <ion-label>
+        <div class="codesale">
+          <input type="text" class="input-text" placeholder="Nhập mã ưu đãi (nếu có)" [(ngModel)]="codesale" />
+          <div (click)="CodeSale()" class="button-codesale">Áp dụng</div>
+        </div>
+        <h2 class="code-success" *ngIf="boolean3">Áp dụng mã thành công</h2>
+        <h2 class="code-error" *ngIf="boolean_code">Mã code không tồn tại hoặc đã hết hạn</h2>
+        <h2 class="code-error" *ngIf="boolean_code2">Bạn chưa nhập mã</h2>
+      </ion-label>
+    </ion-item>
+    <ion-item class="product_cart_total_price">
+      <ion-label class="product_cart_total_label">
+        <h2>Tổng giá</h2>
+        <h3>{{sale_price_new | currency :'VND' :true: '1.0-3'}}</h3>
+      </ion-label>
+    </ion-item>
+  </ion-list>
+  <button *ngIf="boolean" class="btn-submit" (click)="Payment()">Thanh toán</button>
+</ion-content>

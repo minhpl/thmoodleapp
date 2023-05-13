@@ -50,7 +50,7 @@ export class CoreMainMenuMorePage implements OnInit, OnDestroy {
     protected resizeListener?: CoreEventObserver;
 
     constructor() {
-        this.langObserver = CoreEvents.on(CoreEvents.LANGUAGE_CHANGED, this.loadCustomMenuItems.bind(this));
+        this.langObserver = CoreEvents.on(CoreEvents.LANGUAGE_CHANGED, () => this.loadCustomMenuItems());
 
         this.updateSiteObserver = CoreEvents.on(CoreEvents.SITE_UPDATED, async () => {
             this.customItems = await CoreMainMenu.getCustomMenuItems();
@@ -166,7 +166,7 @@ export class CoreMainMenuMorePage implements OnInit, OnDestroy {
 
             if (!treated) {
                 // Can't handle it, open it in browser.
-                CoreSites.getCurrentSite()?.openInBrowserWithAutoLoginIfSameSite(text);
+                CoreSites.getCurrentSite()?.openInBrowserWithAutoLogin(text);
             }
         } else {
             // It's not a URL, open it in a modal so the user can see it and copy it.

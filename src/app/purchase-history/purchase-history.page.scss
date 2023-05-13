@@ -1,0 +1,110 @@
+ion-header {
+    ion-title {
+        font-size: 1.1rem;
+    }
+
+    ion-buttons {
+        font-size: 1.5rem;
+        margin-left: 12px;
+    }
+}
+
+ion-content {
+    margin-top: 3px;
+    background-color: #e7dbf4 !important;
+    .toolbar-title ,.toolbar-title-ios,.toolbar-title-md  {
+        color: #8477d1 !important;
+        font-size: 1.9rem;
+        font-weight: 700;
+    }
+    h4 {
+        font-size: 1.1rem;
+        text-align: center;
+        margin-top: 30px;
+    }
+}
+
+ion-card {
+    // background-color: #8477d1;
+    position: relative;
+    // height: 145px !important;
+    border-radius: 9px !important;
+    text-align: left;
+    width: 97% !important;
+    margin: 3px 6px!important;
+    box-shadow: 8px 8px 8px -8px black !important;
+
+    p {
+        margin-left: 7px !important;
+        color: #340064 !important;
+        font-size: 0.9rem !important;
+        font-weight: 500;
+        width: 89%;
+        float: left;
+        margin-top: 2px;
+        margin-bottom: 30px;
+    }
+
+    h2 {
+        margin-left: 6px !important;
+        margin-top: 5px !important;
+    }
+
+    .product_price {
+        position: absolute;
+        bottom: 3px;
+        margin-left: 5px !important;
+        margin-top: -5px !important;
+        p {
+            margin-left: 5px !important;
+            font-size: 1rem;
+            color: #340064;
+            font-weight: 400;
+            text-decoration: line-through;
+            float: left;
+            margin-top: 2px;
+        }
+
+        .sale_price {
+            font-size: 1rem;
+            color: #340064;
+            font-weight: 600;
+            text-decoration: none;
+            float: left;
+            margin-right: 7px;
+            margin-bottom: 35px
+        }
+
+    }
+
+    .product-name {
+        font-size: 0.9rem;
+        color: #340064;
+        font-weight: 600;
+        float: left;
+        display: block;
+        text-align: left;
+        margin-top: 8px !important;
+        //min-height: 47px;
+        width: 100%;
+    }
+
+    button {
+        background-color: #f98012;
+        color:  #fff;
+        padding: 6px;
+        margin-left: 7px;
+        // margin-top: 4px;
+        border-radius: 8px;
+        margin-bottom: 5px;
+    }
+
+    .btn-sucess {
+        background-image: linear-gradient(to bottom, #55128a, #5e28d6) !important;
+        color:  #fff;
+        padding: 6px;
+        margin-left: 7px;
+        margin-top: 4px;
+        border-radius: 8px;
+    }
+    }

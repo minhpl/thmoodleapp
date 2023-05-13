@@ -1,0 +1,376 @@
+  ion-grid ion-row ion-col {
+      display: flex;
+      align-items: center;
+    }
+
+  ion-grid ion-row ion-col img {
+    width: 35px;
+  }
+
+  ion-card {
+    box-shadow: 8px 8px 8px -8px black !important;
+    .card-content-ios p {
+      margin-left: 0;
+      margin-right: 0;
+      margin-top: 0;
+      margin-bottom: 2px;
+      font-size: 0.9rem;
+      font-weight: 400;
+  }
+  }
+
+
+
+  ion-header {
+    background-color: #991799;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    .header-title {
+      display: flex;
+      align-items: center;
+
+      img {
+        width: 30px;
+        height: 30px;
+        margin-left: 10px;
+      }
+
+      h3 {
+        margin-left: 5px;
+        font-size: 1.1rem;
+        color: #fff !important;
+      }
+    }
+  }
+
+  .product_total_orders {
+    right: 42px;
+    position: absolute;
+    top: -5px;
+    font-size: 0.7rem;
+    background-color: #fb5530;
+    width: 28px;
+    height: 14px;
+    text-align: center;
+    border-radius: 45%;
+    border: 1px solid;
+  }
+
+  .slides_introduce {
+    margin-top: -20px;
+
+    ion-slide img {
+      width: 100%;
+      //ios
+      min-height: 150px;
+      object-fit: revert;
+      margin-bottom: 10px;
+    }
+  }
+
+
+  .title-menu {
+    display: flex;
+
+  }
+
+  .prouct_icon_cart {
+    font-size: 1.6rem;
+    color: #ffff !important;
+    font-weight: 500;
+    position: absolute;
+    top: 10px;
+    right: 55px;
+  }
+
+  .search {
+    font-size: 1.5rem;
+    color: #ffff!important;
+    font-weight: 500;
+    position: absolute;
+    top: 12px;
+    right: 16px;
+  }
+
+
+  .swiper-slide {
+    margin-top: 20px;
+    margin-bottom: 20px;
+  }
+
+//   .swiper-slide img {
+//     height: 175px;
+//     width: 100%;
+//   }
+
+  // ion-content header {
+  //   position: relative;
+  //   margin-bottom: 12px;
+  // }
+
+  .swiper-pagination-bullets {
+    bottom: 0px;
+    left: 0;
+    width: 100%;
+}
+
+  ion-slides {
+      height: auto !important;
+      margin-bottom: 10px;
+  }
+
+  ion-content span {
+    padding: 0;
+    margin: 0px 10px -10px 10px;
+    color: #340064;
+    font-weight: 600;
+    font-size: 1.5rem;
+  }
+
+  .card-content-ios {
+    padding-left: 10px;
+    padding-right: 10px;
+    padding-top: 10px;
+    padding-bottom: 10px;
+    font-size: 1rem;
+    line-height: 1.4;
+    font-weight: 500;
+}
+
+  .card-content-ios p {
+    margin-left: 0;
+    margin-right: 0;
+    margin-top: 0;
+    margin-bottom: 2px;
+    font-size: 0.9rem;
+    font-weight: 500;
+}
+    header {
+      p {
+        // margin: -13px 11px -5px;
+        font-size: 1rem;
+        color: #340064;
+        margin-left: 10px;
+        margin-bottom: 22px;
+      }
+    }
+
+    .toolbar-title-md  {
+      font-size: 2.5rem !important;
+      font-weight: 600 !important;
+      color: #340064 !important;
+      padding: 0 !important;
+    }
+
+    .toolbar-title-ios {
+      font-size: 2.5rem !important;
+      font-weight: 600 !important;
+      color: #340064 !important;
+      padding: 0 !important;
+    }
+
+    // ion-content .ion-subtitle {
+    //   font-size: 1.4rem;
+    //   color: #340064;
+    //   margin: 11px 10px 2px 10px;
+    //   position: absolute;
+    //   top: 28px;
+    // }
+
+    .swiper-pagination {
+      position: absolute;
+      bottom: 0px;
+    }
+    .popular_subtitle {
+      font-size: 1rem;
+      color: #340064;
+      margin-top: 5px;
+      font-weight: 500;
+    }
+
+    // ion-slide {
+    //   margin-left: 5px !important;
+    //   margin-right: 5px !important;
+    // }
+
+    ion-content ion-card {
+      --ion-background-color: #e7dbf4 !important;
+      border-radius: 10px !important;
+      min-height: 320px;
+    }
+
+    ion-content ion-card img {
+      min-height: 128px;
+    }
+
+  //   ion-content ion-card {
+  //     height: 280px;
+  //   }
+
+    ion-content ion-card ion-card-content .ion-card-price span {
+      font-size: 1rem;
+      color: #340064;
+      font-weight: 600;
+      float: left;
+      display: block;
+      width: 100%;
+      text-align: left;
+      line-height: 1.2;
+      margin-left: 0;
+    }
+
+
+    ion-content ion-card ion-card-content  p {
+      font-size: 1rem;
+      color: #340064;
+      font-weight: 400;
+      text-decoration: line-through;
+      float: left;
+      margin-top: 2px;
+    }
+
+    ion-content ion-card ion-card-content .sale_price {
+      font-size: 1rem;
+      color: #340064;
+      font-weight: 600;
+      text-decoration: none;
+      float: left;
+      margin-right: 7px;
+    }
+
+    ion-content ion-card ion-card-content .icon-card-btn button {
+      padding: 13px 28px;
+      border-radius: 7px;
+      border: 2px solid #340064;
+      color: #340064;
+      font-weight: 600;
+      background-color: #fff;
+    }
+
+    ion-card-content {
+          margin: 0 !important;
+    }
+
+    .popular {
+      ion-title {
+        .toolbar-title {
+          width: auto;
+        }
+    }
+
+      //ios
+      // position: relative;
+      // margin-bottom: 12px;
+    }
+
+    .ion-card-popular {
+      -webkit-box-shadow: none;
+              box-shadow: none;
+    }
+
+    .ion-card-popular img {
+      border-radius: 15px;
+    }
+
+    .ion-card-description {
+      margin-top: 0px;
+  }
+
+    .ion-card-description p{
+      text-decoration: none !important;
+    }
+
+.ion-slides-products {
+margin-top: -25px;
+}
+
+@media only screen and (min-width: 320px)  {
+ion-content ion-card {
+  min-height: 320px;
+}
+ion-content ion-card ion-card-content .ion-card-price {
+  min-height: 130px;
+}
+ion-content ion-card ion-card-content .ion-card-price span {
+  min-height: 70px;
+}
+ion-content ion-card ion-card-content .ion-card-price span {
+  font-size: 0.95rem;
+}
+ion-content ion-card ion-card-content  p {
+  font-size: 0.9rem;
+}
+
+ion-content ion-card ion-card-content .sale_price {
+  font-size: 0.9rem;
+
+}
+
+ion-content ion-card img {
+  height: 135px !important;
+  width: 100%;
+}
+}
+
+@media only screen and (min-width: 346px)  {
+ion-content ion-card ion-card-content .ion-card-price span {
+  min-height: 55px;
+}
+
+ion-content ion-card ion-card-content .ion-card-price {
+  min-height: 110px;
+}
+ion-content ion-card {
+  min-height: 290px;
+}
+}
+
+
+@media only screen and (min-width: 375px)  {
+ion-content ion-card {
+  min-height: 300px;
+}
+
+ion-content ion-card ion-card-content .ion-card-price span {
+  font-size: 1rem;
+}
+ion-content ion-card ion-card-content  p {
+  font-size: 1rem;
+}
+
+ion-content ion-card ion-card-content .sale_price {
+  font-size: 1rem;
+
+}
+
+ion-content ion-card img {
+  height: 160px !important;
+  width: 100%;
+}
+
+ion-content ion-card ion-card-content .ion-card-price span {
+  min-height: 57px;
+}
+
+ion-content ion-card ion-card-content .ion-card-price {
+  min-height: 87px;
+}
+}
+
+@media only screen and (min-width: 471px) {
+.ion-slides-products {
+  margin-top: 7px;
+}
+}
+
+@media only screen and (min-width: 768px) {
+ion-content ion-card img {
+  height: 220px !important;
+  width: 100%;
+}
+
+ion-content ion-card ion-card-content .ion-card-price {
+  min-height: 100px;
+}
+}
