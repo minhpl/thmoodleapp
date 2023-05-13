@@ -41,8 +41,32 @@ function buildRoutes(injector: Injector): Routes {
                     loadChildren: () => import('./pages/home/home.module').then(m => m.CoreMainMenuHomePageModule),
                 },
                 {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME2,
+                    loadChildren: () => import('../../../addons/block/activatecourses/components/event/event.module').then(m => m.AddonCalendarEventPageModule),
+                },
+                {
                     path: CoreMainMenuProvider.MORE_PAGE_NAME,
                     loadChildren: () => import('./pages/more/more.module').then(m => m.CoreMainMenuMorePageModule),
+                },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME0,
+                    loadChildren: () => import('../../../app/tab/tab.module').then( m => m.TabPageModule)
+                },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME3,
+                    loadChildren: () => import('../../../app/discover/discover.module').then( m => m.DiscoverPageModule)
+                },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME9,
+                    loadChildren: () => import('../../../app/category/category.module').then( m => m.CategoryPageModule)
+                },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME11,
+                    loadChildren: () => import('../../../app/purchase-history/purchase-history.module').then( m => m.PurchasehistoryModule)
+                },
+                {
+                    path: CoreMainMenuProvider.MORE_PAGE_NAME8,
+                    loadChildren: () => import('../../../app/search/search.module').then( m => m.SearchPageModule)
                 },
                 ...routes.children,
             ],
