@@ -37,6 +37,7 @@ import { AddonModSurveyModule } from './survey/survey.module';
 import { AddonModUrlModule } from './url/url.module';
 import { AddonModWikiModule } from './wiki/wiki.module';
 import { AddonModWorkshopModule } from './workshop/workshop.module';
+import { AddonModThUrlModule } from './th_url/thurl.module';
 
 @NgModule({
     imports: [
@@ -63,6 +64,7 @@ import { AddonModWorkshopModule } from './workshop/workshop.module';
         AddonModUrlModule,
         AddonModWikiModule,
         AddonModWorkshopModule,
+        AddonModThUrlModule
     ],
 })
 export class AddonModModule { }
