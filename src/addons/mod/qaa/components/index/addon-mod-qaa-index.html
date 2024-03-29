@@ -68,8 +68,12 @@
             </ion-label>
         </div>
     </div>
-
-    <button (click)="add_question()" color="success" class="btn_add_question" *ngIf="makequest">+</button>
+    <ion-fab slot="fixed" core-fab vertical="bottom" horizontal="end">
+        <ion-fab-button (click)="add_question()" [attr.aria-label]="'core.login.add' | translate" *ngIf="makequest">
+            <ion-icon name="fas-plus" aria-hidden="true"></ion-icon>
+            <span class="sr-only">{{ 'core.login.add' | translate }}</span>
+        </ion-fab-button>
+    </ion-fab>
 </core-loading>
 
 <core-course-module-navigation collapsible-footer appearOnBottom [hidden]="showLoading" [courseId]="courseId" [currentModuleId]="module.id">
