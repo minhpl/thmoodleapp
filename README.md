@@ -397,29 +397,31 @@ Trong file src\addons\mod\qaa\components\answer\answer.ts ta dùng function edit
         }
     }
 
-cài đặt thư viện  ngx-quill và khai báo trong src\addons\mod\qaa\components\components.module.ts
-import { QuillModule } from 'ngx-quill';
+Cài đặt thư viện  ngx-quill và khai báo trong src\addons\mod\qaa\components\components.module.ts
 
-const modules = {
-    toolbar: [
-      ['bold', 'italic', 'underline', 'strike'], // toggled buttons
-      ['blockquote', 'code-block'],
-      [{ header: 1 }, { header: 2 }], // custom button values
-      [{ list: 'ordered' }, { list: 'bullet' }],
-      [{ script: 'sub' }, { script: 'super' }], // superscript/subscript
-      [{ indent: '-1' }, { indent: '+1' }], // outdent/indent
-      [{ direction: 'rtl' }], // text direction
-      [{ size: ['small', false, 'large', 'huge'] }], // custom dropdown
-      [{ header: [1, 2, 3, 4, 5, 6, false] }],
-      [], // dropdown with defaults from theme
-      [{ font: [] }],
-      [{ align: [] }],
-      ['clean'], // remove formatting button
-      ['link', 'image', 'video']  // link and image, video
-    ]
-  };
+    import { QuillModule } from 'ngx-quill';
 
-  Thêm đoạn code style và js vào angular.json để thư viện quill hoạt động
+    const modules = {
+      toolbar: [
+        ['bold', 'italic', 'underline', 'strike'], // toggled buttons
+        ['blockquote', 'code-block'],
+        [{ header: 1 }, { header: 2 }], // custom button values
+        [{ list: 'ordered' }, { list: 'bullet' }],
+        [{ script: 'sub' }, { script: 'super' }], // superscript/subscript
+        [{ indent: '-1' }, { indent: '+1' }], // outdent/indent
+        [{ direction: 'rtl' }], // text direction
+        [{ size: ['small', false, 'large', 'huge'] }], // custom dropdown
+        [{ header: [1, 2, 3, 4, 5, 6, false] }],
+        [], // dropdown with defaults from theme
+        [{ font: [] }],
+        [{ align: [] }],
+        ['clean'], // remove formatting button
+        ['link', 'image', 'video']  // link and image, video
+      ]
+    };
+
+Thêm đoạn code style và js vào angular.json để thư viện quill hoạt động
+    
     "styles": [
               {
                 "input": "src/theme/theme.scss"
