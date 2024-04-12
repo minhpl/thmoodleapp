@@ -2,7 +2,7 @@
 
 1. **Tên tính năng**: Hiển thị subtitle trên video khóa học trên app
 2. **Project**:  tnu,aof,tnut,vmc
-3. **Người phát triển**: aum.ducdnn@gmail.com
+3. **Người phát triển**: huytq72@wru.vn, aum.ducdnn@gmail.com
 4. **Người yêu cầu**: Hoàng Hồng Lan
 5. **Tham chiếu ERP:** 
 6. **Mã nguồn:**
