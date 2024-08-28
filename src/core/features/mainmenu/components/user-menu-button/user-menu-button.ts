@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit } from '@angular/core';
-import { CoreSiteInfo } from '@classes/site';
+import { Component, Input, OnInit, Optional } from '@angular/core';
+import { CoreSiteInfo } from '@classes/sites/unauthenticated-site';
 import { CoreUserTourDirectiveOptions } from '@directives/user-tour';
 import { CoreUserToursAlignment, CoreUserToursSide } from '@features/usertours/services/user-tours';
 import { IonRouterOutlet } from '@ionic/angular';
@@ -22,6 +22,7 @@ import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreMainMenuUserMenuTourComponent } from '../user-menu-tour/user-menu-tour';
 import { CoreMainMenuUserMenuComponent } from '../user-menu/user-menu';
+import { CoreMainMenuPage } from '@features/mainmenu/pages/menu/menu';
 
 /**
  * Component to display an avatar on the header to open user menu.
@@ -35,6 +36,7 @@ import { CoreMainMenuUserMenuComponent } from '../user-menu/user-menu';
 })
 export class CoreMainMenuUserButtonComponent implements OnInit {
 
+    @Input() alwaysShow = false;
     siteInfo?: CoreSiteInfo;
     isMainScreen = false;
     userTour: CoreUserTourDirectiveOptions = {
@@ -44,10 +46,8 @@ export class CoreMainMenuUserButtonComponent implements OnInit {
         side: CoreScreen.isMobile ? CoreUserToursSide.Start : CoreUserToursSide.End,
     };
 
-    constructor(protected routerOutlet: IonRouterOutlet) {
-        const currentSite = CoreSites.getRequiredCurrentSite();
-
-        this.siteInfo = currentSite.getInfo();
+    constructor(protected routerOutlet: IonRouterOutlet, @Optional() protected menuPage: CoreMainMenuPage | null) {
+        this.siteInfo = CoreSites.getCurrentSite()?.getInfo();
     }
 
     /**

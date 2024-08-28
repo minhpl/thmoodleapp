@@ -22,9 +22,13 @@ export class CoreArray {
      *
      * @param arr Array.
      * @param item Item.
-     * @return Whether item is within the array.
+     * @returns Whether item is within the array.
+     * @deprecated since 4.1. Use arr.includes() instead.
      */
     static contains<T>(arr: T[], item: T): boolean {
+        // eslint-disable-next-line no-console
+        console.warn('CoreArray.contains is deprecated and will be removed soon. Please use array \'includes\' instead.');
+
         return arr.indexOf(item) !== -1;
     }
 
@@ -34,10 +38,14 @@ export class CoreArray {
      * @see https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/flat#reduce_and_concat
      *
      * @param arr Original array.
-     * @return Flattened array.
+     * @returns Flattened array.
+     * @deprecated since 4.4 Use Array.prototype.flat() instead.
      */
     static flatten<T>(arr: T[][]): T[] {
-        return (<T[]> []).concat(...arr);
+        // eslint-disable-next-line no-console
+        console.warn('CoreArray.flatten is deprecated and will be removed soon. Please use array \'flat\' instead.');
+
+        return arr.flat();
     }
 
     /**
@@ -45,7 +53,7 @@ export class CoreArray {
      *
      * @param arr Array.
      * @param item Item to remove.
-     * @return Array without the specified item.
+     * @returns Array without the specified item.
      */
     static withoutItem<T>(arr: T[], item: T): T[] {
         const newArray = [...arr];
@@ -56,6 +64,48 @@ export class CoreArray {
         }
 
         return newArray;
+    }
+
+    /**
+     * Return an array without duplicate values.
+     *
+     * @param array The array to treat.
+     * @param [key] Key of the property that must be unique. If not specified, the whole entry.
+     * @returns Array without duplicate values.
+     */
+    static unique<T>(array: T[], key?: string): T[] {
+        const unique = {}; // Use an object to make it faster to check if it's duplicate.
+
+        return array.filter(entry => {
+            const value = key ? entry[key] : entry;
+
+            if (value in unique) {
+                return false;
+            }
+
+            unique[value] = true;
+
+            return true;
+        });
+    }
+
+    /**
+     * Given an array of strings, return only the ones that match a regular expression.
+     *
+     * @param array Array to filter.
+     * @param regex RegExp to apply to each string.
+     * @returns Filtered array.
+     */
+    static filterByRegexp(array: string[], regex: RegExp): string[] {
+        if (!array || !array.length) {
+            return [];
+        }
+
+        return array.filter((entry) => {
+            const matches = entry.match(regex);
+
+            return matches && matches.length;
+        });
     }
 
 }

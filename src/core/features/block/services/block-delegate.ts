@@ -15,13 +15,15 @@
 import { Injectable, Type } from '@angular/core';
 import { CoreSites } from '@services/sites';
 import { CoreDelegate, CoreDelegateHandler } from '@classes/delegate';
-import { CoreSite } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { Subject } from 'rxjs';
 import { CoreCourseBlock } from '@features/course/services/course';
 import { Params } from '@angular/router';
 import { makeSingleton } from '@singletons';
 import { CoreBlockDefaultHandler } from './handlers/default-block';
 import { CoreNavigationOptions } from '@services/navigator';
+import type { ICoreBlockComponent } from '@features/block/classes/base-block-component';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Interface that all blocks must implement.
@@ -38,13 +40,13 @@ export interface CoreBlockHandler extends CoreDelegateHandler {
      * @param block The block to render.
      * @param contextLevel The context where the block will be used.
      * @param instanceId The instance ID associated with the context level.
-     * @return Data or promise resolved with the data.
+     * @returns Data or promise resolved with the data.
      */
     getDisplayData?(
         block: CoreCourseBlock,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
-    ): undefined | CoreBlockHandlerData | Promise<CoreBlockHandlerData>;
+    ): undefined | CoreBlockHandlerData | Promise<undefined | CoreBlockHandlerData>;
 }
 
 /**
@@ -65,7 +67,7 @@ export interface CoreBlockHandlerData {
      * The component to render the contents of the block.
      * It's recommended to return the class of the component, but you can also return an instance of the component.
      */
-    component: Type<unknown>;
+    component: Type<ICoreBlockComponent>;
 
     /**
      * Data to pass to the component. All the properties in this object will be passed to the component as inputs.
@@ -103,16 +105,23 @@ export class CoreBlockDelegateService extends CoreDelegate<CoreBlockHandler> {
     constructor(
         protected defaultHandler: CoreBlockDefaultHandler,
     ) {
-        super('CoreBlockDelegate', true);
+        super('CoreBlockDelegate');
 
         this.blocksUpdateObservable = new Subject<void>();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async isEnabled(): Promise<boolean> {
+        return !this.areBlocksDisabledInSite();
     }
 
     /**
      * Check if blocks are disabled in a certain site.
      *
      * @param site Site. If not defined, use current site.
-     * @return Whether it's disabled.
+     * @returns Whether it's disabled.
      */
     areBlocksDisabledInSite(site?: CoreSite): boolean {
         site = site || CoreSites.getCurrentSite();
@@ -124,7 +133,7 @@ export class CoreBlockDelegateService extends CoreDelegate<CoreBlockHandler> {
      * Check if blocks are disabled in a certain site for courses.
      *
      * @param site Site. If not defined, use current site.
-     * @return Whether it's disabled.
+     * @returns Whether it's disabled.
      */
     areBlocksDisabledInCourses(site?: CoreSite): boolean {
         site = site || CoreSites.getCurrentSite();
@@ -136,7 +145,7 @@ export class CoreBlockDelegateService extends CoreDelegate<CoreBlockHandler> {
      * Check if blocks are disabled in a certain site.
      *
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved with true if disabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if disabled, rejected or resolved with false otherwise.
      */
     async areBlocksDisabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -150,11 +159,11 @@ export class CoreBlockDelegateService extends CoreDelegate<CoreBlockHandler> {
      * @param block The block to render.
      * @param contextLevel The context where the block will be used.
      * @param instanceId The instance ID associated with the context level.
-     * @return Promise resolved with the display data.
+     * @returns Promise resolved with the display data.
      */
     async getBlockDisplayData(
         block: CoreCourseBlock,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
     ): Promise<CoreBlockHandlerData | undefined> {
         return this.executeFunctionOnEnabled(
@@ -168,7 +177,7 @@ export class CoreBlockDelegateService extends CoreDelegate<CoreBlockHandler> {
      * Check if any of the blocks in a list is supported.
      *
      * @param blocks The list of blocks.
-     * @return Whether any of the blocks is supported.
+     * @returns Whether any of the blocks is supported.
      */
     hasSupportedBlock(blocks: CoreCourseBlock[]): boolean {
         blocks = blocks || [];
@@ -180,7 +189,7 @@ export class CoreBlockDelegateService extends CoreDelegate<CoreBlockHandler> {
      * Check if a block is supported.
      *
      * @param name Block "name". E.g. 'activity_modules'.
-     * @return Whether it's supported.
+     * @returns Whether it's supported.
      */
     isBlockSupported(name: string): boolean {
         return this.hasHandler(name, true);
@@ -191,7 +200,7 @@ export class CoreBlockDelegateService extends CoreDelegate<CoreBlockHandler> {
      *
      * @param handler Handler to check.
      * @param site Site to check.
-     * @return Whether is enabled or disabled in site.
+     * @returns Whether is enabled or disabled in site.
      */
     protected isFeatureDisabled(handler: CoreBlockHandler, site: CoreSite): boolean {
         // Allow displaying my overview even if all blocks are disabled, to avoid having an empty My Courses.

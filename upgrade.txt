@@ -1,5 +1,46 @@
-This files describes API changes in the Moodle Mobile app,
-information provided here is intended especially for developers.
+This file describes API changes in the Moodle App that affect site plugins, information provided here is intended especially for developers.
+
+For more information about upgrading, read the official documentation: https://moodledev.io/general/app/upgrading/
+
+=== 4.4.0 ===
+
+ - Starting with this release, this file will only document breaking changes for APIs exposed to site plugins. Internal changes will no longer be documented.
+ - CoreCache has been deprecated, use plain object as in-memory stores instead.
+ - Renamed CoreLoginSitesComponent to CoreLoginSitesModalComponent to make it clear that it's a modal and to avoid confusing it with the new CoreSitesListComponent.
+ - Removed CoreToLocaleStringPipe deprecated since 3.6.0
+ - With the upgrade to Ionic 7 ion-slides is no longer supported and now you need to use swiper-container and swiper-slide. More info here: https://ionicframework.com/docs/angular/slides
+ - With the upgrade to Ionic7 ion-datetime has changed its usage. We recommend using ion-datetime-button. More info here: https://ionicframework.com/docs/updating/6-0#datetime
+ - CoreLoginHelper.getErrorMessages has been removed. Please create the messages object yourself.
+ - CoreAppProvider.isAutomated() has been deprecated, use CorePlatformService.isAutomated() instead.
+ - Due to a breaking change in cordova-plugin-file, avoid using FileEntry.toURL(). Use CoreFileProvider.getFileEntryURL instead.
+ - FileTransfer service is no longer available, now we recommend use window.FileTransfer instead.
+ - CSS variable --font-size-normal has been deprecated in favor of --font-size-md.
+ - Activity modules services that does not admit plugins are not avaible for site plugins anymore.
+ - CoreUserDelegate type available values changed from newpage and communication to listitem and button.
+
+=== 4.3.0 ===
+
+ - CoreSiteBasicInfo fullName attribute has changed to fullname and avatar to userpictureurl to match user fields.
+ - Font Awesome icon library has been updated to 6.4.0. But nothing has changed, only version number.
+ - The analytics system in the app has been refactored and some functions that could trigger analytics calls no longer do it, now you need to use CoreAnalytics instead. Some functions in CoreCourseLogHelper and CorePushNotificationsProvider have been deprecated.
+ - Due to the analytics refactor, the parameters of most log functions have changed.
+ - CoreCourseModuleHandlerData.buttons has been deprecated, now only one button in attribute button will be shown.
+
+=== 4.2.0 ===
+
+- CoreIconComponent has been removed after deprecation period: Use CoreFaIconDirective instead.
+- The courseSummaryComponent property has been removed from the CoreCourseFormatComponent component, and the getCourseSummaryComponent method from the CoreCourseFormatHandler interface.
+- Font Awesome icon library has been updated to 6.3.0.
+- Some methods in glossary addon services have changed.
+
+=== 4.1.0 ===
+
+- Zoom levels changed from "normal / low / high" to " none / medium / high".
+- --addon-messages-* CSS3 variables have been renamed to --core-messages-*
+- The database constants in CoreSite (WS_CACHE_TABLE, CONFIG_TABLE, LAST_VIEWED_TABLE) and the DBRecord types have been moved to src/core/services/database.
+- The component <core-block> will no longer detect changes of properties inside the extraData object, it will only detect changes if the object itself changes.
+- CSS variable declarations have been moved to the `html` selector instead of using `body` and `:root`.
+- The second argument of `CoreTextUtilsProvider.cleanTags` has been converted into an object with boolean flags.
 
 === 4.0.0 ===
 

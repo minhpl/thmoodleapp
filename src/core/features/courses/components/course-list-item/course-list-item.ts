@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { Component, ElementRef, Input, OnChanges, OnDestroy, OnInit } from '@angular/core';
 import { CoreCourseProvider, CoreCourse } from '@features/course/services/course';
 import { CoreCourseHelper, CorePrefetchStatusInfo } from '@features/course/services/course-helper';
@@ -26,6 +26,7 @@ import { CoreEventCourseStatusChanged, CoreEventObserver, CoreEvents } from '@si
 import { CoreCourseListItem, CoreCourses, CoreCoursesProvider } from '../../services/courses';
 import { CoreCoursesHelper, CoreEnrolledCourseDataWithExtraInfoAndOptions } from '../../services/courses-helper';
 import { CoreCoursesCourseOptionsMenuComponent } from '../course-options-menu/course-options-menu';
+import { CoreEnrolHelper } from '@features/enrol/services/enrol-helper';
 
 /**
  * This directive is meant to display an item for a list of courses.
@@ -50,7 +51,7 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
     prefetchCourseData: CorePrefetchStatusInfo = {
         icon: '',
         statusTranslatable: 'core.loading',
-        status: '',
+        status: DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED,
         loading: true,
     };
 
@@ -59,14 +60,24 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
     progress = -1;
     completionUserTracked: boolean | undefined = false;
 
-    protected courseStatus = CoreConstants.NOT_DOWNLOADED;
+    protected courseStatus: DownloadStatus = DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
     protected isDestroyed = false;
     protected courseStatusObserver?: CoreEventObserver;
 
     protected element: HTMLElement;
+    protected progressObserver: CoreEventObserver;
 
     constructor(element: ElementRef) {
         this.element = element.nativeElement;
+        const siteId = CoreSites.getCurrentSiteId();
+        this.progressObserver = CoreEvents.on(CoreCourseProvider.PROGRESS_UPDATED, (data) => {
+            if (!this.course || this.course.id !== data.courseId || !('progress' in this.course)) {
+                return;
+            }
+
+            this.course.progress = data.progress;
+            this.progress = this.course.progress ?? undefined;
+        }, siteId);
     }
 
     /**
@@ -98,34 +109,18 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
             this.initPrefetchCourse();
 
         } else if ('enrollmentmethods' in this.course) {
-            this.enrolmentIcons = [];
-
-            this.course.enrollmentmethods.forEach((instance) => {
-                if (instance === 'self') {
-                    this.enrolmentIcons.push({
-                        label: 'core.courses.selfenrolment',
-                        icon: 'fas-key',
-                    });
-                } else if (instance === 'guest') {
-                    this.enrolmentIcons.push({
-                        label: 'core.courses.allowguests',
-                        icon: 'fas-unlock',
-                    });
-                } else if (instance === 'paypal') {
-                    this.enrolmentIcons.push({
-                        label: 'core.courses.otherenrolments',
-                        icon: 'fas-external-link-alt',
-                    });
-                }
-            });
-
-            if (this.enrolmentIcons.length == 0) {
-                this.enrolmentIcons.push({
-                    label: 'core.courses.notenrollable',
-                    icon: 'fas-lock',
-                });
-            }
+            this.enrolmentIcons = await CoreEnrolHelper.getEnrolmentIcons(this.course.enrollmentmethods, this.course.id);
         }
+    }
+
+    /**
+     * Removes the course image set because it cannot be loaded and set the fallback icon color.
+     */
+    loadFallbackCourseIcon(): void {
+        this.course.courseimage = undefined;
+
+        // Set the color because it won't be set at this point.
+        this.setCourseColor();
     }
 
     /**
@@ -163,12 +158,10 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
 
     /**
      * Open a course.
-     *
-     * @param course The course to open.
      */
     openCourse(): void {
         if (this.isEnrolled) {
-            CoreCourseHelper.openCourse(this.course);
+            CoreCourseHelper.openCourse(this.course, { params: { isGuest: false } });
         } else {
             CoreNavigator.navigateToSitePath(
                 `/course/${this.course.id}/summary`,
@@ -179,6 +172,8 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
 
     /**
      * Initialize prefetch course.
+     *
+     * @param forceInit Force initialization of prefetch course info.
      */
     async initPrefetchCourse(forceInit = false): Promise<void> {
         if (!this.isEnrolled || !this.showDownload ||
@@ -226,7 +221,7 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
      *
      * @param status Status to show.
      */
-    protected updateCourseStatus(status: string): void {
+    protected updateCourseStatus(status: DownloadStatus): void {
         const statusData = CoreCourseHelper.getCoursePrefetchStatusInfo(status);
 
         this.courseStatus = status;
@@ -234,6 +229,7 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
         this.prefetchCourseData.icon = statusData.icon;
         this.prefetchCourseData.statusTranslatable = statusData.statusTranslatable;
         this.prefetchCourseData.loading = statusData.loading;
+        this.prefetchCourseData.downloadSucceeded = status === DownloadStatus.DOWNLOADED;
     }
 
     /**
@@ -309,7 +305,7 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
                 }
                 break;
             case 'delete':
-                if (this.courseStatus == CoreConstants.DOWNLOADED || this.courseStatus == CoreConstants.OUTDATED) {
+                if (this.courseStatus === DownloadStatus.DOWNLOADED || this.courseStatus === DownloadStatus.OUTDATED) {
                     this.deleteCourseStoredData();
                 }
                 break;
@@ -401,6 +397,7 @@ export class CoreCoursesCourseListItemComponent implements OnInit, OnDestroy, On
     ngOnDestroy(): void {
         this.isDestroyed = true;
         this.courseStatusObserver?.off();
+        this.progressObserver.off();
     }
 
 }

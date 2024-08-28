@@ -14,8 +14,7 @@
 
 import { CoreSyncBaseProvider } from '@classes/base-sync';
 import { CoreCourse, CoreCourseAnyModuleData } from '../services/course';
-import { CoreCourseModulePrefetchDelegate } from '../services/module-prefetch-delegate';
-import { CoreCourseModulePrefetchHandlerBase } from './module-prefetch-handler';
+import { CoreCourseModulePrefetchDelegate, CoreCourseModulePrefetchHandler } from '../services/module-prefetch-delegate';
 
 /**
  * Base class to create activity sync providers. It provides some common functions.
@@ -27,24 +26,25 @@ export class CoreCourseActivitySyncBaseProvider<T = void> extends CoreSyncBasePr
     /**
      * Conveniece function to prefetch data after an update.
      *
+     * @param prefetchHandler Prefetch Handler.
      * @param module Module.
      * @param courseId Course ID.
      * @param preventDownloadRegex If regex matches, don't download the data. Defaults to check files.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved with boolean: true if prefetched, false if no need to prefetch.
      */
     async prefetchAfterUpdate(
-        prefetchHandler: CoreCourseModulePrefetchHandlerBase,
+        prefetchHandler: CoreCourseModulePrefetchHandler,
         module: CoreCourseAnyModuleData,
         courseId: number,
         preventDownloadRegex?: RegExp,
         siteId?: string,
-    ): Promise<void> {
+    ): Promise<boolean> {
         // Get the module updates to check if the data was updated or not.
         const result = await CoreCourseModulePrefetchDelegate.getModuleUpdates(module, courseId, true, siteId);
 
         if (!result?.updates.length) {
-            return;
+            return false;
         }
 
         // Only prefetch if files haven't changed, to prevent downloading too much data automatically.
@@ -52,8 +52,12 @@ export class CoreCourseActivitySyncBaseProvider<T = void> extends CoreSyncBasePr
         const shouldDownload = !result.updates.find((entry) => entry.name.match(regex));
 
         if (shouldDownload) {
-            return prefetchHandler.download(module, courseId);
+            await prefetchHandler.download(module, courseId);
+
+            return true;
         }
+
+        return false;
     }
 
     /**

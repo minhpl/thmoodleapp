@@ -1,4 +1,4 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
     --addon-calendar-blank-day-background-color: var(--light);
@@ -25,7 +25,6 @@
         @include border-end(1px, solid var(--addon-calendar-border-color));
         overflow: hidden;
         min-height: 60px;
-        cursor: pointer;
 
         &:first-child {
             @include padding-horizontal(10px, null);
@@ -99,7 +98,7 @@
 
     .addon-calendar-period {
         flex-grow: 3;
-        h3 {
+        h2 {
             margin-top: 10px;
             font-size: 1.2rem;
         }
@@ -143,15 +142,14 @@
         }
     }
 
-    ion-slide {
+    swiper-slide {
         display: block;
-        font-size: inherit;
         justify-content: start;
         align-items: start;
         text-align: start;
     }
 }
 
-:host-context(body.dark) {
+:host-context(html.dark) {
     --addon-calendar-blank-day-background-color: var(--gray-900);
 }

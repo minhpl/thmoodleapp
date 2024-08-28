@@ -32,13 +32,13 @@ export class CoreCoursesDashboardLinkHandlerService extends CoreContentLinksHand
     /**
      * Get the list of actions for a link (url).
      *
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
     getActions(): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
         return [{
-            action: (siteId): void => {
+            action: async (siteId): Promise<void> => {
                 // Use redirect to select the tab.
-                CoreNavigator.navigateToSitePath(
+                await CoreNavigator.navigateToSitePath(
                     `/${CoreMainMenuHomeHandlerService.PAGE_NAME}/${CoreDashboardHomeHandlerService.PAGE_NAME}`,
                     {
                         siteId,
@@ -53,7 +53,7 @@ export class CoreCoursesDashboardLinkHandlerService extends CoreContentLinksHand
      * Check if the handler is enabled for a certain site (site + user) and a URL.
      *
      * @param siteId The site ID.
-     * @return Whether the handler is enabled for the URL and site.
+     * @returns Whether the handler is enabled for the URL and site.
      */
     async isEnabled(siteId: string): Promise<boolean> {
         return CoreDashboardHomeHandler.isEnabledForSite(siteId);

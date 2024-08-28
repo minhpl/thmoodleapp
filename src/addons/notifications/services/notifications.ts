@@ -18,11 +18,13 @@ import { CoreSites, CoreSitesCommonWSOptions } from '@services/sites';
 import { CoreWSExternalWarning } from '@services/ws';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreTimeUtils } from '@services/utils/time';
-import { CoreUser } from '@features/user/services/user';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreUser, USER_NOREPLY_USER } from '@features/user/services/user';
+import { CoreSite } from '@classes/sites/site';
 import { CoreLogger } from '@singletons/logger';
-import { makeSingleton } from '@singletons';
+import { Translate, makeSingleton } from '@singletons';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
+import { AddonNotificationsPushNotification } from './handlers/push-click';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
 
 declare module '@singletons/events' {
 
@@ -57,10 +59,52 @@ export class AddonNotificationsProvider {
     }
 
     /**
+     * Convert a push notification data to use the same format as the get_messages WS.
+     *
+     * @param notification Push notification to convert.
+     * @returns Converted notification.
+     */
+    async convertPushToMessage(
+        notification: AddonNotificationsPushNotification,
+    ): Promise<AddonNotificationsNotificationMessageFormatted> {
+        const message = notification.message ?? '';
+        const siteInfo = CoreSites.getCurrentSite()?.getInfo();
+
+        if (notification.senderImage && notification.customdata && !notification.customdata.notificationiconurl) {
+            notification.customdata.notificationiconurl = notification.senderImage;
+        }
+
+        const notificationMessage: AddonNotificationsNotificationMessage = {
+            id: notification.id ?? 0,
+            useridfrom: notification.userfromid ? Number(notification.userfromid) : USER_NOREPLY_USER,
+            userfromfullname: notification.userfromfullname ?? Translate.instant('core.noreplyname'),
+            useridto: notification.usertoid ? Number(notification.usertoid) : (siteInfo?.userid ?? 0),
+            usertofullname: siteInfo?.fullname ?? '',
+            subject: notification.title ?? '',
+            text: message,
+            fullmessage: message,
+            fullmessageformat: 1,
+            fullmessagehtml: message,
+            smallmessage: message,
+            notification: Number(notification.notif ?? 1),
+            contexturl: notification.contexturl || null,
+            contexturlname: null,
+            timecreated: Number(notification.date ?? 0),
+            timeread: 0,
+            component: notification.moodlecomponent,
+            customdata: notification.customdata ? JSON.stringify(notification.customdata) : undefined,
+        };
+
+        const formatted = await this.formatNotificationsData([notificationMessage]);
+
+        return formatted[0];
+    }
+
+    /**
      * Function to format notification data.
      *
      * @param notifications List of notifications.
-     * @return Promise resolved with notifications.
+     * @returns Promise resolved with notifications.
      */
     protected async formatNotificationsData(
         notifications: AddonNotificationsNotificationMessage[],
@@ -75,8 +119,8 @@ export class AddonNotificationsProvider {
             notification.notif = 1;
             notification.read = notification.timeread > 0;
 
-            if (typeof notification.customdata == 'string') {
-                notification.customdata = CoreTextUtils.parseJSON<Record<string, unknown>>(notification.customdata, {});
+            if (typeof notification.customdata === 'string') {
+                notification.customdata = CoreTextUtils.parseJSON<Record<string, string|number>>(notification.customdata, {});
             }
 
             // Try to set courseid the notification belongs to.
@@ -91,9 +135,9 @@ export class AddonNotificationsProvider {
 
             if (!notification.iconurl) {
                 // The iconurl is only returned in 4.0 or above. Calculate it if not present.
-                if (notification.component && notification.component.startsWith('mod_')) {
+                if (notification.moodlecomponent && notification.moodlecomponent.startsWith('mod_')) {
                     notification.iconurl = await CoreCourseModuleDelegate.getModuleIconSrc(
-                        notification.component.replace('mod_', ''),
+                        notification.moodlecomponent.replace('mod_', ''),
                     );
                 }
             }
@@ -108,6 +152,12 @@ export class AddonNotificationsProvider {
                 } catch {
                     // Error getting user. This can happen if device is offline or the user is deleted.
                 }
+            } else {
+                // Do not assign avatar for newlogin notifications.
+                if (notification.eventtype !== 'newlogin') {
+                    const imgUrl = notification.customdata?.notificationpictureurl || notification.customdata?.notificationiconurl;
+                    notification.imgUrl = imgUrl ? String(imgUrl) : undefined;
+                }
             }
 
             return notification;
@@ -119,7 +169,7 @@ export class AddonNotificationsProvider {
     /**
      * Get the cache key for the get notification preferences call.
      *
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getNotificationPreferencesCacheKey(): string {
         return ROOT_CACHE_KEY + 'notificationPreferences';
@@ -129,7 +179,7 @@ export class AddonNotificationsProvider {
      * Get notification preferences.
      *
      * @param options Options.
-     * @return Promise resolved with the notification preferences.
+     * @returns Promise resolved with the notification preferences.
      */
     async getNotificationPreferences(options: CoreSitesCommonWSOptions = {}): Promise<AddonNotificationsPreferences> {
         this.logger.debug('Get notification preferences');
@@ -153,7 +203,7 @@ export class AddonNotificationsProvider {
     /**
      * Get cache key for notification list WS calls.
      *
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getNotificationsCacheKey(): string {
         return ROOT_CACHE_KEY + 'list';
@@ -164,7 +214,8 @@ export class AddonNotificationsProvider {
      *
      * @param notifications Current list of loaded notifications. It's used to calculate the offset.
      * @param options Other options.
-     * @return Promise resolved with notifications and if can load more.
+     * @returns Promise resolved with notifications and if can load more.
+     * @deprecated since 4.1. Use getNotificationsWithStatus instead.
      */
     async getNotifications(
         notifications: AddonNotificationsNotificationMessageFormatted[],
@@ -229,9 +280,9 @@ export class AddonNotificationsProvider {
      *
      * @param read True if should get read notifications, false otherwise.
      * @param options Other options.
-     * @return Promise resolved with notifications.
+     * @returns Promise resolved with notifications.
      */
-    protected async getNotificationsWithStatus(
+    async getNotificationsWithStatus(
         read: AddonNotificationsGetReadType,
         options: AddonNotificationsGetNotificationsOptions = {},
     ): Promise<AddonNotificationsNotificationMessageFormatted[]> {
@@ -272,7 +323,7 @@ export class AddonNotificationsProvider {
      *
      * @param userId The user id who received the notification. If not defined, use current user.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise resolved with the message notifications count.
+     * @returns Promise resolved with the message notifications count.
      */
     async getUnreadNotificationsCount(userId?: number, siteId?: string): Promise<{ count: number; hasMore: boolean} > {
         const site = await CoreSites.getSite(siteId);
@@ -329,7 +380,7 @@ export class AddonNotificationsProvider {
      * Get cache key for unread notifications count WS calls.
      *
      * @param userId User ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getUnreadNotificationsCountCacheKey(userId: number): string {
         return `${ROOT_CACHE_KEY}count:${userId}`;
@@ -338,7 +389,7 @@ export class AddonNotificationsProvider {
     /**
      * Mark all message notification as read.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async markAllNotificationsAsRead(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -355,7 +406,7 @@ export class AddonNotificationsProvider {
      *
      * @param notificationId ID of notification to mark as read
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async markNotificationRead(
         notificationId: number,
@@ -376,7 +427,7 @@ export class AddonNotificationsProvider {
      * Invalidate get notification preferences.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when data is invalidated.
+     * @returns Promise resolved when data is invalidated.
      */
     async invalidateNotificationPreferences(siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -388,7 +439,7 @@ export class AddonNotificationsProvider {
      * Invalidates notifications list WS calls.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the list is invalidated.
+     * @returns Promise resolved when the list is invalidated.
      */
     async invalidateNotificationsList(siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -449,14 +500,14 @@ export type AddonNotificationsPreferencesNotificationProcessor = {
     lockedmessage?: string; // @since 3.6. Text to display if locked.
     userconfigured: number; // Is configured?.
     enabled?: boolean; // @since 4.0. Processor enabled.
-    loggedin: AddonNotificationsPreferencesNotificationProcessorState; // @deprecated removed on 4.0.
-    loggedoff: AddonNotificationsPreferencesNotificationProcessorState; // @deprecated removed on 4.0.
+    loggedin: AddonNotificationsPreferencesNotificationProcessorState; // @deprecatedonmoodle since 4.0.
+    loggedoff: AddonNotificationsPreferencesNotificationProcessorState; // @deprecatedonmoodle since 4.0.
 };
 
 /**
  * State in notification processor in notification preferences component.
  *
- * @deprecated removed on 4.0.
+ * @deprecatedonmoodle since 4.0
  */
 export type AddonNotificationsPreferencesNotificationProcessorState = {
     name: 'loggedoff' | 'loggedin'; // Name.
@@ -501,8 +552,8 @@ export type AddonNotificationsNotificationMessage = {
     fullmessagehtml: string; // The message in html.
     smallmessage: string; // The shorten message.
     notification: number; // Is a notification?.
-    contexturl: string; // Context URL.
-    contexturlname: string; // Context URL link name.
+    contexturl: string | null; // Context URL.
+    contexturlname: string | null; // Context URL link name.
     timecreated: number; // Time created.
     timeread: number; // Time read.
     usertofullname: string; // User to full name.
@@ -531,15 +582,16 @@ export type AddonNotificationsGetUserNotificationPreferencesResult = {
  * Calculated data for messages returned by core_message_get_messages.
  */
 export type AddonNotificationsNotificationCalculatedData = {
-    mobiletext?: string; // Calculated in the app. Text to display for the notification.
+    mobiletext: string; // Calculated in the app. Text to display for the notification.
     moodlecomponent?: string; // Calculated in the app. Moodle's component.
-    notif?: number; // Calculated in the app. Whether it's a notification.
-    notification?: number; // Calculated in the app in some cases. Whether it's a notification.
-    read?: boolean; // Calculated in the app. Whether the notifications is read.
+    notif: number; // Calculated in the app. Whether it's a notification.
+    notification: number; // Calculated in the app in some cases. Whether it's a notification.
+    read: boolean; // Calculated in the app. Whether the notifications is read.
     courseid?: number; // Calculated in the app. Course the notification belongs to.
     profileimageurlfrom?: string; // Calculated in the app. Avatar of user that sent the notification.
     userfromfullname?: string; // Calculated in the app in some cases. User from full name.
-    customdata?: Record<string, unknown>; // Parsed custom data.
+    customdata?: Record<string, string|number>; // Parsed custom data.
+    imgUrl?: string; // Calculated in the app. URL of the image to use if the notification has no real user from.
 };
 
 /**

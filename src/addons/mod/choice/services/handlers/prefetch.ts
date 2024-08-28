@@ -21,8 +21,9 @@ import { CoreSitesReadingStrategy } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreWSFile } from '@services/ws';
 import { makeSingleton } from '@singletons';
-import { AddonModChoice, AddonModChoiceProvider } from '../choice';
+import { AddonModChoice } from '../choice';
 import { AddonModChoiceSync, AddonModChoiceSyncResult } from '../choice-sync';
+import { ADDON_MOD_CHOICE_COMPONENT } from '../../constants';
 
 /**
  * Handler to prefetch choices.
@@ -32,14 +33,14 @@ export class AddonModChoicePrefetchHandlerService extends CoreCourseActivityPref
 
     name = 'AddonModChoice';
     modName = 'choice';
-    component = AddonModChoiceProvider.COMPONENT;
+    component = ADDON_MOD_CHOICE_COMPONENT;
     updatesNames = /^configuration$|^.*files$|^answers$/;
 
     /**
      * @inheritdoc
      */
     prefetch(module: CoreCourseAnyModuleData, courseId: number, single?: boolean): Promise<void> {
-        return this.prefetchPackage(module, courseId, this.prefetchChoice.bind(this, module, courseId, !!single));
+        return this.prefetchPackage(module, courseId, (siteId) => this.prefetchChoice(module, courseId, !!single, siteId));
     }
 
     /**
@@ -49,7 +50,7 @@ export class AddonModChoicePrefetchHandlerService extends CoreCourseActivityPref
      * @param courseId Course ID the module belongs to.
      * @param single True if we're downloading a single module, false if we're downloading a whole section.
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchChoice(
         module: CoreCourseAnyModuleData,
@@ -74,16 +75,17 @@ export class AddonModChoicePrefetchHandlerService extends CoreCourseActivityPref
         await Promise.all([
             AddonModChoice.getOptions(choice.id, modOptions),
             this.prefetchResults(choice.id, courseId, modOptions),
-            CoreFilepool.addFilesToQueue(siteId, introFiles, AddonModChoiceProvider.COMPONENT, module.id),
+            CoreFilepool.addFilesToQueue(siteId, introFiles, ADDON_MOD_CHOICE_COMPONENT, module.id),
         ]);
     }
 
     /**
      * Prefetch choice results.
      *
-     * @param choiceId Choice ID.
+     * @param choiceId Choice Id.
+     * @param courseId Course Id.
      * @param modOptions Options.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async prefetchResults(
         choiceId: number,
@@ -132,7 +134,7 @@ export class AddonModChoicePrefetchHandlerService extends CoreCourseActivityPref
      *
      * @param module Module.
      * @param courseId Course ID the module belongs to.
-     * @return Promise resolved when invalidated.
+     * @returns Promise resolved when invalidated.
      */
     invalidateModule(module: CoreCourseAnyModuleData, courseId: number): Promise<void> {
         return AddonModChoice.invalidateChoiceData(courseId);
@@ -144,7 +146,7 @@ export class AddonModChoicePrefetchHandlerService extends CoreCourseActivityPref
      * @param module Module.
      * @param courseId Course ID the module belongs to
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     sync(module: CoreCourseAnyModuleData, courseId: number, siteId?: string): Promise<AddonModChoiceSyncResult> {
         return AddonModChoiceSync.syncChoice(module.instance, undefined, siteId);

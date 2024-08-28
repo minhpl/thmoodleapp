@@ -25,6 +25,7 @@ import {
     ViewChild,
     OnDestroy,
     Inject,
+    ChangeDetectorRef,
 } from '@angular/core';
 import { IonContent } from '@ionic/angular';
 
@@ -33,22 +34,28 @@ import { CoreDomUtils } from '@services/utils/dom';
 import { CoreIframeUtils, CoreIframeUtilsProvider } from '@services/utils/iframe';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreUtils } from '@services/utils/utils';
-import { CoreSite } from '@classes/site';
-import { NgZone, Platform, Translate } from '@singletons';
+import { CoreSite } from '@classes/sites/site';
+import { NgZone, Translate } from '@singletons';
 import { CoreExternalContentDirective } from './external-content';
 import { CoreLinkDirective } from './link';
 import { CoreFilter, CoreFilterFilter, CoreFilterFormatTextOptions } from '@features/filter/services/filter';
 import { CoreFilterDelegate } from '@features/filter/services/filter-delegate';
 import { CoreFilterHelper } from '@features/filter/services/filter-helper';
 import { CoreSubscriptions } from '@singletons/subscriptions';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 import { CoreCollapsibleItemDirective } from './collapsible-item';
 import { CoreCancellablePromise } from '@classes/cancellable-promise';
-import { AsyncComponent } from '@classes/async-component';
-import { CoreText } from '@singletons/text';
+import { AsyncDirective } from '@classes/async-directive';
 import { CoreDom } from '@singletons/dom';
 import { CoreEvents } from '@singletons/events';
 import { CoreRefreshContext, CORE_REFRESH_CONTEXT } from '@/core/utils/refresh-context';
+import { CorePlatform } from '@services/platform';
+import { ElementController } from '@classes/element-controllers/ElementController';
+import { MediaElementController } from '@classes/element-controllers/MediaElementController';
+import { FrameElement, FrameElementController } from '@classes/element-controllers/FrameElementController';
+import { CoreUrl } from '@singletons/url';
+import { CoreIcons } from '@singletons/icons';
+import { ContextLevel } from '../constants';
 
 /**
  * Directive to format text rendered. It renders the HTML and treats all links and media, using CoreLinkDirective
@@ -62,7 +69,7 @@ import { CoreRefreshContext, CORE_REFRESH_CONTEXT } from '@/core/utils/refresh-c
 @Directive({
     selector: 'core-format-text',
 })
-export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncComponent {
+export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncDirective {
 
     @ViewChild(CoreCollapsibleItemDirective) collapsible?: CoreCollapsibleItemDirective;
 
@@ -75,28 +82,24 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
     @Input() singleLine?: boolean | string; // Whether new lines should be removed (all text in single line). Only if clean=true.
     @Input() highlight?: string; // Text to highlight.
     @Input() filter?: boolean | string; // Whether to filter the text. If not defined, true if contextLevel and instanceId are set.
-    @Input() contextLevel?: string; // The context level of the text.
+    @Input() contextLevel?: ContextLevel; // The context level of the text.
     @Input() contextInstanceId?: number; // The instance ID related to the context.
     @Input() courseId?: number; // Course ID the text belongs to. It can be used to improve performance with filters.
     @Input() wsNotFiltered?: boolean | string; // If true it means the WS didn't filter the text for some reason.
     @Input() captureLinks?: boolean; // Whether links should tried to be opened inside the app. Defaults to true.
     @Input() openLinksInApp?: boolean; // Whether links should be opened in InAppBrowser.
     @Input() hideIfEmpty = false; // If true, the tag will contain nothing if text is empty.
-
-    @Input() fullOnClick?: boolean | string; // @deprecated on 4.0 Won't do anything.
-    @Input() fullTitle?: string; // @deprecated on 4.0 Won't do anything.
-    /**
-     * Max height in pixels to render the content box. It should be 50 at least to make sense.
-     */
-    @Input() maxHeight?: number; // @deprecated on 4.0 Use collapsible-item directive instead.
+    @Input() disabled?: boolean; // If disabled, autoplay elements will be disabled.
 
     @Output() afterRender: EventEmitter<void>; // Called when the data is rendered.
     @Output() onClick: EventEmitter<void> = new EventEmitter(); // Called when clicked.
 
     protected element: HTMLElement;
+    protected elementControllers: ElementController[] = [];
     protected emptyText = '';
     protected domPromises: CoreCancellablePromise<void>[] = [];
     protected domElementPromise?: CoreCancellablePromise<void>;
+    protected externalContentInstances: CoreExternalContentDirective[] = [];
 
     constructor(
         element: ElementRef,
@@ -104,7 +107,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
         protected viewContainerRef: ViewContainerRef,
         @Optional() @Inject(CORE_REFRESH_CONTEXT) protected refreshContext?: CoreRefreshContext,
     ) {
-        CoreComponentsRegistry.register(element.nativeElement, this);
+        CoreDirectivesRegistry.register(element.nativeElement, this);
 
         this.element = element.nativeElement;
         this.element.classList.add('core-loading'); // Hide contents until they're treated.
@@ -114,7 +117,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
 
         this.afterRender = new EventEmitter<void>();
 
-        this.element.addEventListener('click', this.elementClicked.bind(this));
+        this.element.addEventListener('click', (event) => this.elementClicked(event));
 
         this.siteId = this.siteId || CoreSites.getCurrentSiteId();
     }
@@ -125,6 +128,14 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
     ngOnChanges(changes: { [name: string]: SimpleChange }): void {
         if (changes.text || changes.filter || changes.contextLevel || changes.contextInstanceId) {
             this.formatAndRenderContents();
+
+            return;
+        }
+
+        if ('disabled' in changes) {
+            const disabled = changes['disabled'].currentValue;
+
+            this.elementControllers.forEach(controller => disabled ? controller.disable() : controller.enable());
         }
     }
 
@@ -134,6 +145,8 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
     ngOnDestroy(): void {
         this.domElementPromise?.cancel();
         this.domPromises.forEach((promise) => { promise.cancel();});
+        this.elementControllers.forEach(controller => controller.destroy());
+        this.externalContentInstances.forEach(extContent => extContent.ngOnDestroy());
     }
 
     /**
@@ -156,7 +169,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
      * Apply CoreExternalContentDirective to a certain element.
      *
      * @param element Element to add the attributes to.
-     * @return External content instance or undefined if siteId is not provided.
+     * @returns External content instance or undefined if siteId is not provided.
      */
     protected addExternalContent(element: Element): CoreExternalContentDirective | undefined {
         if (!this.siteId) {
@@ -169,12 +182,21 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
         extContent.component = this.component;
         extContent.componentId = this.componentId;
         extContent.siteId = this.siteId;
-        extContent.src = element.getAttribute('src') || undefined;
-        extContent.href = element.getAttribute('href') || element.getAttribute('xlink:href') || undefined;
-        extContent.targetSrc = element.getAttribute('target-src') || undefined;
-        extContent.poster = element.getAttribute('poster') || undefined;
+        extContent.url = element.getAttribute('src') ?? element.getAttribute('href') ?? element.getAttribute('xlink:href');
+        extContent.posterUrl = element.getAttribute('poster');
+
+        // Remove the original attributes to avoid performing requests to untreated URLs.
+        element.removeAttribute('src');
+        element.removeAttribute('href');
+        element.removeAttribute('xlink:href');
+        element.removeAttribute('poster');
 
         extContent.ngAfterViewInit();
+
+        this.externalContentInstances.push(extContent);
+
+        const changeDetectorRef = this.viewContainerRef.injector.get(ChangeDetectorRef);
+        changeDetectorRef.markForCheck();
 
         return extContent;
     }
@@ -225,9 +247,9 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
     }
 
     /**
-     * Add magnifying glass icons to view adapted images at full size.
+     * Add image viewer button to view adapted images at full size.
      */
-    async addMagnifyingGlasses(): Promise<void> {
+    protected async addImageViewerButton(): Promise<void> {
         const imgs = Array.from(this.element.querySelectorAll('.core-adapted-img-container > img'));
         if (!imgs.length) {
             return;
@@ -252,19 +274,20 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
                 return;
             }
 
-            const imgSrc = CoreTextUtils.escapeHTML(img.getAttribute('data-original-src') || img.getAttribute('src'));
             const label = Translate.instant('core.openfullimage');
             const button = document.createElement('button');
 
             button.classList.add('core-image-viewer-icon');
             button.classList.add('hidden');
             button.setAttribute('aria-label', label);
+            const iconName = 'up-right-and-down-left-from-center';
+            const src = CoreIcons.getIconSrc('font-awesome', 'solid', iconName);
             // Add an ion-icon item to apply the right styles, but the ion-icon component won't be executed.
-            button.innerHTML = '<ion-icon name="fas-expand-alt" aria-hidden="true" \
-                src="assets/fonts/font-awesome/solid/expand-alt.svg">\
-            </ion-icon>';
+            button.innerHTML = `<ion-icon name="fas-${iconName}" aria-hidden="true" src="${src}"></ion-icon>`;
 
             button.addEventListener('click', (e: Event) => {
+                const imgSrc = CoreTextUtils.escapeHTML(img.getAttribute('data-original-src') || img.getAttribute('src'));
+
                 e.preventDefault();
                 e.stopPropagation();
                 CoreDomUtils.viewImage(imgSrc, img.getAttribute('alt'), this.component, this.componentId);
@@ -293,7 +316,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
             return;
         }
 
-        if (this.onClick.observers.length > 0) {
+        if (this.onClick.observed) {
             this.onClick.emit();
 
             return;
@@ -323,6 +346,10 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
      * Format contents and render.
      */
     protected async formatAndRenderContents(): Promise<void> {
+        // Destroy previous instances of external-content.
+        this.externalContentInstances.forEach(extContent => extContent.ngOnDestroy());
+        this.externalContentInstances = [];
+
         if (!this.text) {
             this.element.innerHTML = this.emptyText; // Remove current contents.
 
@@ -347,17 +374,13 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
         // Move the children to the current element to be able to calculate the height.
         CoreDomUtils.moveChildren(result.div, this.element);
 
+        this.elementControllers.forEach(controller => controller.destroy());
+        this.elementControllers = result.elementControllers;
+
         await CoreUtils.nextTick();
 
-        // Use collapsible-item directive instead.
-        if (this.maxHeight && !this.collapsible) {
-            this.collapsible = new CoreCollapsibleItemDirective(new ElementRef(this.element));
-            this.collapsible.height = this.maxHeight;
-            this.collapsible.ngOnInit();
-        }
-
         // Add magnifying glasses to images.
-        this.addMagnifyingGlasses();
+        this.addImageViewerButton();
 
         if (result.options.filter) {
             // Let filters handle HTML. We do it here because we don't want them to block the render of the text.
@@ -380,7 +403,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
     /**
      * Apply formatText and set sub-directives.
      *
-     * @return Promise resolved with a div element containing the code.
+     * @returns Promise resolved with a div element containing the code.
      */
     protected async formatContents(): Promise<FormatContentsResult> {
         // Retrieve the site since it might be needed later.
@@ -388,8 +411,14 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
 
         const siteId = site?.getId();
 
-        if (site && this.contextLevel == 'course' && this.contextInstanceId !== undefined && this.contextInstanceId <= 0) {
+        if (
+            site && this.contextLevel === ContextLevel.COURSE && this.contextInstanceId !== undefined && this.contextInstanceId <= 0
+        ) {
             this.contextInstanceId = site.getSiteHomeId();
+        }
+
+        if (this.contextLevel === ContextLevel.COURSE && this.contextInstanceId === undefined && this.courseId !== undefined) {
+            this.contextInstanceId = this.courseId;
         }
 
         const filter = this.filter === undefined ?
@@ -409,7 +438,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
         if (filter) {
             const filterResult = await CoreFilterHelper.getFiltersAndFormatText(
                 this.text || '',
-                this.contextLevel || '',
+                this.contextLevel || ContextLevel.SYSTEM,
                 this.contextInstanceId ?? -1,
                 options,
                 siteId,
@@ -427,13 +456,14 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
 
         div.innerHTML = formatted;
 
-        this.treatHTMLElements(div, site);
+        const elementControllers = this.treatHTMLElements(div, site);
 
         return {
             div,
             filters,
             options,
             siteId,
+            elementControllers,
         };
     }
 
@@ -442,18 +472,20 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
      *
      * @param div Div element.
      * @param site Site instance.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    protected async treatHTMLElements(div: HTMLElement, site?: CoreSite): Promise<void> {
+    protected treatHTMLElements(div: HTMLElement, site?: CoreSite): ElementController[] {
         const images = Array.from(div.querySelectorAll('img'));
         const anchors = Array.from(div.querySelectorAll('a'));
         const audios = Array.from(div.querySelectorAll('audio'));
         const videos = Array.from(div.querySelectorAll('video'));
         const iframes = Array.from(div.querySelectorAll('iframe'));
-        const buttons = Array.from(div.querySelectorAll('.button'));
-        const elementsWithInlineStyles = Array.from(div.querySelectorAll('*[style]'));
-        const stopClicksElements = Array.from(div.querySelectorAll('button,input,select,textarea'));
-        const frames = Array.from(div.querySelectorAll(CoreIframeUtilsProvider.FRAME_TAGS.join(',').replace(/iframe,?/, '')));
+        const buttons = Array.from(div.querySelectorAll<HTMLElement>('.button'));
+        const elementsWithInlineStyles = Array.from(div.querySelectorAll<HTMLElement>('*[style]'));
+        const stopClicksElements = Array.from(div.querySelectorAll<HTMLElement>('button,input,select,textarea'));
+        const frames = Array.from(
+            div.querySelectorAll<FrameElement>(CoreIframeUtilsProvider.FRAME_TAGS.join(',').replace(/iframe,?/, '')),
+        );
         const svgImages = Array.from(div.querySelectorAll('image'));
         const promises: Promise<void>[] = [];
 
@@ -493,17 +525,28 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
             });
         }
 
-        audios.forEach((audio) => {
+        const audioControllers = audios.map(audio => {
             this.treatMedia(audio);
+
+            return new MediaElementController(audio, !this.disabled);
         });
 
-        videos.forEach((video) => {
+        const videoControllers = videos.map(video => {
             this.treatMedia(video, true);
+
+            return new MediaElementController(video, !this.disabled);
         });
 
-        iframes.forEach((iframe) => {
+        const iframeControllers = iframes.map(iframe => {
+            const { launchExternal, label } = CoreIframeUtils.frameShouldLaunchExternal(iframe);
+            if (launchExternal && this.replaceFrameWithButton(iframe, site, label)) {
+                return;
+            }
+
             promises.push(this.treatIframe(iframe, site));
-        });
+
+            return new FrameElementController(iframe, !this.disabled);
+        }).filter((controller): controller is FrameElementController => controller !== undefined);
 
         svgImages.forEach((image) => {
             this.addExternalContent(image);
@@ -515,6 +558,12 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
             if (button.querySelector('a')) {
                 button.classList.add('core-button-with-inner-link');
             }
+        });
+
+        // Handle Font Awesome icons to be rendered by the app.
+        const icons = Array.from(div.querySelectorAll('.fa,.fas,.far,.fab,.fa-solid,.fa-regular,.fa-brands'));
+        icons.forEach((icon) => {
+            CoreIcons.replaceCSSIcon(icon);
         });
 
         // Handle inline styles.
@@ -534,9 +583,16 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
         });
 
         // Handle all kind of frames.
-        frames.forEach((frame: HTMLFrameElement | HTMLObjectElement | HTMLEmbedElement) => {
+        const frameControllers = frames.map((frame) => {
+            const { launchExternal, label } = CoreIframeUtils.frameShouldLaunchExternal(frame);
+            if (launchExternal && this.replaceFrameWithButton(frame, site, label)) {
+                return;
+            }
+
             CoreIframeUtils.treatFrame(frame, false);
-        });
+
+            return new FrameElementController(frame, !this.disabled);
+        }).filter((controller): controller is FrameElementController => controller !== undefined);
 
         CoreDomUtils.handleBootstrapTooltips(div);
 
@@ -555,7 +611,15 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
             promises.push(CoreUtils.ignoreErrors(CoreUtils.timeoutPromise(promise, 5000)));
         }
 
-        await Promise.all(promises);
+        // Run asynchronous operations in the background to avoid blocking rendering.
+        Promise.all(promises).catch(error => CoreUtils.logUnhandledError('Error treating format-text elements', error));
+
+        return [
+            ...videoControllers,
+            ...audioControllers,
+            ...iframeControllers,
+            ...frameControllers,
+        ];
     }
 
     /**
@@ -573,12 +637,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
                 return;
             }
 
-            if (element.tagName !== 'BUTTON' && element.tagName !== 'A') {
-                element.setAttribute('tabindex', '0');
-                element.setAttribute('role', 'button');
-            }
-
-            CoreDom.onActivate(element, async (event) => {
+            CoreDom.initializeClickableElementA11y(element, async (event) => {
                 event.preventDefault();
                 event.stopPropagation();
 
@@ -600,7 +659,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
                 }
 
                 if (openInApp) {
-                    site.openInAppWithAutoLoginIfSameSite(url);
+                    site.openInAppWithAutoLogin(url);
 
                     if (refreshOnResume && this.refreshContext) {
                         // Refresh the context when the IAB is closed.
@@ -609,13 +668,13 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
                         });
                     }
                 } else {
-                    site.openInBrowserWithAutoLoginIfSameSite(url, undefined, {
+                    site.openInBrowserWithAutoLogin(url, undefined, {
                         showBrowserWarning: !confirmMessage,
                     });
 
                     if (refreshOnResume && this.refreshContext) {
                         // Refresh the context when the app is resumed.
-                        CoreSubscriptions.once(Platform.resume, () => {
+                        CoreSubscriptions.once(CorePlatform.resume, () => {
                             NgZone.run(async () => {
                                 this.refreshContext?.refreshContext();
                             });
@@ -629,7 +688,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
     /**
      * Returns the element width in pixels.
      *
-     * @return The width of the element in pixels.
+     * @returns The width of the element in pixels.
      */
     protected async getElementWidth(): Promise<number> {
         if (!this.domElementPromise) {
@@ -675,6 +734,10 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
      * @param isVideo Whether it's a video.
      */
     protected treatMedia(element: HTMLElement, isVideo: boolean = false): void {
+        if (isVideo) {
+            this.fixVideoSrcPlaceholder(element);
+        }
+
         this.addMediaAdaptClass(element);
         this.addExternalContent(element);
 
@@ -692,18 +755,8 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
 
         const sources = Array.from(element.querySelectorAll('source'));
         const tracks = Array.from(element.querySelectorAll('track'));
-        const hasPoster = isVideo && !!element.getAttribute('poster');
-
-        if (isVideo && !hasPoster) {
-            this.fixVideoSrcPlaceholder(element);
-        }
 
         sources.forEach((source) => {
-            if (isVideo && !hasPoster) {
-                this.fixVideoSrcPlaceholder(source);
-            }
-            source.setAttribute('target-src', source.getAttribute('src') || '');
-            source.removeAttribute('src');
             this.addExternalContent(source);
         });
 
@@ -720,19 +773,23 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
     /**
      * Try to fix the placeholder displayed when a video doesn't have a poster.
      *
-     * @param element Element to fix.
+     * @param videoElement Element to fix.
      */
-    protected fixVideoSrcPlaceholder(element: HTMLElement): void {
-        const src = element.getAttribute('src');
-        if (!src) {
+    protected fixVideoSrcPlaceholder(videoElement: HTMLElement): void {
+        if (videoElement.getAttribute('poster')) {
+            // Video has a poster, nothing to fix.
             return;
         }
 
-        if (src.match(/#t=\d/)) {
-            return;
-        }
+        // Fix the video and its sources.
+        [videoElement].concat(Array.from(videoElement.querySelectorAll('source'))).forEach((element) => {
+            const src = element.getAttribute('src');
+            if (!src || src.match(/#t=\d/)) {
+                return;
+            }
 
-        element.setAttribute('src', src + '#t=0.001');
+            element.setAttribute('src', src + '#t=0.001');
+        });
     }
 
     /**
@@ -768,23 +825,8 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
         await CoreIframeUtils.fixIframeCookies(src);
 
         if (site && src) {
-            // Check if it's a Vimeo video. If it is, use the wsplayer script instead to make restricted videos work.
-            const matches = src.match(/https?:\/\/player\.vimeo\.com\/video\/([0-9]+)([?&]+h=([a-zA-Z0-9]*))?/);
-            if (matches && matches[1]) {
-                let newUrl = CoreText.concatenatePaths(site.getURL(), '/media/player/vimeo/wsplayer.php?video=') +
-                    matches[1] + '&token=' + site.getToken();
-
-                let privacyHash: string | undefined | null = matches[3];
-                if (!privacyHash) {
-                    // No privacy hash using the new format. Check the legacy format.
-                    const matches = src.match(/https?:\/\/player\.vimeo\.com\/video\/([0-9]+)(\/([a-zA-Z0-9]+))?/);
-                    privacyHash = matches && matches[3];
-                }
-
-                if (privacyHash) {
-                    newUrl += `&h=${privacyHash}`;
-                }
-
+            let vimeoUrl = CoreUrl.getVimeoPlayerUrl(src, site);
+            if (vimeoUrl) {
                 const domPromise = CoreDom.waitToBeInDOM(iframe);
                 this.domPromises.push(domPromise);
 
@@ -814,12 +856,12 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
 
                 // Width and height parameters are required in 3.6 and older sites.
                 if (site && !site.isVersionGreaterEqualThan('3.7')) {
-                    newUrl += '&width=' + width + '&height=' + height;
+                    vimeoUrl += '&width=' + width + '&height=' + height;
                 }
 
-                await CoreIframeUtils.fixIframeCookies(newUrl);
+                await CoreIframeUtils.fixIframeCookies(vimeoUrl);
 
-                iframe.src = newUrl;
+                iframe.src = vimeoUrl;
 
                 if (!iframe.width) {
                     iframe.width = String(width);
@@ -834,7 +876,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
                         if (iframe.contentDocument) {
                             const css = document.createElement('style');
                             css.setAttribute('type', 'text/css');
-                            css.innerHTML = 'iframe {width: 100%;height: 100%;}';
+                            css.innerHTML = 'iframe {width: 100%;height: 100%;position:absolute;top:0; left:0;}';
                             iframe.contentDocument.head.appendChild(css);
                         }
                     });
@@ -843,6 +885,38 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
         }
 
         CoreIframeUtils.treatFrame(iframe, false);
+    }
+
+    /**
+     * Replace a frame with a button to open the frame's URL in an external app.
+     *
+     * @param frame Frame element to replace.
+     * @param site Site instance.
+     * @param label The text to put in the button.
+     * @returns Whether iframe was replaced.
+     */
+    protected replaceFrameWithButton(frame: FrameElement, site: CoreSite | undefined, label: string): boolean {
+        const url = 'src' in frame ? frame.src : frame.data;
+        if (!url) {
+            return false;
+        }
+
+        const button = document.createElement('ion-button');
+        button.setAttribute('expand', 'block');
+        button.classList.add('ion-text-wrap');
+        button.innerHTML = label;
+
+        button.addEventListener('click', () => {
+            CoreIframeUtils.frameLaunchExternal(url, {
+                site,
+                component: this.component,
+                componentId: this.componentId,
+            });
+        });
+
+        frame.replaceWith(button);
+
+        return true;
     }
 
     /**
@@ -874,7 +948,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
      * Convert window.open to window.openWindowSafely inside HTML tags.
      *
      * @param text Text to treat.
-     * @return Treated text.
+     * @returns Treated text.
      */
     protected treatWindowOpen(text: string): string {
         // Get HTML tags that include window.open. Script tags aren't executed so there's no need to treat them.
@@ -897,6 +971,7 @@ export class CoreFormatTextDirective implements OnChanges, OnDestroy, AsyncCompo
 type FormatContentsResult = {
     div: HTMLElement;
     filters: CoreFilterFilter[];
+    elementControllers: ElementController[];
     options: CoreFilterFormatTextOptions;
     siteId?: string;
 };

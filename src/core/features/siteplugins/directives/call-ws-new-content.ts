@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Directive, Input, ElementRef, Optional } from '@angular/core';
-import { CoreSiteWSPreSets } from '@classes/site';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
 import { CoreNavigator } from '@services/navigator';
 import { CoreUtils } from '@services/utils/utils';
 import { Md5 } from 'ts-md5';
@@ -76,9 +76,7 @@ export class CoreSitePluginsCallWSNewContentDirective extends CoreSitePluginsCal
     }
 
     /**
-     * Function called when the WS call is successful.
-     *
-     * @param result Result of the WS call.
+     * @inheritdoc
      */
     protected wsCallSuccess(result: unknown): void {
         let args = this.args || {};
@@ -101,7 +99,7 @@ export class CoreSitePluginsCallWSNewContentDirective extends CoreSitePluginsCal
         } else {
             const component = this.component || this.parentContent?.component;
             const method = this.method || this.parentContent?.method;
-            const hash = <string> Md5.hashAsciiStr(JSON.stringify(args));
+            const hash = Md5.hashAsciiStr(JSON.stringify(args));
 
             CoreNavigator.navigateToSitePath(`siteplugins/content/${component}/${method}/${hash}`, {
                 params: {

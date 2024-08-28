@@ -38,9 +38,9 @@ export class AddonCompetencyCompetencyLinkHandlerService extends CoreContentLink
         courseId = courseId || parseInt(params.courseid || params.cid, 10);
 
         return [{
-            action: (siteId: string): void => {
+            action: async (siteId: string): Promise<void> => {
                 if (courseId) {
-                    CoreNavigator.navigateToSitePath(
+                    await CoreNavigator.navigateToSitePath(
                         `${COURSE_PAGE_NAME}/${courseId}/${ADDON_COMPETENCY_COMPETENCIES_PAGE}`,
                         {
                             params: { userId: params.userid },
@@ -52,7 +52,7 @@ export class AddonCompetencyCompetencyLinkHandlerService extends CoreContentLink
                 }
 
                 if (params.planid) {
-                    CoreNavigator.navigateToSitePath(
+                    await CoreNavigator.navigateToSitePath(
                         `${ADDON_COMPETENCY_LEARNING_PLANS_PAGE}/competencies/${params.planid}`,
                         {
                             params: { userId: params.userid },
@@ -70,10 +70,7 @@ export class AddonCompetencyCompetencyLinkHandlerService extends CoreContentLink
      * @inheritdoc
      */
     async isEnabled(siteId: string): Promise<boolean> {
-        // Handler is disabled if all competency features are disabled.
-        const disabled = await AddonCompetency.allCompetenciesDisabled(siteId);
-
-        return !disabled;
+        return AddonCompetency.areCompetenciesEnabled({ siteId });
     }
 
 }

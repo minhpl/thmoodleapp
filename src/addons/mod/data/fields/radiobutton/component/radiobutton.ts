@@ -11,8 +11,9 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 import { Component } from '@angular/core';
-import { AddonModDataFieldPluginComponent } from '../../../classes/field-plugin-component';
+import { AddonModDataFieldPluginBaseComponent } from '../../../classes/base-field-plugin-component';
 
 /**
  * Component to render data radiobutton field.
@@ -21,7 +22,7 @@ import { AddonModDataFieldPluginComponent } from '../../../classes/field-plugin-
     selector: 'addon-mod-data-field-radiobutton',
     templateUrl: 'addon-mod-data-field-radiobutton.html',
 })
-export class AddonModDataFieldRadiobuttonComponent extends AddonModDataFieldPluginComponent {
+export class AddonModDataFieldRadiobuttonComponent extends AddonModDataFieldPluginBaseComponent {
 
     options: string[] = [];
 
@@ -34,6 +35,7 @@ export class AddonModDataFieldRadiobuttonComponent extends AddonModDataFieldPlug
         }
 
         this.options = this.field.param1.split('\n');
+        this.options = this.options.filter((option) => option !== '');
 
         let val: string | undefined;
         if (this.editMode && this.value) {

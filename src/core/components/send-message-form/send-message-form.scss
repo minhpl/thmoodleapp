@@ -1,12 +1,15 @@
+@use "theme/globals" as *;
+
 :host {
+    display: contents;
+
     --textarea-background: var(--core-input-background);
     --textarea-color: var(--core-input-text);
     --textarea-border-width: var(--core-input-border-width);
     --textarea-border-color: var(--core-input-stroke);
-    --textarea-radius: var(--huge-radius);
+    --textarea-radius: var(--mdl-shape-borderRadius-xl);
 
     form {
-        position: relative;
         display: flex;
         align-items: center;
         width: 100%;
@@ -24,11 +27,16 @@
         border: var(--textarea-border-width) solid var(--textarea-border-color);
         border-radius: var(--textarea-radius);
 
-        min-height: var(--a11y-min-target-size);
+        min-height: var(--a11y-sizing-minTargetSize);
         line-height: 20px;
         padding: 10px;
-        margin: 4px 8px;
+        @include margin(4px, 0px, 4px, 8px);
         resize: vertical;
+    }
+
+    ion-button {
+        --padding-start: 16px;
+        --padding-end: 16px;
     }
 
     .core-send-message-input::placeholder {

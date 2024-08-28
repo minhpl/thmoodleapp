@@ -13,29 +13,48 @@
 // limitations under the License.
 
 import { CoreError } from '@classes/errors/error';
+import { CoreUserSupportConfig } from '@features/user/classes/support/support-config';
 
 /**
- * Error returned when performing operations regarding a site (check if it exists, authenticate user, etc.).
+ * Error returned when performing operations regarding a site.
  */
 export class CoreSiteError extends CoreError {
 
-    errorcode?: string;
-    critical?: boolean;
-    loggedOut?: boolean;
+    debug?: CoreSiteErrorDebug;
+    supportConfig?: CoreUserSupportConfig;
 
-    constructor(protected error: SiteError) {
-        super(error.message);
+    constructor(options: CoreSiteErrorOptions) {
+        super(options.message);
 
-        this.errorcode = error.errorcode;
-        this.critical = error.critical;
-        this.loggedOut = error.loggedOut;
+        this.debug = options.debug;
+        this.supportConfig = options.supportConfig;
+    }
+
+    /**
+     * @deprecated This getter should not be called directly, but it's defined for backwards compatibility with many
+     * parts of the code that type errors as any and use it. We cannot rename those because the errors could also be
+     * CoreWSError instances which do have an "errorcode" property.
+     *
+     * @returns error code.
+     */
+    get errorcode(): string | undefined {
+        return this.debug?.code;
     }
 
 }
 
-export type SiteError = {
+export type CoreSiteErrorDebug = {
+    code: string; // Technical error code useful for technical assistance.
+    details: string; // Technical error details useful for technical assistance.
+};
+
+export type CoreSiteErrorOptions = {
     message: string;
-    errorcode?: string;
-    critical?: boolean; // Whether the error is important enough to abort the operation.
-    loggedOut?: boolean; // Whether site has been marked as logged out.
+
+    // Debugging information.
+    debug?: CoreSiteErrorDebug;
+
+    // Configuration to use to contact site support. If this attribute is present, it means
+    // that the error warrants contacting support.
+    supportConfig?: CoreUserSupportConfig;
 };

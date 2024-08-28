@@ -15,8 +15,9 @@
 import { Injectable } from '@angular/core';
 import { CoreWSFile } from '@services/ws';
 import { Translate } from '@singletons';
-import { AddonModAssignPlugin } from '../assign';
+import { AddonModAssignAssign, AddonModAssignPlugin, AddonModAssignSavePluginData, AddonModAssignSubmission } from '../assign';
 import { AddonModAssignFeedbackHandler } from '../feedback-delegate';
+import { CoreFormFields } from '@singletons/form';
 
 /**
  * Default handler used when a feedback plugin doesn't have a specific implementation.
@@ -28,39 +29,39 @@ export class AddonModAssignDefaultFeedbackHandler implements AddonModAssignFeedb
     type = 'default';
 
     /**
-     * Discard the draft data of the feedback plugin.
-     *
-     * @return If the function is async, it should return a Promise resolved when done.
+     * @inheritdoc
      */
-    discardDraft(): void {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    discardDraft(assignId: number, userId: number, siteId?: string): void | Promise<void> {
         // Nothing to do.
     }
 
     /**
-     * Return the draft saved data of the feedback plugin.
-     *
-     * @return Data (or promise resolved with the data).
+     * @inheritdoc
      */
-    getDraft(): undefined {
+    getDraft(
+        assignId: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        userId: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): CoreFormFields | Promise<CoreFormFields | undefined> | undefined {
         // Nothing to do.
         return;
     }
 
     /**
-     * Get files used by this plugin.
-     * The files returned by this function will be prefetched when the user prefetches the assign.
-     *
-     * @return The files (or promise resolved with the files).
+     * @inheritdoc
      */
-    getPluginFiles(): CoreWSFile[] {
+    getPluginFiles(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): CoreWSFile[] | Promise<CoreWSFile[]> {
         return [];
     }
 
     /**
-     * Get a readable name to use for the plugin.
-     *
-     * @param plugin The plugin object.
-     * @return The plugin name.
+     * @inheritdoc
      */
     getPluginName(plugin: AddonModAssignPlugin): string {
         // Check if there's a translated string for the plugin.
@@ -81,57 +82,68 @@ export class AddonModAssignDefaultFeedbackHandler implements AddonModAssignFeedb
     }
 
     /**
-     * Check if the feedback data has changed for this plugin.
-     *
-     * @return Boolean (or promise resolved with boolean): whether the data has changed.
+     * @inheritdoc
      */
-    hasDataChanged(): boolean {
+    async hasDataChanged(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        inputData: CoreFormFields, // eslint-disable-line @typescript-eslint/no-unused-vars
+        userId: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): Promise<boolean> {
         return false;
     }
 
     /**
-     * Check whether the plugin has draft data stored.
-     *
-     * @return Boolean or promise resolved with boolean: whether the plugin has draft data.
+     * @inheritdoc
      */
-    hasDraftData(): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    hasDraftData(assignId: number, userId: number, siteId?: string): boolean | Promise<boolean> {
         return false;
     }
 
     /**
-     * Whether or not the handler is enabled on a site level.
-     *
-     * @return True or promise resolved with true if enabled.
+     * @inheritdoc
      */
     async isEnabled(): Promise<boolean> {
         return true;
     }
 
     /**
-     * Prefetch any required data for the plugin.
-     * This should NOT prefetch files. Files to be prefetched should be returned by the getPluginFiles function.
-     *
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
-    async prefetch(): Promise<void> {
+    async prefetch(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): Promise<void> {
         return;
     }
 
     /**
-     * Prepare and add to pluginData the data to send to the server based on the draft data saved.
-     *
-     * @return If the function is async, it should return a Promise resolved when done.
+     * @inheritdoc
      */
-    prepareFeedbackData(): void {
+    prepareFeedbackData(
+        assignId: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        userId: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        pluginData: AddonModAssignSavePluginData, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): void | Promise<void> {
         // Nothing to do.
     }
 
     /**
-     * Save draft data of the feedback plugin.
-     *
-     * @return If the function is async, it should return a Promise resolved when done.
+     * @inheritdoc
      */
-    saveDraft(): void {
+    saveDraft(
+        assignId: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        userId: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        data: CoreFormFields, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): void | Promise<void> {
         // Nothing to do.
     }
 

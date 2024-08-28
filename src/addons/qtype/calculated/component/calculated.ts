@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnInit, ElementRef } from '@angular/core';
+import { Component, ElementRef } from '@angular/core';
 
 import { AddonModQuizCalculatedQuestion, CoreQuestionBaseComponent } from '@features/question/classes/base-question-component';
 
@@ -22,22 +22,19 @@ import { AddonModQuizCalculatedQuestion, CoreQuestionBaseComponent } from '@feat
 @Component({
     selector: 'addon-qtype-calculated',
     templateUrl: 'addon-qtype-calculated.html',
+    styleUrls: ['calculated.scss'],
 })
-export class AddonQtypeCalculatedComponent extends CoreQuestionBaseComponent implements OnInit {
-
-    calcQuestion?: AddonModQuizCalculatedQuestion;
+export class AddonQtypeCalculatedComponent extends CoreQuestionBaseComponent<AddonModQuizCalculatedQuestion> {
 
     constructor(elementRef: ElementRef) {
         super('AddonQtypeCalculatedComponent', elementRef);
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
-    ngOnInit(): void {
+    init(): void {
         this.initCalculatedComponent();
-
-        this.calcQuestion = this.question;
     }
 
 }

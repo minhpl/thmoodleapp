@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { OnInit, OnDestroy, Input, Output, EventEmitter, Component, Optional, Inject } from '@angular/core';
 import { CoreAnyError } from '@classes/errors/error';
-import { IonRefresher } from '@ionic/angular';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 
@@ -31,6 +30,9 @@ import { CoreCourse } from '../services/course';
 import { CoreCourseHelper, CoreCourseModuleData } from '../services/course-helper';
 import { CoreCourseModuleDelegate, CoreCourseModuleMainComponent } from '../services/module-delegate';
 import { CoreCourseModulePrefetchDelegate } from '../services/module-prefetch-delegate';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreUrlUtils } from '@services/utils/url';
+import { CoreTime } from '@singletons/time';
 
 /**
  * Result of a resource download.
@@ -56,14 +58,14 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     component?: string; // Component name.
     componentId?: number; // Component ID.
     hasOffline = false; // Resources don't have any data to sync.
-
     description?: string; // Module description.
+    pluginName?: string; // The plugin name without "mod_", e.g. assign or book.
 
     protected fetchContentDefaultError = 'core.course.errorgetmodule'; // Default error to show when loading contents.
     protected isCurrentView = false; // Whether the component is in the current view.
     protected siteId?: string; // Current Site ID.
     protected statusObserver?: CoreEventObserver; // Observer of package status. Only if setStatusListener is called.
-    currentStatus?: string; // The current status of the module. Only if setStatusListener is called.
+    currentStatus?: DownloadStatus; // The current status of the module. Only if setStatusListener is called.
     downloadTimeReadable?: string; // Last download time in a readable format. Only if setStatusListener is called.
 
     protected completionObserver?: CoreEventObserver;
@@ -72,14 +74,16 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     protected showCompletion = false; // Whether to show completion inside the activity.
     protected displayDescription = true; // Wether to show Module description on module page, and not on summary or the contrary.
     protected isDestroyed = false; // Whether the component is destroyed.
-    protected fetchSuccess = false; // Whether a fetch was finished successfully.
     protected checkCompletionAfterLog = true; // Whether to check if completion has changed after calling logActivity.
+    protected finishSuccessfulFetch: () => void;
 
     constructor(
         @Optional() @Inject('') loggerName: string = 'CoreCourseModuleMainResourceComponent',
         protected courseContentsPage?: CoreCourseContentsPage,
     ) {
         this.logger = CoreLogger.getInstance(loggerName);
+
+        this.finishSuccessfulFetch = CoreTime.once(() => this.performFinishSuccessfulFetch());
     }
 
     /**
@@ -114,9 +118,9 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      *
      * @param refresher Refresher.
      * @param showErrors If show errors to the user of hide them.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async doRefresh(refresher?: IonRefresher | null, showErrors = false): Promise<void> {
+    async doRefresh(refresher?: HTMLIonRefresherElement | null, showErrors = false): Promise<void> {
         if (!this.module) {
             // Module can be undefined if course format changes from single activity to weekly/topics.
             return;
@@ -138,7 +142,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      *
      * @param sync If the refresh needs syncing.
      * @param showErrors Wether to show errors to the user or hide them.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     protected async refreshContent(sync: boolean = false, showErrors: boolean = false): Promise<void> {
@@ -162,7 +166,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         return;
@@ -172,7 +176,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      * Download the component contents.
      *
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     protected async fetchContent(refresh?: boolean): Promise<void> {
@@ -183,7 +187,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      * Loads the component contents and shows the corresponding error.
      *
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadContent(refresh?: boolean): Promise<void> {
         if (!this.module) {
@@ -211,7 +215,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      * Check if an error is a "module not found" error.
      *
      * @param error Error.
-     * @return Whether the error is a "module not found" error.
+     * @returns Whether the error is a "module not found" error.
      */
     protected isNotFoundError(error: CoreAnyError): boolean {
         return CoreTextUtils.getErrorMessageFromError(error) === Translate.instant('core.course.modulenotfound');
@@ -234,9 +238,12 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     /**
      * Check if the module is prefetched or being prefetched.
      * To make it faster, just use the data calculated by setStatusListener.
+     *
+     * @returns If module has been prefetched.
      */
     protected isPrefetched(): boolean {
-        return this.currentStatus != CoreConstants.NOT_DOWNLOADABLE && this.currentStatus != CoreConstants.NOT_DOWNLOADED;
+        return this.currentStatus !== DownloadStatus.NOT_DOWNLOADABLE &&
+            this.currentStatus !== DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
     }
 
     /**
@@ -244,6 +251,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      *
      * @param error The specific error.
      * @param multiLine Whether to put each message in a different paragraph or in a single line.
+     * @returns Error text message.
      */
     protected getErrorDownloadingSomeFilesMessage(error: string | CoreTextErrorObject, multiLine?: boolean): string {
         if (multiLine) {
@@ -274,7 +282,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      * @param previousStatus The previous status. If not defined, there is no previous status.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    protected showStatus(status: string, previousStatus?: string): void {
+    protected showStatus(status: DownloadStatus, previousStatus?: DownloadStatus): void {
         // To be overridden.
     }
 
@@ -282,7 +290,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      * Watch for changes on the status.
      *
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async setStatusListener(refresh?: boolean): Promise<void> {
         if (this.statusObserver === undefined) {
@@ -324,7 +332,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
      * If module.contents cannot be loaded then the Promise will be rejected.
      *
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async downloadResourceIfNeeded(
         refresh?: boolean,
@@ -338,7 +346,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
         // Get module status to determine if it needs to be downloaded.
         await this.setStatusListener(refresh);
 
-        if (this.currentStatus != CoreConstants.DOWNLOADED) {
+        if (this.currentStatus !== DownloadStatus.DOWNLOADED) {
             // Download content. This function also loads module contents if needed.
             try {
                 await CoreCourseModulePrefetchDelegate.downloadModule(this.module, this.courseId);
@@ -354,7 +362,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
 
         if (!this.module.contents?.length || (refresh && !contentsAlreadyLoaded)) {
             // Try to load the contents.
-            const ignoreCache = refresh && CoreApp.isOnline();
+            const ignoreCache = refresh && CoreNetwork.isOnline();
 
             try {
                 await CoreCourse.loadModuleContents(this.module, undefined, undefined, false, ignoreCache);
@@ -375,7 +383,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     /**
      * The completion of the modules has changed.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async onCompletionChange(): Promise<void> {
         // Update the module data after a while.
@@ -385,14 +393,26 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     /**
      * Fetch module.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchModule(): Promise<void> {
+        const previousCompletion = this.module.completiondata;
+
         const module = await CoreCourse.getModule(this.module.id, this.courseId);
 
         await CoreCourseHelper.loadModuleOfflineCompletion(this.courseId, module);
 
         this.module = module;
+
+        // @todo: Temporary fix to update course page completion. This should be refactored in MOBILE-4326.
+        if (previousCompletion && module.completiondata && previousCompletion.state !== module.completiondata.state) {
+            await CoreUtils.ignoreErrors(CoreCourse.invalidateSections(this.courseId));
+
+            CoreEvents.trigger(CoreEvents.COMPLETION_MODULE_VIEWED, {
+                courseId: this.courseId,
+                cmId: module.completiondata.cmid,
+            });
+        }
     }
 
     /**
@@ -432,16 +452,11 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     }
 
     /**
-     * Finish a successful fetch.
+     * Finish first successful fetch.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    protected async finishSuccessfulFetch(): Promise<void> {
-        if (this.fetchSuccess) {
-            return; // Already treated.
-        }
-
-        this.fetchSuccess = true;
+    protected async performFinishSuccessfulFetch(): Promise<void> {
         this.storeModuleViewed();
 
         // Log activity now.
@@ -459,7 +474,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     /**
      * Store module as viewed.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async storeModuleViewed(): Promise<void> {
         await CoreCourse.storeModuleViewed(this.courseId, this.module.id, { sectionId: this.module.section });
@@ -468,10 +483,40 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     /**
      * Log activity.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async logActivity(): Promise<void> {
         // To be overridden.
+    }
+
+    /**
+     * Log activity view in analytics.
+     *
+     * @param wsName Name of the WS used.
+     * @param options Other data to send.
+     * @returns Promise resolved when done.
+     */
+    async analyticsLogEvent(
+        wsName: string,
+        options: AnalyticsLogEventOptions = {},
+    ): Promise<void> {
+        let url: string | undefined;
+        if (options.sendUrl === true || options.sendUrl === undefined) {
+            if (typeof options.url === 'string') {
+                url = options.url;
+            } else if (this.pluginName) {
+                // Use default value.
+                url = CoreUrlUtils.addParamsToUrl(`/mod/${this.pluginName}/view.php?id=${this.module.id}`, options.data);
+            }
+        }
+
+        await CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM,
+            ws: wsName,
+            name: options.name || this.module.name,
+            data: { id: this.module.instance, category: this.pluginName, ...options.data },
+            url,
+        });
     }
 
     /**
@@ -482,7 +527,7 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.isDestroyed = true;
@@ -519,3 +564,10 @@ export class CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy,
     }
 
 }
+
+type AnalyticsLogEventOptions = {
+    data?: Record<string, unknown>; // Other data to send.
+    name?: string; // Name to send, defaults to activity name.
+    url?: string; // URL to use. If not set and sendUrl is true, a default value will be used.
+    sendUrl?: boolean; // Whether to pass a URL to analytics. Defaults to true.
+};

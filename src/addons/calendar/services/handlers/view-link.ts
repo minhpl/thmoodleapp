@@ -20,6 +20,7 @@ import { CoreContentLinksAction } from '@features/contentlinks/services/contentl
 import { CoreNavigator } from '@services/navigator';
 import { makeSingleton } from '@singletons';
 import { AddonCalendar } from '../calendar';
+import moment from 'moment-timezone';
 
 const SUPPORTED_VIEWS = ['month', 'mini', 'minithree', 'day', 'upcoming', 'upcoming_mini'];
 
@@ -38,7 +39,7 @@ export class AddonCalendarViewLinkHandlerService extends CoreContentLinksHandler
      * @param siteIds List of sites the URL belongs to.
      * @param url The URL to treat.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
     getActions(
         siteIds: string[],
@@ -46,7 +47,7 @@ export class AddonCalendarViewLinkHandlerService extends CoreContentLinksHandler
         params: Record<string, string>,
     ): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
         return [{
-            action: (siteId?: string): void => {
+            action: async (siteId?: string): Promise<void> => {
                 if (!params.view || params.view == 'month' || params.view == 'mini' || params.view == 'minithree') {
                     // Monthly view, open the calendar tab.
                     const stateParams: Params = {
@@ -54,11 +55,11 @@ export class AddonCalendarViewLinkHandlerService extends CoreContentLinksHandler
                     };
                     const timestamp = params.time ? Number(params.time) * 1000 : Date.now();
 
-                    const date = new Date(timestamp);
-                    stateParams.year = date.getFullYear();
-                    stateParams.month = date.getMonth() + 1;
+                    const momentInstance = moment(timestamp);
+                    stateParams.year = momentInstance.year();
+                    stateParams.month = momentInstance.month() + 1;
 
-                    CoreNavigator.navigateToSitePath('/calendar/index', {
+                    await CoreNavigator.navigateToSitePath('/calendar/index', {
                         params: stateParams,
                         siteId,
                         preferCurrentTab: false,
@@ -71,12 +72,12 @@ export class AddonCalendarViewLinkHandlerService extends CoreContentLinksHandler
                     };
                     const timestamp = params.time ? Number(params.time) * 1000 : Date.now();
 
-                    const date = new Date(timestamp);
-                    stateParams.year = date.getFullYear();
-                    stateParams.month = date.getMonth() + 1;
-                    stateParams.day = date.getDate();
+                    const momentInstance = moment(timestamp);
+                    stateParams.year = momentInstance.year();
+                    stateParams.month = momentInstance.month() + 1;
+                    stateParams.day = momentInstance.date();
 
-                    CoreNavigator.navigateToSitePath('/calendar/day', { params: stateParams, siteId });
+                    await CoreNavigator.navigateToSitePath('/calendar/day', { params: stateParams, siteId });
 
                 } else if (params.view == 'upcoming' || params.view == 'upcoming_mini') {
                     // Upcoming view, open the calendar tab.
@@ -85,7 +86,7 @@ export class AddonCalendarViewLinkHandlerService extends CoreContentLinksHandler
                         upcoming: true,
                     };
 
-                    CoreNavigator.navigateToSitePath('/calendar/index', {
+                    await CoreNavigator.navigateToSitePath('/calendar/index', {
                         params: stateParams,
                         siteId,
                         preferCurrentTab: false,
@@ -103,7 +104,7 @@ export class AddonCalendarViewLinkHandlerService extends CoreContentLinksHandler
      * @param siteId The site ID.
      * @param url The URL to treat.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
-     * @return Whether the handler is enabled for the URL and site.
+     * @returns Whether the handler is enabled for the URL and site.
      */
     async isEnabled(siteId: string, url: string, params: Record<string, string>): Promise<boolean> {
         if (params.view && SUPPORTED_VIEWS.indexOf(params.view) == -1) {

@@ -16,7 +16,7 @@ import { Component, Input, Output, OnInit, OnDestroy, ElementRef, EventEmitter, 
 import { CoreTabBase } from '@classes/tabs';
 
 import { CoreUtils } from '@services/utils/utils';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 import { CoreNavBarButtonsComponent } from '../navbar-buttons/navbar-buttons';
 import { CoreTabsComponent } from './tabs';
 
@@ -41,7 +41,7 @@ import { CoreTabsComponent } from './tabs';
  */
 @Component({
     selector: 'core-tab',
-    template: '<ng-container *ngIf="loaded" [ngTemplateOutlet]="template"></ng-container>',
+    template: '<ng-container *ngIf="loaded && template" [ngTemplateOutlet]="template" />',
 })
 export class CoreTabComponent implements OnInit, OnDestroy, CoreTabBase {
 
@@ -68,7 +68,7 @@ export class CoreTabComponent implements OnInit, OnDestroy, CoreTabBase {
     @Input() id = ''; // An ID to identify the tab.
     @Output() ionSelect: EventEmitter<CoreTabComponent> = new EventEmitter<CoreTabComponent>();
 
-    @ContentChild(TemplateRef) template?: TemplateRef<unknown>; // Template defined by the content.
+    @ContentChild(TemplateRef) template?: TemplateRef<void>; // Template defined by the content.
 
     element: HTMLElement; // The core-tab element.
     loaded = false;
@@ -89,7 +89,7 @@ export class CoreTabComponent implements OnInit, OnDestroy, CoreTabBase {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         this.element.setAttribute('aria-labelledby', this.id + '-tab');
@@ -140,7 +140,7 @@ export class CoreTabComponent implements OnInit, OnDestroy, CoreTabBase {
     protected showHideNavBarButtons(show: boolean): void {
         const elements = this.element.querySelectorAll('core-navbar-buttons');
         elements.forEach((element) => {
-            const instance = CoreComponentsRegistry.resolve(element, CoreNavBarButtonsComponent);
+            const instance = CoreDirectivesRegistry.resolve(element, CoreNavBarButtonsComponent);
 
             if (instance) {
                 instance.forceHide(!show);

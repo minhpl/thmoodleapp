@@ -28,14 +28,12 @@ import { CoreContextMenuItemComponent } from './context-menu-item';
 })
 export class CoreContextMenuPopoverComponent {
 
-    title: string;
     uniqueId: string;
     items: CoreContextMenuItemComponent[];
 
     constructor(
         navParams: NavParams,
     ) {
-        this.title = navParams.get('title');
         this.items = navParams.get('items') || [];
         this.uniqueId = navParams.get('id');
     }
@@ -52,7 +50,7 @@ export class CoreContextMenuPopoverComponent {
      *
      * @param event Click event.
      * @param item Item clicked.
-     * @return Return true if success, false if error.
+     * @returns Return true if success, false if error.
      */
     itemClicked(event: Event, item: CoreContextMenuItemComponent): boolean {
         if (item.iconAction == 'toggle' && !event.defaultPrevented) {
@@ -61,7 +59,7 @@ export class CoreContextMenuPopoverComponent {
             item.toggle = !item.toggle;
         }
 
-        if (!!item.action && item.action.observers.length > 0) {
+        if (!!item.action && item.action.observed) {
             event.preventDefault();
             event.stopPropagation();
 
@@ -73,8 +71,8 @@ export class CoreContextMenuPopoverComponent {
                 this.closeMenu(item);
             }
 
-            item.action.emit(this.closeMenu.bind(this, item));
-        } else if (item.closeOnClick && (item.href || (!!item.onClosed && item.onClosed.observers.length > 0))) {
+            item.action.emit(() => this.closeMenu(item));
+        } else if (item.closeOnClick && (item.href || (!!item.onClosed && item.onClosed.observed))) {
             this.closeMenu(item);
         }
 

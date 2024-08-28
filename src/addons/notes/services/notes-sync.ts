@@ -16,7 +16,7 @@ import { Injectable } from '@angular/core';
 import { CoreSyncBaseProvider } from '@classes/base-sync';
 import { CoreNetworkError } from '@classes/errors/network-error';
 import { CoreCourses } from '@features/courses/services/courses';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { Translate, makeSingleton } from '@singletons';
@@ -24,6 +24,9 @@ import { CoreEvents } from '@singletons/events';
 import { AddonNotesDBRecord, AddonNotesDeletedDBRecord } from './database/notes';
 import { AddonNotes, AddonNotesCreateNoteData } from './notes';
 import { AddonNotesOffline } from './notes-offline';
+import { CoreArray } from '@singletons/array';
+import { CoreAnyError } from '@classes/errors/error';
+import { CoreTextUtils } from '@services/utils/text';
 
 /**
  * Service to sync notes.
@@ -42,10 +45,10 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
      *
      * @param siteId Site ID to sync. If not defined, sync all sites.
      * @param force Wether to force sync not depending on last execution.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     syncAllNotes(siteId?: string, force?: boolean): Promise<void> {
-        return this.syncOnSites('all notes', this.syncAllNotesFunc.bind(this, !!force), siteId);
+        return this.syncOnSites('all notes', (siteId) => this.syncAllNotesFunc(!!force, siteId), siteId);
     }
 
     /**
@@ -53,7 +56,7 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
      *
      * @param force Wether to force sync not depending on last execution.
      * @param siteId Site ID to sync.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     protected async syncAllNotesFunc(force: boolean, siteId: string): Promise<void> {
         const notesArray = await Promise.all([
@@ -67,7 +70,7 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
             courseIds = courseIds.concat(notes.map((note) => note.courseid));
         });
 
-        CoreUtils.uniqueArray(courseIds);
+        CoreArray.unique(courseIds);
 
         // Sync all courses.
         const promises = courseIds.map(async (courseId) => {
@@ -92,7 +95,7 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the notes are synced or if they don't need to be synced.
+     * @returns Promise resolved when the notes are synced or if they don't need to be synced.
      */
     protected async syncNotesIfNeeded(courseId: number, siteId?: string): Promise<AddonNotesSyncResult | undefined> {
         const needed = await this.isSyncNeeded(courseId, siteId);
@@ -107,7 +110,7 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     syncNotes(courseId: number, siteId?: string): Promise<AddonNotesSyncResult> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -130,7 +133,7 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
      *
      * @param courseId Course ID.
      * @param siteId Site ID.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     async performSyncNotes(courseId: number, siteId?: string): Promise<AddonNotesSyncResult> {
         const result: AddonNotesSyncResult = {
@@ -148,12 +151,12 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
             return result;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // Cannot sync in offline.
             throw new CoreNetworkError();
         }
 
-        const errors: string[] = [];
+        const errors: CoreAnyError[] = [];
         const promises: Promise<void>[] = [];
 
         // Format the notes to be sent.
@@ -231,8 +234,8 @@ export class AddonNotesSyncProvider extends CoreSyncBaseProvider<AddonNotesSyncR
 
             result.warnings = errors.map((error) =>
                 Translate.instant('addon.notes.warningnotenotsent', {
-                    course: 'fullname' in course ? course.fullname : courseId,
-                    error: error,
+                    course: 'fullname' in course ? course.fullname : courseId, // @deprecated since 4.3.
+                    error: CoreTextUtils.getErrorMessageFromError(error),
                 }));
         }
 

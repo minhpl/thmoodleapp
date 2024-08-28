@@ -18,7 +18,7 @@ import { COURSE_PAGE_NAME } from '@features/course/course.module';
 import { CoreUserProfile } from '@features/user/services/user';
 import {
     CoreUserProfileHandler,
-    CoreUserDelegateService,
+    CoreUserProfileHandlerType,
     CoreUserProfileHandlerData,
     CoreUserDelegateContext,
 } from '@features/user/services/user-delegate';
@@ -36,14 +36,14 @@ export class AddonCompetencyUserHandlerService implements CoreUserProfileHandler
 
     name = 'AddonCompetency'; // This name doesn't match any disabled feature, they'll be checked in isEnabledForContext.
     priority = 100;
-    type = CoreUserDelegateService.TYPE_NEW_PAGE;
+    type = CoreUserProfileHandlerType.LIST_ITEM;
     cacheEnabled = true;
 
     /**
      * @inheritdoc
      */
     async isEnabled(): Promise<boolean> {
-        return true;
+        return AddonCompetency.areCompetenciesEnabled();
     }
 
     /**

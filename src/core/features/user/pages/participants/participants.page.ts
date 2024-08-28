@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { AfterViewInit, Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
 
 import { CoreApp } from '@services/app';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -24,6 +23,8 @@ import { CoreUser, CoreUserParticipant, CoreUserData } from '@features/user/serv
 import { CoreUtils } from '@services/utils/utils';
 import { CoreUserParticipantsSource } from '@features/user/classes/participants-source';
 import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/routed-items-manager-sources-tracker';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { Translate } from '@singletons';
 
 /**
  * Page that displays the list of course participants.
@@ -39,7 +40,6 @@ export class CoreUserParticipantsPage implements OnInit, AfterViewInit, OnDestro
     searchQuery: string | null = null;
     searchInProgress = false;
     searchEnabled = false;
-    showSearchBox = false;
     fetchMoreParticipantsFailed = false;
 
     @ViewChild(CoreSplitViewComponent) splitView!: CoreSplitViewComponent;
@@ -73,8 +73,14 @@ export class CoreUserParticipantsPage implements OnInit, AfterViewInit, OnDestro
      */
     async ngAfterViewInit(): Promise<void> {
         await this.fetchInitialParticipants();
+        await this.participants.start(this.splitView);
+    }
 
-        this.participants.start(this.splitView);
+    /**
+     * @inheritdoc
+     */
+    async ionViewDidEnter(): Promise<void> {
+        await this.participants.start();
     }
 
     /**
@@ -82,20 +88,6 @@ export class CoreUserParticipantsPage implements OnInit, AfterViewInit, OnDestro
      */
     ngOnDestroy(): void {
         this.participants.destroy();
-    }
-
-    /**
-     * Show or hide search box.
-     */
-    toggleSearch(): void {
-        this.showSearchBox = !this.showSearchBox;
-
-        if (this.showSearchBox) {
-            // Make search bar visible.
-            this.splitView.menuContent.scrollToTop();
-        } else {
-            this.clearSearch();
-        }
     }
 
     /**
@@ -143,7 +135,7 @@ export class CoreUserParticipantsPage implements OnInit, AfterViewInit, OnDestro
      *
      * @param refresher Refresher.
      */
-    async refreshParticipants(refresher: IonRefresher): Promise<void> {
+    async refreshParticipants(refresher: HTMLIonRefresherElement): Promise<void> {
         await CoreUtils.ignoreErrors(CoreUser.invalidateParticipantsList(this.courseId));
         await CoreUtils.ignoreErrors(this.fetchParticipants(true));
 
@@ -204,7 +196,15 @@ class CoreUserParticipantsManager extends CoreListItemsManager<CoreUserParticipa
      * @inheritdoc
      */
     protected async logActivity(): Promise<void> {
-        await CoreUser.logParticipantsView(this.getSource().COURSE_ID);
+        await CoreUtils.ignoreErrors(CoreUser.logParticipantsView(this.getSource().COURSE_ID));
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+            ws: 'core_user_view_user_list',
+            name: Translate.instant('core.user.participants'),
+            data: { courseid: this.getSource().COURSE_ID, category: 'user' },
+            url: `/user/index.php?id=${this.getSource().COURSE_ID}`,
+        });
     }
 
 }

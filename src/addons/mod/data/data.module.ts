@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
@@ -22,10 +22,6 @@ import { CoreTagAreaDelegate } from '@features/tag/services/tag-area-delegate';
 import { CoreCronDelegate } from '@services/cron';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
 import { AddonModDataProvider } from './services/data';
-import { AddonModDataFieldsDelegateService } from './services/data-fields-delegate';
-import { AddonModDataHelperProvider } from './services/data-helper';
-import { AddonModDataOfflineProvider } from './services/data-offline';
-import { AddonModDataSyncProvider } from './services/data-sync';
 import { ADDON_MOD_DATA_OFFLINE_SITE_SCHEMA } from './services/database/data';
 import { AddonModDataApproveLinkHandler } from './services/handlers/approve-link';
 import { AddonModDataDeleteLinkHandler } from './services/handlers/delete-link';
@@ -38,16 +34,7 @@ import { AddonModDataShowLinkHandler } from './services/handlers/show-link';
 import { AddonModDataSyncCronHandler } from './services/handlers/sync-cron';
 import { AddonModDataTagAreaHandler } from './services/handlers/tag-area';
 import { AddonModDataFieldModule } from './fields/field.module';
-import { AddonModDataComponentsModule } from './components/components.module';
-
-// List of providers (without handlers).
-export const ADDON_MOD_DATA_SERVICES: Type<unknown>[] = [
-    AddonModDataProvider,
-    AddonModDataHelperProvider,
-    AddonModDataSyncProvider,
-    AddonModDataOfflineProvider,
-    AddonModDataFieldsDelegateService,
-];
+import { CoreCourseHelper } from '@features/course/services/course-helper';
 
 const routes: Routes = [
     {
@@ -60,7 +47,6 @@ const routes: Routes = [
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
         AddonModDataFieldModule,
-        AddonModDataComponentsModule,
     ],
     providers: [
         {
@@ -82,6 +68,8 @@ const routes: Routes = [
                 CoreContentLinksDelegate.registerHandler(AddonModDataShowLinkHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModDataEditLinkHandler.instance);
                 CoreTagAreaDelegate.registerHandler(AddonModDataTagAreaHandler.instance);
+
+                CoreCourseHelper.registerModuleReminderClick(AddonModDataProvider.COMPONENT);
             },
         },
     ],

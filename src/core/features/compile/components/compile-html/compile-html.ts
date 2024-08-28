@@ -33,6 +33,7 @@ import {
     Type,
     KeyValueDiffer,
 } from '@angular/core';
+import { CorePromisedValue } from '@classes/promised-value';
 
 import { CoreCompile } from '@features/compile/services/compile';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -55,10 +56,9 @@ import { CoreUtils } from '@services/utils/utils';
  */
 @Component({
     selector: 'core-compile-html',
-    template: '<core-loading [hideUntil]="loaded"><ng-container #dynamicComponent></ng-container></core-loading>',
+    template: '<core-loading [hideUntil]="loaded"><ng-container #dynamicComponent /></core-loading>',
     styles: [':host { display: contents; }'],
 })
-// eslint-disable-next-line @angular-eslint/no-conflicting-lifecycle
 export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
 
     @Input() text!: string; // The HTML text to display.
@@ -66,15 +66,15 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
     @Input() jsData?: Record<string, unknown>; // Data to pass to the fake component.
     @Input() extraImports: unknown[] = []; // Extra import modules.
     @Input() extraProviders: Type<unknown>[] = []; // Extra providers.
-    @Input() forceCompile?: boolean; // Set it to true to force compile even if the text/javascript hasn't changed.
+    @Input() forceCompile = false; // Set it to true to force compile even if the text/javascript hasn't changed.
     @Output() created = new EventEmitter<unknown>(); // Will emit an event when the component is instantiated.
     @Output() compiling = new EventEmitter<boolean>(); // Event that indicates whether the template is being compiled.
 
+    loaded = false;
+    componentInstance?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
+
     // Get the container where to put the content.
     @ViewChild('dynamicComponent', { read: ViewContainerRef }) container?: ViewContainerRef;
-
-    loaded?: boolean;
-    componentInstance?: any; // eslint-disable-line @typescript-eslint/no-explicit-any
 
     protected componentRef?: ComponentRef<unknown>;
     protected element: HTMLElement;
@@ -92,9 +92,8 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
     }
 
     /**
-     * Detect and act upon changes that Angular can’t or won’t detect on its own (objects and arrays).
+     * @inheritdoc
      */
-    // eslint-disable-next-line @angular-eslint/no-conflicting-lifecycle
     ngDoCheck(): void {
         if (!this.componentInstance || this.creatingComponent) {
             return;
@@ -112,50 +111,54 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
     }
 
     /**
-     * Detect changes on input properties.
+     * @inheritdoc
      */
-    // eslint-disable-next-line @angular-eslint/no-conflicting-lifecycle
     async ngOnChanges(changes: Record<string, SimpleChange>): Promise<void> {
         // Only compile if text/javascript has changed or the forceCompile flag has been set to true.
-        if (this.text !== undefined && (changes.text || changes.javascript ||
-                (changes.forceCompile && CoreUtils.isTrueOrOne(this.forceCompile)))) {
+        if (this.text === undefined ||
+            !(changes.text || changes.javascript || (changes.forceCompile && CoreUtils.isTrueOrOne(this.forceCompile)))) {
+            return;
+        }
 
-            // Create a new component and a new module.
-            this.creatingComponent = true;
-            this.compiling.emit(true);
+        // Create a new component and a new module.
+        this.creatingComponent = true;
+        this.compiling.emit(true);
 
-            try {
-                const factory = await CoreCompile.createAndCompileComponent(
+        try {
+            const componentClass = await this.getComponentClass();
+
+            // Destroy previous components.
+            this.componentRef?.destroy();
+
+            // Create the component.
+            if (this.container) {
+                this.componentRef = await CoreCompile.createAndCompileComponent(
                     this.text,
-                    this.getComponentClass(),
+                    componentClass,
+                    this.container,
                     this.extraImports,
                 );
 
-                // Destroy previous components.
-                this.componentRef?.destroy();
-
-                if (factory) {
-                    // Create the component.
-                    this.componentRef = this.container?.createComponent(factory);
-                    this.componentRef && this.created.emit(this.componentRef.instance);
-                }
-
-                this.loaded = true;
-            } catch (error) {
-                CoreDomUtils.showErrorModal(error);
-
-                this.loaded = true;
-            } finally {
-                this.creatingComponent = false;
-                this.compiling.emit(false);
+                this.element.addEventListener('submit', (event) => {
+                    event.preventDefault();
+                });
             }
+            this.componentRef && this.created.emit(this.componentRef.instance);
+
+            this.loaded = true;
+        } catch (error) {
+            CoreDomUtils.showErrorModal(error);
+
+            this.loaded = true;
+        } finally {
+            this.creatingComponent = false;
+            this.compiling.emit(false);
         }
     }
 
     /**
-     * Component destroyed.
+     * @inheritdoc
      */
-    // eslint-disable-next-line @angular-eslint/no-conflicting-lifecycle
     ngOnDestroy(): void {
         this.componentRef?.destroy();
     }
@@ -163,14 +166,17 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
     /**
      * Get a class that defines the dynamic component.
      *
-     * @return The component class.
+     * @returns The component class.
      */
-    protected getComponentClass(): Type<unknown> {
+    protected async getComponentClass(): Promise<Type<unknown>> {
         // eslint-disable-next-line @typescript-eslint/no-this-alias
         const compileInstance = this;
+        await CoreCompile.loadLibraries();
 
         // Create the component, using the text as the template.
         return class CoreCompileHtmlFakeComponent implements OnInit, AfterContentInit, AfterViewInit, OnDestroy {
+
+            private ongoingLifecycleHooks: Set<keyof AfterViewInit | keyof AfterContentInit | keyof OnDestroy> = new Set();
 
             constructor() {
                 // Store this instance so it can be accessed by the outer component.
@@ -181,7 +187,10 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
                 this['dataArray'] = [];
 
                 // Inject the libraries.
-                CoreCompile.injectLibraries(this, compileInstance.extraProviders);
+                CoreCompile.injectLibraries(
+                    this,
+                    compileInstance.extraProviders,
+                );
 
                 // Always add these elements, they could be needed on component init (componentObservable).
                 this['ChangeDetectorRef'] = compileInstance.changeDetector;
@@ -192,7 +201,7 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
             }
 
             /**
-             * Component being initialized.
+             * @inheritdoc
              */
             ngOnInit(): void {
                 // If there is some javascript to run, do it now.
@@ -204,7 +213,7 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
                 for (const name in compileInstance.pendingCalls) {
                     const pendingCall = compileInstance.pendingCalls[name];
 
-                    if (typeof this[name] == 'function') {
+                    if (typeof this[name] === 'function') {
                         // Call the function.
                         Promise.resolve(this[name].apply(this, pendingCall.params)).then(pendingCall.defer.resolve)
                             .catch(pendingCall.defer.reject);
@@ -218,24 +227,44 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
             }
 
             /**
-             * Content has been initialized.
+             * @inheritdoc
              */
             ngAfterContentInit(): void {
-                // To be overridden.
+                this.callLifecycleHookOverride('ngAfterContentInit');
             }
 
             /**
-             * View has been initialized.
+             * @inheritdoc
              */
             ngAfterViewInit(): void {
-                // To be overridden.
+                this.callLifecycleHookOverride('ngAfterViewInit');
             }
 
             /**
-             * Component destroyed.
+             * @inheritdoc
              */
             ngOnDestroy(): void {
-                // To be overridden.
+                this.callLifecycleHookOverride('ngOnDestroy');
+            }
+
+            /**
+             * Call a lifecycle method that can be overriden in plugins.
+             *
+             * This is necessary because overriding lifecycle hooks at runtime does not work in Angular. This may be happening
+             * because lifecycle hooks are special methods treated by the Angular compiler, so it is possible that it's storing
+             * a reference to the method defined during compilation. In order to work around that, this will call the actual method
+             * from the plugin without causing infinite loops in case it wasn't overriden.
+             *
+             * @param method Lifecycle hook method name.
+             */
+            private callLifecycleHookOverride(method: keyof AfterViewInit | keyof AfterContentInit | keyof OnDestroy): void {
+                if (this.ongoingLifecycleHooks.has(method)) {
+                    return;
+                }
+
+                this.ongoingLifecycleHooks.add(method);
+                this[method]();
+                this.ongoingLifecycleHooks.delete(method);
             }
 
         };
@@ -261,11 +290,11 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
      * @param params List of params to send to the function.
      * @param callWhenCreated If this param is true and the component hasn't been created yet, call the function
      *                        once the component has been created.
-     * @return Result of the call. Undefined if no component instance or the function doesn't exist.
+     * @returns Result of the call. Undefined if no component instance or the function doesn't exist.
      */
-    callComponentFunction(name: string, params?: unknown[], callWhenCreated: boolean = true): unknown {
+    callComponentFunction(name: string, params?: unknown[], callWhenCreated = true): unknown {
         if (this.componentInstance) {
-            if (typeof this.componentInstance[name] == 'function') {
+            if (typeof this.componentInstance[name] === 'function') {
                 return this.componentInstance[name].apply(this.componentInstance, params);
             }
         } else if (callWhenCreated) {
@@ -278,14 +307,14 @@ export class CoreCompileHtmlComponent implements OnChanges, OnDestroy, DoCheck {
                 return this.pendingCalls[name].defer.promise;
             }
 
-            const defer = CoreUtils.promiseDefer();
+            const defer = new CorePromisedValue();
 
             this.pendingCalls[name] = {
                 params,
                 defer,
             };
 
-            return defer.promise;
+            return defer;
         }
     }
 

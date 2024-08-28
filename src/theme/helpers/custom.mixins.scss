@@ -11,81 +11,124 @@
 // --------------------------------------------------------------------------------------------
 @function get-color-shade-percent($color, $percent: 48%) {
     @return mix(#000, $color, $percent);
-  }
+}
 
-  // Mixes a color with white to create its tint.
-  // Default to bootstrap level -10.
-  // --------------------------------------------------------------------------------------------
-  @function get-color-tint-percent($color, $percent: 80%) {
+// Mixes a color with white to create its tint.
+// Default to bootstrap level -10.
+// --------------------------------------------------------------------------------------------
+@function get-color-tint-percent($color, $percent: 80%) {
     @return mix(#fff, $color, $percent);
-  }
+}
 
-  // Ionic Colors
-  // --------------------------------------------------
-  // Generates the color classes and variables based on the
-  // colors map
+// Ionic Colors
+// --------------------------------------------------
+// Generates the color classes and variables based on the
+// colors map
 
-  @mixin generate-color($color-name, $colors) {
-      $base: map-get($colors, $color-name);
-      $light: map-get($base, 'light');
+@mixin generate-color($color-name, $colors, $theme) {
+    $color-themes: map-get($colors, $color-name);
+    $base: map-get($color-themes, $theme);
 
-      @include generate-color-variants($color-name, $light);
+    @if $theme == 'dark' {
+        $base: mix(map-get($color-themes, 'light'), white, 80%) !default;
+    }
 
-      body.dark {
-          $dark: map-get($base, 'dark');
-          $dark: mix($light, white, 80%) !default;
-          @include generate-color-variants($color-name, $dark);
-      }
-  }
+    @include generate-color-variants($color-name, $base);
+}
 
-  @mixin generate-color-variants($color-name, $base) {
-      $contrast: get_contrast_color($base);
-      $shade: get-color-shade-percent($base);
-      $tint: get-color-tint-percent($base);
+@mixin generate-color-variants($color-name, $base) {
+    $contrast: get_contrast_color($base);
+    $shade: get-color-shade-percent($base);
+    $tint: get-color-tint-percent($base);
 
-      --#{$color-name}: #{$base};
-      --#{$color-name}-shade: #{$shade};
-      --#{$color-name}-tint: #{$tint};
-      --#{$color-name}-contrast: #{$contrast};
+    --#{$color-name}: #{$base};
+    --#{$color-name}-shade: #{$shade};
+    --#{$color-name}-tint: #{$tint};
+    --#{$color-name}-contrast: #{$contrast};
 
-      // Internal ionic use only.
-      --ion-color-#{$color-name}: var(--#{$color-name});
-      --ion-color-#{$color-name}-base: var(--ion-color-#{$color-name});
-      --ion-color-#{$color-name}-rgb: #{color-to-rgb-list($base)};
-      --ion-color-#{$color-name}-contrast: #{$contrast};
-      --ion-color-#{$color-name}-contrast-rgb: #{color-to-rgb-list($contrast)};
-      --ion-color-#{$color-name}-shade: #{$shade};
-      --ion-color-#{$color-name}-tint: #{$tint};
+    // Internal ionic use only.
+    --ion-color-#{$color-name}: var(--#{$color-name});
+    --ion-color-#{$color-name}-base: var(--ion-color-#{$color-name});
+    --ion-color-#{$color-name}-rgb: #{color-to-rgb-list($base)};
+    --ion-color-#{$color-name}-contrast: #{$contrast};
+    --ion-color-#{$color-name}-contrast-rgb: #{color-to-rgb-list($contrast)};
+    --ion-color-#{$color-name}-shade: #{$shade};
+    --ion-color-#{$color-name}-tint: #{$tint};
 
-      .ion-color-#{$color-name} {
-          --ion-color: var(--ion-color-#{$color-name});
-          --ion-color-base: var(--ion-color-#{$color-name}-base);
-          --ion-color-rgb: var(--ion-color-#{$color-name}-rgb);
-          --ion-color-contrast: var(--ion-color-#{$color-name}-contrast);
-          --ion-color-contrast-rgb: var(--ion-color-#{$color-name}-contrast-rgb);
-          --ion-color-shade: var(--ion-color-#{$color-name}-shade);
-          --ion-color-tint: var(--ion-color-#{$color-name}-tint);
-      }
-  }
+    .ion-color-#{$color-name} {
+        --ion-color: var(--ion-color-#{$color-name});
+        --ion-color-base: var(--ion-color-#{$color-name}-base);
+        --ion-color-rgb: var(--ion-color-#{$color-name}-rgb);
+        --ion-color-contrast: var(--ion-color-#{$color-name}-contrast);
+        --ion-color-contrast-rgb: var(--ion-color-#{$color-name}-contrast-rgb);
+        --ion-color-shade: var(--ion-color-#{$color-name}-shade);
+        --ion-color-tint: var(--ion-color-#{$color-name}-tint);
+    }
+}
+
+@mixin core-focus-over() {
+    &:focus-visible {
+        @include core-focus-over-internal();
+    }
+
+    @supports not selector(:focus-visible) {
+        @at-root:focus {
+            @include core-focus-over-internal();
+        }
+    }
+}
+
+@mixin core-focus-outline() {
+    &:focus-visible {
+        @include core-focus-outline-internal();
+    }
+    @supports not selector(:focus-visible) {
+        @at-root:focus {
+            @include core-focus-outline-internal();
+        }
+    }
+}
+
+@mixin core-focus-background() {
+    &:focus-visible {
+        @include core-focus-background-internal();
+    }
+    @supports not selector(:focus-visible) {
+        @at-root:focus {
+            @include core-focus-background-internal();
+        }
+    }
+}
 
 
- @mixin core-focus() {
+@mixin core-focus-over-internal() {
     outline: none;
     position: relative;
+
     &::after {
-        @include position(0, 0, 0, 0);
+        @include position(0px, 0px, 0px, 0px);
         position: absolute;
         content: "";
-        opacity: 1;
         z-index: 1;
-        @include core-focus-style();
+        pointer-events: none;
+        user-select: none;
+        @include core-focus-background-internal();
     }
- }
+}
 
- @mixin core-focus-style() {
-    box-shadow: inset 0 0 var(--a11y-focus-width) 1px var(--a11y-focus-color);
-    // Thicker option:
-    // border: var(--a11y-focus-width) solid var(--a11y-focus-color);
+@mixin core-focus-outline-internal() {
+    // box-shadow: var(--a11y-shadow-focus-boxShadow);
+    // border-radius: var(--border-radius);
+    outline: var(--a11y-shadow-focus-outline);
+}
+
+
+@mixin core-focus-background-internal() {
+    --background-focused: var(--background-focused, var(--a11y-background-focus-background));
+    --background-focused-opacity: var(--a11y-background-focus-opacity);
+    --background: var(--a11y-background-focus-background-rgb);
+    background: var(--background);
+    outline: none;
 }
 
 @mixin core-transition($properties: all, $duration: 500ms, $timing-function: ease-in-out) {
@@ -96,6 +139,50 @@
 
     -webkit-transition: $transitions;
     transition: $transitions;
+}
+
+@mixin sr-only() {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+@mixin ellipsis($lines: 1) {
+    @if ($lines == 1) {
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    } @else {
+        // Only supported on Android 124+, iOs 11+. https://caniuse.com/css-line-clamp
+        @supports (-webkit-line-clamp: 2) {
+            -webkit-line-clamp: $lines;
+            -webkit-box-orient: vertical;
+            display: -webkit-box;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: normal;
+        }
+    }
+}
+
+@mixin pointer-events-on-buttons() {
+    a,
+    ion-button,
+    button,
+    audio,
+    video,
+    select,
+    input,
+    iframe,
+    [role="button"] {
+        pointer-events: visible;
+    }
 }
 
 /**
@@ -188,29 +275,29 @@
 
 @mixin core-headings() {
     h1 {
-        font-size: 26px;
+        font: var(--mdl-typography-heading1-font);
     }
     h2, .item-heading {
-        font-size: 24px;
+        font: var(--mdl-typography-heading2-font);
     }
     h3 {
-        font-size: 22px;
+        font: var(--mdl-typography-heading3-font);
     }
     h4 {
-        font-size: 20px;
+        font: var(--mdl-typography-heading4-font);
     }
     h5 {
-        font-size: 18px;
+        font: var(--mdl-typography-heading5-font);
     }
     h6 {
-        font-size: 16px;
+        font: var(--mdl-typography-heading6-font);
     }
 }
 
 @mixin darkmode() {
     $root: #{&};
 
-    @at-root #{add-root-selector($root, "body.dark")} {
+    @at-root #{add-root-selector($root, "html.dark")} {
         @content;
     }
 }
@@ -238,7 +325,7 @@
 
 // Color mixins.
 @function get_brightness($color) {
-    @return (red($color) + green($color) + blue($color)) / 3;
+    @return math.div(red($color) + green($color) + blue($color), 3);
 }
 
 // Get the better color contrast using WCAG algorythm.
@@ -246,9 +333,9 @@
     $lumiance: luminance($color);
 
     // White lumiance is 1.
-    $whiteContrast: ($lumiance + 0.05) / (1 + 0.05);
+    $whiteContrast: math.div($lumiance + 0.05, 1 + 0.05);
     // White lumiance is 0.
-    $blackContrast: (0.05) / ($lumiance + 0.05);
+    $blackContrast: math.div(0.05, $lumiance + 0.05);
 
     @return if($whiteContrast < $blackContrast, white, black);
 }
@@ -259,20 +346,20 @@
     $g: green($color);
     $b: blue($color);
 
-    $yiq: (($r * 299) + ($g * 587) + ($b * 114)) / 1000;
+    $yiq: math.div(($r * 299) + ($g * 587) + ($b * 114), 1000);
 
     @return if($yiq >= 128, $dark, $light);
 }
 
-// WCAG contrast algorythm
+// WCAG contrast algorithm
 @function check-contrast($foreground, $background) {
     $foregroundLumiance: luminance($foreground);
     $backgroundLuminance: luminance($background);
 
     @if ($backgroundLuminance < $foregroundLumiance) {
-        @return ($backgroundLuminance + 0.05) / ($foregroundLumiance + 0.05);
+        @return math.div($backgroundLuminance + 0.05, $foregroundLumiance + 0.05);
     } @else {
-        @return ($foregroundLumiance + 0.05) / ($backgroundLuminance + 0.05);
+        @return math.div($foregroundLumiance + 0.05, $backgroundLuminance + 0.05);
     }
 }
 
@@ -289,11 +376,11 @@
 }
 
 @function component-luminance($value) {
-    $value: $value / 255;
+    $value: math.div($value, 255);
 
     @if ($value <= 0.03928) {
-        @return $value / 12.92;
+        @return math.div($value, 12.92);
     } @else {
-        @return math.pow(($value + 0.055) / 1.055, 2.4);
+        @return math.pow(math.div($value + 0.055, 1.055), 2.4);
     }
 }

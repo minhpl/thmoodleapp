@@ -21,6 +21,7 @@ import { Params } from '@angular/router';
 import { makeSingleton } from '@singletons';
 import { AddonCalendarMainMenuHandlerService } from '@addons/calendar/services/handlers/mainmenu';
 import { CoreSites } from '@services/sites';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Block handler.
@@ -37,12 +38,12 @@ export class AddonBlockCalendarUpcomingHandlerService extends CoreBlockBaseHandl
      * @param block The block to render.
      * @param contextLevel The context where the block will be used.
      * @param instanceId The instance ID associated with the context level.
-     * @return Data or promise resolved with the data.
+     * @returns Data or promise resolved with the data.
      */
-    getDisplayData(block: CoreCourseBlock, contextLevel: string, instanceId: number): CoreBlockHandlerData {
+    getDisplayData(block: CoreCourseBlock, contextLevel: ContextLevel, instanceId: number): CoreBlockHandlerData {
         const linkParams: Params = { upcoming: true };
 
-        if (contextLevel == 'course' && instanceId !== CoreSites.getCurrentSiteHomeId()) {
+        if (contextLevel === ContextLevel.COURSE && instanceId !== CoreSites.getCurrentSiteHomeId()) {
             linkParams.courseId = instanceId;
         }
 

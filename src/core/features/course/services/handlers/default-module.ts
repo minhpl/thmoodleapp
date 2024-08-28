@@ -41,12 +41,12 @@ export class CoreCourseModuleDefaultHandler implements CoreCourseModuleHandler {
     /**
      * @inheritdoc
      */
-    async getData(
+    getData(
         module: CoreCourseModuleData,
-    ): Promise<CoreCourseModuleHandlerData> {
+    ): CoreCourseModuleHandlerData {
         // Return the default data.
         const defaultData: CoreCourseModuleHandlerData = {
-            icon: await CoreCourse.getModuleIconSrc(module.modname, module.modicon),
+            icon: CoreCourse.getModuleIconSrc(module.modname, module.modicon),
             title: module.name,
             class: 'core-course-default-handler core-course-module-' + module.modname + '-handler',
             action: async (event: Event, module: CoreCourseModuleData, courseId: number, options?: CoreNavigationOptions) => {
@@ -60,16 +60,16 @@ export class CoreCourseModuleDefaultHandler implements CoreCourseModuleHandler {
         if ('url' in module && module.url) {
             const url = module.url;
 
-            defaultData.buttons = [{
-                icon: 'fas-external-link-alt',
+            defaultData.button = {
+                icon: 'fas-up-right-from-square',
                 label: 'core.openinbrowser',
                 action: (e: Event): void => {
                     e.preventDefault();
                     e.stopPropagation();
 
-                    CoreSites.getRequiredCurrentSite().openInBrowserWithAutoLoginIfSameSite(url);
+                    CoreSites.getRequiredCurrentSite().openInBrowserWithAutoLogin(url);
                 },
-            }];
+            };
         }
 
         return defaultData;

@@ -1,76 +1,37 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
-    --header-background: var(--white);
-    --odd-cell-background: var(--light);
-    --odd-cell-hover: var(--gray-200);
-    --even-cell-background: var(--white);
-    --even-cell-hover: var(--light);
     --icon-color: var(--gray-500);
-    --border-color: var(--stroke);
-    --mod-icon-filter: brightness(0);
-
-    .odd {
-        --cell-background: var(--odd-cell-background);
-        --cell-hover: var(--odd-cell-hover);
-    }
-
-    .even {
-        --cell-background: var(--even-cell-background);
-        --cell-hover: var(--even-cell-hover);
-    }
-
+    --core-table-border-color: var(--stroke);
 }
 
-:host-context(body.dark) {
-    --header-background: var(--gray-900);
-    --odd-cell-background: var(--gray-800);
-    --odd-cell-hover: var(--gray-600);
-    --even-cell-background: var(--gray-900);
-    --even-cell-hover: var(--gray-700);
+:host-context(html.dark) {
     --icon-color: var(--gray-200);
-    --mod-icon-filter: brightness(0) invert(1);
 }
 
-.core-grades-table {
-    border-collapse: collapse;
-    line-height: 20px;
+table.core-table.core-grades-table {
     width: 100%;
-    font-size: 16px;
-    color: var(--ion-text-color);
-
-    tr {
-        border-bottom: 1px solid var(--border-color);
-    }
-
-    th, td {
-        @include padding(8px, 8px, 8px, null);
-        vertical-align: top;
-        white-space: normal;
-        text-align: start;
-    }
-
-    thead th {
-        vertical-align: bottom;
-        font-weight: bold;
-        background-color: var(--header-background);
-    }
+    margin: 0px;
 
     thead #gradeitem {
         @include padding(null, null, null, 24px);
     }
 
-    tbody th {
-      font-weight: normal;
+    tbody tr.core-bold th {
+      font-weight: inherit;
     }
 
     tbody #gradeitem {
         @include padding(null, null, null, 4px);
     }
 
+    th, td {
+        @include padding(8px, 8px, 8px, 0px);
+        vertical-align: top;
+    }
+
     .core-grades-table-gradeitem {
         @include padding(null, null, null, 4px);
-        font-weight: bold;
 
         &.column-itemname {
             @include padding(null, null, null, 0);
@@ -82,12 +43,11 @@
         }
 
         core-mod-icon {
-            padding: 0px;
-            --size: 16px;
-            background: transparent;
-            --filter: var(--mod-icon-filter);
+            --module-icon-padding: 0px;
+            --module-legacy-icon-padding: 0px;
+            --module-icon-size: 16px;
+            --module-legacy-icon-size: 16px;
         }
-
 
         ion-icon {
             color: var(--icon-color);
@@ -124,15 +84,8 @@
         }
     }
 
-    .dimmed_text,
-    .hidden {
-        opacity: .7;
-    }
-
-    .odd, .even {
-        td, th, th[aria-current="page"] {
-            background-color: var(--cell-background);
-        }
+    .core-grades-table-leader {
+        width: 0;
     }
 
     .core-grades-grade-clickable {
@@ -144,7 +97,7 @@
         }
 
         th, td {
-            height: var(--a11y-min-target-size);
+            height: var(--a11y-sizing-minTargetSize);
             vertical-align: middle;
         }
     }

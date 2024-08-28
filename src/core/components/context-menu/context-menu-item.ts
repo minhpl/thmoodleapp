@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { Component, Input, Output, OnInit, OnDestroy, EventEmitter, OnChanges, SimpleChange } from '@angular/core';
-import { CoreLogger } from '@singletons/logger';
 import { CoreContextMenuComponent } from '../context-menu/context-menu';
 
 /**
@@ -45,7 +44,7 @@ export class CoreContextMenuItemComponent implements OnInit, OnDestroy, OnChange
     @Input() ariaAction?: string; // Aria label to add to iconAction. If not set, it will be equal to content.
     @Input() href?: string; // Link to go if no action provided.
     @Input() captureLink?: boolean | string; // Whether the link needs to be captured by the app.
-    @Input() autoLogin?: string; // Whether the link needs to be opened using auto-login.
+    @Input() autoLogin: boolean | string = true; // Whether the link needs to be opened using auto-login.
     @Input() closeOnClick = true; // Whether to close the popover when the item is clicked.
     @Input() priority?: number; // Used to sort items. The highest priority, the highest position.
     @Input() badge?: string; // A badge to show in the item.
@@ -58,11 +57,6 @@ export class CoreContextMenuItemComponent implements OnInit, OnDestroy, OnChange
     @Output() onClosed?: EventEmitter<() => void>; // Will emit an event when the popover is closed because the item was clicked.
     @Output() toggleChange = new EventEmitter<boolean>();// Will emit an event when toggle changes to enable 2-way data binding.
 
-    /**
-     * @deprecated since 4.0.
-     */
-    @Input() iconDescription?: string; // Name of the icon to be shown on the left side of the item. Not used anymore.
-
     protected hasAction = false;
     protected destroyed = false;
 
@@ -74,12 +68,12 @@ export class CoreContextMenuItemComponent implements OnInit, OnDestroy, OnChange
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         // Initialize values.
         this.priority = this.priority || 1;
-        this.hasAction = !!this.action && this.action.observers.length > 0;
+        this.hasAction = !!this.action && this.action.observed;
         this.ariaAction = this.ariaAction || this.content;
 
         if (this.hasAction) {
@@ -88,15 +82,9 @@ export class CoreContextMenuItemComponent implements OnInit, OnDestroy, OnChange
 
         // Navigation help if href provided.
         this.captureLink = this.href && this.captureLink ? this.captureLink : false;
-        this.autoLogin = this.autoLogin || 'check';
 
         if (!this.destroyed) {
             this.ctxtMenu.addItem(this);
-        }
-
-        if (this.iconDescription !== undefined) {
-            CoreLogger.getInstance('CoreContextMenuItemComponent')
-                .warn('iconDescription Input is deprecated and should not be used');
         }
     }
 

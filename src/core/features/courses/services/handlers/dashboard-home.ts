@@ -40,7 +40,7 @@ export class CoreDashboardHomeHandlerService implements CoreMainMenuHomeHandler 
     /**
      * Check if the handler is enabled on a site level.
      *
-     * @return Whether or not the handler is enabled on a site level.
+     * @returns Whether or not the handler is enabled on a site level.
      */
     isEnabled(): Promise<boolean> {
         return this.isEnabledForSite();
@@ -50,7 +50,7 @@ export class CoreDashboardHomeHandlerService implements CoreMainMenuHomeHandler 
      * Check if the handler is enabled on a certain site.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Whether or not the handler is enabled on a site level.
+     * @returns Whether or not the handler is enabled on a site level.
      */
     async isEnabledForSite(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -85,14 +85,14 @@ export class CoreDashboardHomeHandlerService implements CoreMainMenuHomeHandler 
     /**
      * Returns the data needed to render the handler.
      *
-     * @return Data needed to render the handler.
+     * @returns Data needed to render the handler.
      */
     getDisplayData(): CoreMainMenuHomeHandlerToDisplay {
         return {
             title: 'core.courses.mymoodle',
             page: CoreDashboardHomeHandlerService.PAGE_NAME,
             class: 'core-courses-dashboard-handler',
-            icon: 'fas-tachometer-alt',
+            icon: 'fas-gauge-high',
         };
     }
 

@@ -4,7 +4,11 @@
     flex-direction: column;
     background: var(--background);
 
-    ion-item-divider {
+    ion-card {
+        --border-radius: var(--mdl-shape-borderRadius-sm);
+    }
+
+    ::ng-deep ion-item-divider {
         min-height: var(--item-divider-min-height);
     }
 

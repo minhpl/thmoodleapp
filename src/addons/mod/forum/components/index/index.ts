@@ -15,7 +15,6 @@
 import { Component, Optional, OnInit, OnDestroy, ViewChild, AfterViewInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
 import { IonContent } from '@ionic/angular';
-import { ModalOptions } from '@ionic/core';
 
 import { CoreCourseModuleMainActivityComponent } from '@features/course/classes/main-activity-component';
 import {
@@ -31,7 +30,7 @@ import { AddonModForumOffline } from '@addons/mod/forum/services/forum-offline';
 import { Translate } from '@singletons';
 import { CoreCourseContentsPage } from '@features/course/pages/contents/contents';
 import { AddonModForumHelper } from '@addons/mod/forum/services/forum-helper';
-import { CoreGroups, CoreGroupsProvider } from '@services/groups';
+import { CoreGroupInfo } from '@services/groups';
 import { CoreEvents, CoreEventObserver } from '@singletons/events';
 import {
     AddonModForumAutoSyncData,
@@ -42,13 +41,10 @@ import {
 import { CoreSites } from '@services/sites';
 import { CoreUser } from '@features/user/services/user';
 import { CoreDomUtils } from '@services/utils/dom';
-import { CoreUtils } from '@services/utils/utils';
 import { CoreCourse } from '@features/course/services/course';
 import { CoreSplitViewComponent } from '@components/split-view/split-view';
 import { AddonModForumDiscussionOptionsMenuComponent } from '../discussion-options-menu/discussion-options-menu';
-import { AddonModForumSortOrderSelectorComponent } from '../sort-order-selector/sort-order-selector';
 import { CoreScreen } from '@services/screen';
-import { CoreArray } from '@singletons/array';
 import { AddonModForumPrefetchHandler } from '../../services/handlers/prefetch';
 import { AddonModForumModuleHandlerService } from '../../services/handlers/module';
 import { CoreRatingProvider } from '@features/rating/services/rating';
@@ -59,7 +55,9 @@ import { AddonModForumDiscussionItem, AddonModForumDiscussionsSource } from '../
 import { CoreListItemsManager } from '@classes/items-management/list-items-manager';
 import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/routed-items-manager-sources-tracker';
 import { CorePromisedValue } from '@classes/promised-value';
-
+import { CoreNavigator } from '@services/navigator';
+import { ADDON_MOD_FORUM_SEARCH_PAGE_NAME } from '@addons/mod/forum/constants';
+import { CoreSearchGlobalSearch } from '@features/search/services/global-search';
 /**
  * Component that displays a forum entry page.
  */
@@ -73,7 +71,7 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
     @ViewChild(CoreSplitViewComponent) splitView!: CoreSplitViewComponent;
 
     component = AddonModForumProvider.COMPONENT;
-    moduleName = 'forum';
+    pluginName = 'forum';
     descriptionNote?: string;
     promisedDiscussions: CorePromisedValue<AddonModForumDiscussionsManager>;
     discussionsItems: AddonModForumDiscussionItem[] = [];
@@ -83,12 +81,10 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
     availabilityMessage: string | null = null;
     sortingAvailable!: boolean;
     sortOrders: AddonModForumSortOrder[] = [];
-    canPin = false;
     hasOfflineRatings = false;
     showQAMessage = false;
-    sortOrderSelectorModalOptions: ModalOptions = {
-        component: AddonModForumSortOrderSelectorComponent,
-    };
+    isSetPinAvailable = false;
+    showSearch = false;
 
     protected fetchContentDefaultError = 'addon.mod_forum.errorgetforum';
     protected syncEventName = AddonModForumSyncProvider.AUTO_SYNCED;
@@ -124,11 +120,45 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
         return this.discussions?.getSource().selectedSortOrder ?? undefined;
     }
 
+    get supportsChangeGroup(): boolean {
+        return this.discussions?.getSource().supportsChangeGroup ?? false;
+    }
+
+    get groupId(): number {
+        return this.discussions?.getSource().groupId ?? 0;
+    }
+
+    set groupId(value: number) {
+        if (this.discussions) {
+            this.discussions.getSource().groupId = value;
+        }
+    }
+
+    get groupInfo(): CoreGroupInfo | undefined {
+        return this.discussions?.getSource().groupInfo;
+    }
+
+    get usesGroups(): boolean {
+        return !!(this.discussions?.getSource().usesGroups);
+    }
+
+    get canPin(): boolean {
+        return !!(this.isSetPinAvailable && this.discussions?.getSource().allPartsPermissions?.canpindiscussions);
+    }
+
+    get canAddDiscussionToGroup(): boolean {
+        return !!(this.forum && this.canAddDiscussion && this.discussions?.getSource().canAddDiscussionToGroup);
+    }
+
+    get errorLoadingDiscussions(): boolean {
+        return !!this.discussions?.getSource().errorLoadingDiscussions;
+    }
+
     /**
      * Check whether a discussion is online.
      *
      * @param discussion Discussion
-     * @return Whether the discussion is online.
+     * @returns Whether the discussion is online.
      */
     isOnlineDiscussion(discussion: AddonModForumDiscussionItem): boolean {
         return !!this.discussions?.getSource().isOnlineDiscussion(discussion);
@@ -138,23 +168,20 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
      * Check whether a discussion is offline.
      *
      * @param discussion Discussion
-     * @return Whether the discussion is offline.
+     * @returns Whether the discussion is offline.
      */
     isOfflineDiscussion(discussion: AddonModForumDiscussionItem): boolean {
         return !!this.discussions?.getSource().isOfflineDiscussion(discussion);
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         this.addDiscussionText = Translate.instant('addon.mod_forum.addanewdiscussion');
         this.sortingAvailable = AddonModForum.isDiscussionListSortingAvailable();
         this.sortOrders = AddonModForum.getAvailableSortOrders();
-
-        this.sortOrderSelectorModalOptions.componentProps = {
-            sortOrders: this.sortOrders,
-        };
+        this.isSetPinAvailable = AddonModForum.isSetPinStateAvailableForSite();
 
         await super.ngOnInit();
 
@@ -209,11 +236,11 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
         // Listen for discussions added. When a discussion is added, we reload the data.
         this.newDiscObserver = CoreEvents.on(
             AddonModForumProvider.NEW_DISCUSSION_EVENT,
-            this.eventReceived.bind(this, true),
+            (data) => this.eventReceived(true, data),
         );
         this.replyObserver = CoreEvents.on(
             AddonModForumProvider.REPLY_DISCUSSION_EVENT,
-            this.eventReceived.bind(this, false),
+            (data) => this.eventReceived(false, data),
         );
         this.changeDiscObserver = CoreEvents.on(AddonModForumProvider.CHANGE_DISCUSSION_EVENT, data => {
             if (!this.forum) {
@@ -272,6 +299,9 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
                 this.hasOffline = this.hasOffline || this.hasOfflineRatings;
             }
         });
+
+        // Initialize search.
+        this.showSearch = await this.isSearchEnabled();
     }
 
     async ngAfterViewInit(): Promise<void> {
@@ -283,7 +313,7 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         super.ngOnDestroy();
@@ -297,6 +327,22 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
         this.ratingSyncObserver && this.ratingSyncObserver.off();
         this.sourceUnsubscribe && this.sourceUnsubscribe();
         this.discussions?.destroy();
+    }
+
+    /**
+     * Open search page.
+     */
+    async openSearch(): Promise<void> {
+        if (!this.forum) {
+            return;
+        }
+
+        await CoreNavigator.navigateToSitePath(ADDON_MOD_FORUM_SEARCH_PAGE_NAME, {
+            params: {
+                courseId: this.courseId,
+                forumId: this.forum.id,
+            },
+        });
     }
 
     /**
@@ -384,19 +430,10 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
         const promises: Promise<void>[] = [];
 
         // Check if the activity uses groups.
-        promises.push(
-            CoreGroups.instance
-                .getActivityGroupMode(forum.cmid)
-                .then(async mode => {
-                    discussions.getSource().usesGroups =
-                        mode === CoreGroupsProvider.SEPARATEGROUPS || mode === CoreGroupsProvider.VISIBLEGROUPS;
-
-                    return;
-                }),
-        );
+        promises.push(discussions.getSource().loadGroupInfo(forum.id));
 
         promises.push(
-            AddonModForum.instance
+            AddonModForum
                 .getAccessInformation(forum.id, { cmId: this.module.id })
                 .then(async accessInfo => {
                     // Disallow adding discussions if cut-off date is reached and the user has not the
@@ -411,34 +448,14 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
                 }),
         );
 
-        if (AddonModForum.isSetPinStateAvailableForSite()) {
-            // Use the canAddDiscussion WS to check if the user can pin discussions.
-            promises.push(
-                AddonModForum.instance
-                    .canAddDiscussionToAll(forum.id, { cmId: this.module.id })
-                    .then(async response => {
-                        this.canPin = !!response.canpindiscussions;
-
-                        return;
-                    })
-                    .catch(async () => {
-                        this.canPin = false;
-
-                        return;
-                    }),
-            );
-        } else {
-            this.canPin = false;
-        }
-
         await Promise.all(promises);
     }
 
     /**
      * Convenience function to load more forum discussions.
      *
-     * @param infiniteComplete Infinite scroll complete function. Only used from core-infinite-loading.
-     * @return Promise resolved when done.
+     * @param complete Infinite scroll complete function. Only used from core-infinite-loading.
+     * @returns Promise resolved when done.
      */
     async fetchMoreDiscussions(complete: () => void): Promise<void> {
         const discussions = await this.promisedDiscussions;
@@ -459,45 +476,28 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Convenience function to fetch the sort order preference.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchSortOrderPreference(): Promise<void> {
-        const getSortOrder = async () => {
-            if (!this.sortingAvailable) {
-                return null;
-            }
-
-            const value = await CoreUtils.ignoreErrors(
-                CoreUser.getUserPreference(AddonModForumProvider.PREFERENCE_SORTORDER),
-            );
-
-            return value ? parseInt(value, 10) : null;
-        };
-
         const discussions = await this.promisedDiscussions;
-        const value = await getSortOrder();
-        const selectedOrder = this.sortOrders.find(sortOrder => sortOrder.value === value) || this.sortOrders[0];
+        const selectedOrder = await AddonModForum.getSelectedSortOrder();
 
         discussions.getSource().selectedSortOrder = selectedOrder;
-
-        if (this.sortOrderSelectorModalOptions.componentProps) {
-            this.sortOrderSelectorModalOptions.componentProps.selected = selectedOrder.value;
-        }
     }
 
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         const promises: Promise<void>[] = [];
 
-        promises.push(AddonModForum.invalidateForumData(this.courseId));
+        if (this.discussions) {
+            promises.push(this.discussions.getSource().invalidateCache());
+        }
 
         if (this.forum) {
-            promises.push(AddonModForum.invalidateDiscussionsList(this.forum.id));
-            promises.push(CoreGroups.invalidateActivityGroupMode(this.forum.cmid));
             promises.push(AddonModForum.invalidateAccessInformation(this.forum.id));
         }
 
@@ -509,29 +509,17 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
     }
 
     /**
-     * Performs the sync of the activity.
-     *
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
     protected sync(): Promise<AddonModForumSyncResult> {
         return AddonModForumPrefetchHandler.sync(this.module, this.courseId);
     }
 
     /**
-     * Checks if sync has succeed from result sync data.
-     *
-     * @param result Data returned on the sync function.
-     * @return Whether it succeed or not.
-     */
-    protected hasSyncSucceed(result: AddonModForumSyncResult): boolean {
-        return result.updated;
-    }
-
-    /**
      * Compares sync event data with current data to check if refresh content is needed.
      *
      * @param syncEventData Data receiven on sync observer.
-     * @return True if refresh is needed, false otherwise.
+     * @returns True if refresh is needed, false otherwise.
      */
     protected isRefreshSyncNeeded(syncEventData: AddonModForumAutoSyncData | AddonModForumManualSyncData): boolean {
         return !!this.forum
@@ -546,42 +534,56 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
      * @param isNewDiscussion Whether it's a new discussion event.
      * @param data Event data.
      */
-    protected eventReceived(
+    protected async eventReceived(
         isNewDiscussion: boolean,
         data: AddonModForumNewDiscussionData | AddonModForumReplyDiscussionData,
-    ): void {
-        if ((this.forum && this.forum.id === data.forumId) || data.cmId === this.module.id) {
-            this.showLoadingAndRefresh(false).finally(() => {
-                // If it's a new discussion in tablet mode, try to open it.
-                if (isNewDiscussion && CoreScreen.isTablet) {
-                    const newDiscussionData = data as AddonModForumNewDiscussionData;
-                    const discussion = this.discussions?.items.find(disc => {
-                        if (this.discussions?.getSource().isOfflineDiscussion(disc)) {
-                            return disc.timecreated === newDiscussionData.discTimecreated;
-                        }
-
-                        if (this.discussions?.getSource().isOnlineDiscussion(disc)) {
-                            return CoreArray.contains(newDiscussionData.discussionIds ?? [], disc.discussion);
-                        }
-
-                        return false;
-                    });
-
-                    if (this.discussions && (discussion || !this.discussions.empty)) {
-                        this.discussions.select(discussion ?? this.discussions.items[0]);
-                    }
-                }
-            });
-
-            // Check completion since it could be configured to complete once the user adds a new discussion or replies.
-            this.checkCompletion();
+    ): Promise<void> {
+        if ((!this.forum || this.forum.id !== data.forumId) && data.cmId !== this.module.id) {
+            return; // Not current forum.
         }
+
+        // Check completion since it could be configured to complete once the user adds a new discussion or replies.
+        this.checkCompletion();
+
+        try {
+            if (isNewDiscussion) {
+                CoreDomUtils.showToast('addon.mod_forum.postaddedsuccess', true);
+
+                const newDiscGroupId = (data as AddonModForumNewDiscussionData).groupId;
+
+                if (!newDiscGroupId || newDiscGroupId < 0 || !this.groupId || newDiscGroupId === this.groupId) {
+                    await this.showLoadingAndRefresh(false);
+                } else {
+                    // Discussion is in a different group than the one currently viewed, only invalidate data.
+                    await this.discussions?.getSource().invalidateList();
+                }
+            } else {
+                await this.showLoadingAndRefresh(false);
+            }
+        } finally {
+            // If it's a new discussion in tablet mode, try to open it.
+            if (isNewDiscussion && CoreScreen.isTablet && this.discussions) {
+                const newDiscussionData = data as AddonModForumNewDiscussionData;
+                const discussion = this.discussions.items.find(disc => {
+                    if (this.discussions?.getSource().isOfflineDiscussion(disc)) {
+                        return disc.timecreated === newDiscussionData.discTimecreated;
+                    }
+
+                    if (this.discussions?.getSource().isOnlineDiscussion(disc)) {
+                        return (newDiscussionData.discussionIds ?? []).includes(disc.discussion);
+                    }
+
+                    return false;
+                });
+
+                this.discussions.select(discussion ?? null);
+            }
+        }
+
     }
 
     /**
      * Opens the new discussion form.
-     *
-     * @param timeCreated Creation time of the offline discussion.
      */
     openNewDiscussion(): void {
         this.discussions?.select(AddonModForumDiscussionsSource.NEW_DISCUSSION);
@@ -590,16 +592,14 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
     /**
      * Changes the sort order.
      *
-     * @param sortOrder Sort order new data.
+     * @param sortOrderValue Sort order new data.
      */
-    async setSortOrder(sortOrder: AddonModForumSortOrder): Promise<void> {
-        if (this.discussions && sortOrder.value != this.discussions.getSource().selectedSortOrder?.value) {
+    async setSortOrder(sortOrderValue: number): Promise<void> {
+        const sortOrder = this.sortOrders.find(sortOrder => sortOrder.value === sortOrderValue);
+
+        if (this.discussions && sortOrder && sortOrder.value != this.discussions.getSource().selectedSortOrder?.value) {
             this.discussions.getSource().selectedSortOrder = sortOrder;
             this.discussions.getSource().setDirty(true);
-
-            if (this.sortOrderSelectorModalOptions.componentProps) {
-                this.sortOrderSelectorModalOptions.componentProps.selected = sortOrder.value;
-            }
 
             try {
                 await CoreUser.setUserPreference(AddonModForumProvider.PREFERENCE_SORTORDER, sortOrder.value.toFixed(0));
@@ -607,17 +607,6 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
             } catch (error) {
                 CoreDomUtils.showErrorModalDefault(error, 'Error updating preference.');
             }
-        }
-    }
-
-    /**
-     * Display the sort order selector modal.
-     */
-    async showSortOrderSelector(): Promise<void> {
-        const modalData = await CoreDomUtils.openModal<AddonModForumSortOrder>(this.sortOrderSelectorModalOptions);
-
-        if (modalData) {
-            this.setSortOrder(modalData);
         }
     }
 
@@ -662,6 +651,39 @@ export class AddonModForumIndexComponent extends CoreCourseModuleMainActivityCom
         }
     }
 
+    /**
+     * Group has changed.
+     */
+    async groupChanged(): Promise<void> {
+        const modal = await CoreDomUtils.showModalLoading();
+
+        try {
+            await Promise.all([
+                this.discussions?.getSource().loadSelectedGroupData(),
+                this.discussions?.reload(),
+            ]);
+        } catch (error) {
+            CoreDomUtils.showErrorModalDefault(error, 'core.errorloadingcontent', true);
+        } finally {
+            modal.dismiss();
+        }
+    }
+
+    /**
+     * Check if forum search is available.
+     *
+     * @returns Whether forum search is available.
+     */
+    protected async isSearchEnabled(): Promise<boolean> {
+        if (!CoreSearchGlobalSearch.isEnabled()) {
+            return false;
+        }
+
+        const searchAreas = await CoreSearchGlobalSearch.getSearchAreas();
+
+        return !!searchAreas.find(({ id }) => id === 'mod_forum-post');
+    }
+
 }
 
 /**
@@ -697,18 +719,20 @@ class AddonModForumDiscussionsManager extends CoreListItemsManager<AddonModForum
         }
 
         try {
-            await AddonModForum.instance.logView(forum.id, forum.name);
+            await AddonModForum.logView(forum.id);
 
             CoreCourse.checkModuleCompletion(this.page.courseId, this.page.module.completiondata);
         } catch {
             // Ignore errors.
         }
+
+        this.page.analyticsLogEvent('mod_forum_view_forum');
     }
 
     /**
      * Check whether there is any discussion in the items.
      *
-     * @return Whether there is a discussion.
+     * @returns Whether there is a discussion.
      */
     get hasDiscussions(): boolean {
         const source = this.getSource();

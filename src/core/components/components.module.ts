@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { NgModule } from '@angular/core';
+import { CUSTOM_ELEMENTS_SCHEMA, NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { IonicModule } from '@ionic/angular';
 import { TranslateModule } from '@ngx-translate/core';
@@ -33,7 +33,6 @@ import { CoreDynamicComponent } from './dynamic-component/dynamic-component';
 import { CoreEmptyBoxComponent } from './empty-box/empty-box';
 import { CoreFileComponent } from './file/file';
 import { CoreFilesComponent } from './files/files';
-import { CoreIconComponent } from './icon/icon';
 import { CoreIframeComponent } from './iframe/iframe';
 import { CoreInfiniteLoadingComponent } from './infinite-loading/infinite-loading';
 import { CoreInputErrorsComponent } from './input-errors/input-errors';
@@ -61,6 +60,12 @@ import { CoreHorizontalScrollControlsComponent } from './horizontal-scroll-contr
 import { CoreButtonWithSpinnerComponent } from './button-with-spinner/button-with-spinner';
 import { CoreSwipeSlidesComponent } from './swipe-slides/swipe-slides';
 import { CoreSwipeNavigationTourComponent } from './swipe-navigation-tour/swipe-navigation-tour';
+import { CoreMessageComponent } from './message/message';
+import { CoreGroupSelectorComponent } from './group-selector/group-selector';
+import { CoreRefreshButtonModalComponent } from './refresh-button-modal/refresh-button-modal';
+import { CoreSheetModalComponent } from '@components/sheet-modal/sheet-modal';
+import { CoreCourseImageComponent } from '@components/course-image/course-image';
+import { CoreSitesListComponent } from './sites-list/sites-list';
 
 @NgModule({
     declarations: [
@@ -72,18 +77,20 @@ import { CoreSwipeNavigationTourComponent } from './swipe-navigation-tour/swipe-
         CoreContextMenuComponent,
         CoreContextMenuItemComponent,
         CoreContextMenuPopoverComponent,
+        CoreCourseImageComponent,
         CoreDownloadRefreshComponent,
         CoreDynamicComponent,
         CoreEmptyBoxComponent,
         CoreFileComponent,
         CoreFilesComponent,
-        CoreIconComponent,
+        CoreGroupSelectorComponent,
         CoreIframeComponent,
         CoreInfiniteLoadingComponent,
         CoreInputErrorsComponent,
         CoreLoadingComponent,
         CoreLocalFileComponent,
         CoreMarkRequiredComponent,
+        CoreMessageComponent,
         CoreModIconComponent,
         CoreNavBarButtonsComponent,
         CoreNavigationBarComponent,
@@ -104,6 +111,9 @@ import { CoreSwipeNavigationTourComponent } from './swipe-navigation-tour/swipe-
         CoreSpacerComponent,
         CoreHorizontalScrollControlsComponent,
         CoreSwipeNavigationTourComponent,
+        CoreRefreshButtonModalComponent,
+        CoreSheetModalComponent,
+        CoreSitesListComponent,
     ],
     imports: [
         CommonModule,
@@ -122,18 +132,20 @@ import { CoreSwipeNavigationTourComponent } from './swipe-navigation-tour/swipe-
         CoreContextMenuComponent,
         CoreContextMenuItemComponent,
         CoreContextMenuPopoverComponent,
+        CoreCourseImageComponent,
         CoreDownloadRefreshComponent,
         CoreDynamicComponent,
         CoreEmptyBoxComponent,
         CoreFileComponent,
         CoreFilesComponent,
-        CoreIconComponent,
+        CoreGroupSelectorComponent,
         CoreIframeComponent,
         CoreInfiniteLoadingComponent,
         CoreInputErrorsComponent,
         CoreLoadingComponent,
         CoreLocalFileComponent,
         CoreMarkRequiredComponent,
+        CoreMessageComponent,
         CoreModIconComponent,
         CoreNavBarButtonsComponent,
         CoreNavigationBarComponent,
@@ -154,6 +166,10 @@ import { CoreSwipeNavigationTourComponent } from './swipe-navigation-tour/swipe-
         CoreSpacerComponent,
         CoreHorizontalScrollControlsComponent,
         CoreSwipeNavigationTourComponent,
+        CoreRefreshButtonModalComponent,
+        CoreSheetModalComponent,
+        CoreSitesListComponent,
     ],
+    schemas: [CUSTOM_ELEMENTS_SCHEMA],
 })
 export class CoreComponentsModule {}

@@ -22,6 +22,8 @@ import { CoreUtils } from '@services/utils/utils';
 
 import { CoreRoutedItemsManagerSource } from './routed-items-manager-source';
 import { CoreRoutedItemsManager } from './routed-items-manager';
+import { CoreDom } from '@singletons/dom';
+import { CoreTime } from '@singletons/time';
 
 /**
  * Helper class to manage the state and routing of a list of items in a page.
@@ -34,12 +36,16 @@ export class CoreListItemsManager<
     protected pageRouteLocator?: unknown | ActivatedRoute;
     protected splitView?: CoreSplitViewComponent;
     protected splitViewOutletSubscription?: Subscription;
-    protected fetchSuccess = false; // Whether a fetch was finished successfully.
+    protected finishSuccessfulFetch: () => void;
 
     constructor(source: Source, pageRouteLocator: unknown | ActivatedRoute) {
         super(source);
 
+        const debouncedScrollToCurrentElement = CoreUtils.debounce(() => this.scrollToCurrentElement(), 300);
+
         this.pageRouteLocator = pageRouteLocator;
+        this.addListener({ onSelectedItemUpdated: debouncedScrollToCurrentElement });
+        this.finishSuccessfulFetch = CoreTime.once(() => CoreUtils.ignoreErrors(this.logActivity()));
     }
 
     get items(): Item[] {
@@ -100,7 +106,7 @@ export class CoreListItemsManager<
      * Check whether the given item is selected or not.
      *
      * @param item Item.
-     * @return Whether the given item is selected.
+     * @returns Whether the given item is selected.
      */
     isSelected(item: Item): boolean {
         return this.selectedItem === item;
@@ -110,7 +116,7 @@ export class CoreListItemsManager<
      * Return the current aria value.
      *
      * @param item Item.
-     * @return Will return the current value of the item if selected, false otherwise.
+     * @returns Will return the current value of the item if selected, false otherwise.
      */
     getItemAriaCurrent(item: Item): string {
         return this.isSelected(item) ? 'page' : 'false';
@@ -157,19 +163,6 @@ export class CoreListItemsManager<
     }
 
     /**
-     * Finish a successful fetch.
-     */
-    protected async finishSuccessfulFetch(): Promise<void> {
-        if (this.fetchSuccess) {
-            return; // Already treated.
-        }
-
-        // Log activity.
-        this.fetchSuccess = true;
-        await CoreUtils.ignoreErrors(this.logActivity());
-    }
-
-    /**
      * Log activity when the page starts.
      */
     protected async logActivity(): Promise<void> {
@@ -196,12 +189,37 @@ export class CoreListItemsManager<
         super.updateSelectedItem(route);
 
         const selectDefault = CoreScreen.isTablet && this.selectedItem === null && this.splitView && !this.splitView.isNested;
-
         this.select(selectDefault ? this.getDefaultItem() : this.selectedItem);
     }
 
     /**
+     * Scroll to current element in split-view list.
+     */
+    protected async scrollToCurrentElement(): Promise<void> {
+        if (CoreScreen.isMobile) {
+            return;
+        }
+
+        const element = this.splitView?.nativeElement ?? document;
+        const currentItem = element.querySelector<HTMLElement>('[aria-current="page"]');
+
+        if (!currentItem) {
+            return;
+        }
+
+        const isElementInViewport = CoreDom.isElementInViewport(currentItem, 1, this.splitView?.nativeElement);
+
+        if (isElementInViewport) {
+            return;
+        }
+
+        currentItem.scrollIntoView({ behavior: 'smooth' });
+    }
+
+    /**
      * Get the item that should be selected by default.
+     *
+     * @returns The default item or null if none.
      */
     protected getDefaultItem(): Item | null {
         return this.items[0] || null;
@@ -221,13 +239,13 @@ export class CoreListItemsManager<
     /**
      * @inheritdoc
      */
-    protected getSelectedItemPathFromRoute(route: ActivatedRouteSnapshot): string | null {
+    protected getSelectedItemPathFromRoute(route: ActivatedRouteSnapshot | ActivatedRoute): string | null {
         const segments: UrlSegment[] = [];
 
         while (route.firstChild) {
             route = route.firstChild;
 
-            segments.push(...route.url);
+            segments.push(...CoreNavigator.getRouteUrl(route));
         }
 
         return segments.map(segment => segment.path).join('/').replace(/\/+/, '/').trim() || null;
@@ -237,7 +255,7 @@ export class CoreListItemsManager<
      * Get the page route given a child route on the splitview outlet.
      *
      * @param route Child route.
-     * @return Page route.
+     * @returns Page route.
      */
     private getPageRouteFromSplitViewOutlet(route: ActivatedRouteSnapshot | null): ActivatedRouteSnapshot | null {
         const isPageRoute = this.buildRouteMatcher();
@@ -256,7 +274,7 @@ export class CoreListItemsManager<
      */
     private buildRouteMatcher(): (route: ActivatedRouteSnapshot) => boolean {
         if (this.pageRouteLocator instanceof ActivatedRoute) {
-            const pageRoutePath = CoreNavigator.getRouteFullPath(this.pageRouteLocator.snapshot);
+            const pageRoutePath = CoreNavigator.getRouteFullPath(this.pageRouteLocator);
 
             return route => CoreNavigator.getRouteFullPath(route) === pageRoutePath;
         }

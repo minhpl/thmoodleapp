@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { Component, OnDestroy, OnInit, Optional } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
 import { CoreCourseModuleMainResourceComponent } from '@features/course/classes/main-resource-component';
 import { CoreCourseContentsPage } from '@features/course/pages/contents/contents';
 import { CoreCourse } from '@features/course/services/course';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFileHelper } from '@services/file-helper';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreMimetypeUtils } from '@services/utils/mimetype';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreUtils, OpenFileAction } from '@services/utils/utils';
-import { Network, NgZone, Translate } from '@singletons';
+import { NgZone, Translate } from '@singletons';
 import { Subscription } from 'rxjs';
 import {
     AddonModResource,
@@ -34,6 +34,7 @@ import {
     AddonModResourceProvider,
 } from '../../services/resource';
 import { AddonModResourceHelper } from '../../services/resource-helper';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Component that displays a resource.
@@ -46,6 +47,7 @@ import { AddonModResourceHelper } from '../../services/resource-helper';
 export class AddonModResourceIndexComponent extends CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy {
 
     component = AddonModResourceProvider.COMPONENT;
+    pluginName = 'resource';
 
     mode = '';
     src = '';
@@ -64,7 +66,7 @@ export class AddonModResourceIndexComponent extends CoreCourseModuleMainResource
     timecreated = -1;
     timemodified = -1;
     isExternalFile = false;
-    outdatedStatus = CoreConstants.OUTDATED;
+    outdatedStatus = DownloadStatus.OUTDATED;
 
     protected onlineObserver?: Subscription;
 
@@ -78,14 +80,14 @@ export class AddonModResourceIndexComponent extends CoreCourseModuleMainResource
     async ngOnInit(): Promise<void> {
         super.ngOnInit();
 
-        this.isIOS = CoreApp.isIOS();
-        this.isOnline = CoreApp.isOnline();
+        this.isIOS = CorePlatform.isIOS();
+        this.isOnline = CoreNetwork.isOnline();
 
         // Refresh online status when changes.
-        this.onlineObserver = Network.onChange().subscribe(() => {
+        this.onlineObserver = CoreNetwork.onChange().subscribe(() => {
             // Execute the callback in the Angular zone, so change detection doesn't stop working.
             NgZone.run(() => {
-                this.isOnline = CoreApp.isOnline();
+                this.isOnline = CoreNetwork.isOnline();
             });
         });
 
@@ -109,6 +111,8 @@ export class AddonModResourceIndexComponent extends CoreCourseModuleMainResource
         if (!contents.length) {
             throw new CoreError(Translate.instant('core.filenotfound'));
         }
+
+        this.module.afterlink = await AddonModResourceHelper.getAfterLinkDetails(this.module, this.courseId);
 
         // Get the resource instance to get the latest name/description and to know if it's embedded.
         const resource = await AddonModResource.getResourceData(this.courseId, this.module.id);
@@ -142,7 +146,7 @@ export class AddonModResourceIndexComponent extends CoreCourseModuleMainResource
             this.displayDescription = false;
 
             this.warning = downloadResult.failed
-                ? this.getErrorDownloadingSomeFilesMessage(downloadResult.error!)
+                ? this.getErrorDownloadingSomeFilesMessage(downloadResult.error ?? '')
                 : '';
 
             return;
@@ -187,14 +191,16 @@ export class AddonModResourceIndexComponent extends CoreCourseModuleMainResource
      * @inheritdoc
      */
     protected async logActivity(): Promise<void> {
-        await AddonModResource.logView(this.module.instance, this.module.name);
+        await CoreUtils.ignoreErrors(AddonModResource.logView(this.module.instance));
+
+        this.analyticsLogEvent('mod_resource_view_resource');
     }
 
     /**
      * Opens a file.
      *
      * @param iOSOpenFileAction Action to do in iOS.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async open(iOSOpenFileAction?: OpenFileAction): Promise<void> {
         let downloadable = await CoreCourseModulePrefetchDelegate.isModuleDownloadable(this.module, this.courseId);
@@ -205,7 +211,7 @@ export class AddonModResourceIndexComponent extends CoreCourseModuleMainResource
             downloadable = await AddonModResourceHelper.isMainFileDownloadable(this.module);
 
             if (downloadable) {
-                if (this.currentStatus === CoreConstants.OUTDATED && !this.isOnline && !this.isExternalFile) {
+                if (this.currentStatus === DownloadStatus.OUTDATED && !this.isOnline && !this.isExternalFile) {
                     // Warn the user that the file isn't updated.
                     const alert = await CoreDomUtils.showAlert(
                         undefined,
@@ -220,7 +226,7 @@ export class AddonModResourceIndexComponent extends CoreCourseModuleMainResource
         }
 
         // The resource cannot be downloaded, open the activity in browser.
-        await CoreSites.getCurrentSite()?.openInBrowserWithAutoLoginIfSameSite(this.module.url || '');
+        await CoreSites.getCurrentSite()?.openInBrowserWithAutoLogin(this.module.url || '');
     }
 
     /**

@@ -12,35 +12,81 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AbstractType, Component, CUSTOM_ELEMENTS_SCHEMA, Type, ViewChild } from '@angular/core';
+import { AbstractType, Component, CUSTOM_ELEMENTS_SCHEMA, EventEmitter, Type, ViewChild } from '@angular/core';
 import { BrowserModule } from '@angular/platform-browser';
 import { ComponentFixture, TestBed } from '@angular/core/testing';
-import { Observable, Subject } from 'rxjs';
+import { Observable, of, Subject } from 'rxjs';
 import { sep } from 'path';
 
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { CoreSingletonProxy, Network, Platform } from '@singletons';
+import { ApplicationInit, CoreSingletonProxy, Translate } from '@singletons';
 import { CoreTextUtilsProvider } from '@services/utils/text';
 
-import { TranslatePipeStub } from './stubs/pipes/translate';
 import { CoreExternalContentDirectiveStub } from './stubs/directives/core-external-content';
+import { CoreNetwork } from '@services/network';
+import { CorePlatform } from '@services/platform';
+import { CoreDB } from '@services/db';
+import { CoreNavigator, CoreNavigatorService } from '@services/navigator';
+import { CoreDomUtils } from '@services/utils/dom';
+import { TranslateModule, TranslateService, TranslateStore } from '@ngx-translate/core';
+import { CoreIonLoadingElement } from '@classes/ion-loading';
+import { NoopAnimationsModule } from '@angular/platform-browser/animations';
+import { DefaultUrlSerializer, UrlSerializer } from '@angular/router';
+import { CoreUtils, CoreUtilsProvider } from '@services/utils/utils';
+import { Equal } from '@/core/utils/types';
 
 abstract class WrapperComponent<U> {
 
     child!: U;
 
-};
+}
 
 type ServiceInjectionToken = AbstractType<unknown> | Type<unknown> | string;
 
 let testBedInitialized = false;
 const textUtils = new CoreTextUtilsProvider();
-const DEFAULT_SERVICE_SINGLETON_MOCKS: [CoreSingletonProxy, Record<string, unknown>][] = [
-    [Platform, mock({ is: () => false, ready: () => Promise.resolve(), resume: new Subject<void>() })],
-    [Network, { onChange: () => new Observable() }],
+const DEFAULT_SERVICE_SINGLETON_MOCKS: [CoreSingletonProxy, unknown][] = [
+    [Translate, mock({
+        instant: key => key,
+        get: key => of(key),
+        onTranslationChange: new EventEmitter(),
+        onLangChange: new EventEmitter(),
+        onDefaultLangChange: new EventEmitter(),
+    })],
+    [CoreDB, mock({ getDB: () => mock() })],
+    [CoreNavigator, mock({ navigateToSitePath: () => Promise.resolve(true) })],
+    [ApplicationInit, mock({
+        donePromise: Promise.resolve(),
+        runInitializers: () => Promise.resolve(),
+    })],
+    [CorePlatform, mock({
+        is: () => false,
+        isMobile: () => false,
+        isAndroid: () => false,
+        isIOS: () => false,
+        ready: () => Promise.resolve(),
+        resume: new Subject<void>(),
+    })],
+    [CoreNetwork, mock({
+        isOnline: () => true,
+        onChange: () => new Observable(),
+    })],
+    [CoreDomUtils, mock({
+        showModalLoading: () => Promise.resolve(mock<CoreIonLoadingElement>({ dismiss: jest.fn() })),
+    })],
+    [CoreUtils, mock(new CoreUtilsProvider(), {
+        nextTick: () => Promise.resolve(),
+    })],
 ];
 
-async function renderAngularComponent<T>(component: Type<T>, config: RenderConfig): Promise<ComponentFixture<T>> {
+/**
+ * Renders an Angular component for testing.
+ *
+ * @param component The Angular component to render.
+ * @param config Configuration options for rendering.
+ * @returns A promise that resolves to the testing component fixture.
+ */
+async function renderAngularComponent<T>(component: Type<T>, config: RenderConfig): Promise<TestingComponentFixture<T>> {
     config.declarations.push(component);
 
     TestBed.configureTestingModule({
@@ -49,11 +95,16 @@ async function renderAngularComponent<T>(component: Type<T>, config: RenderConfi
             ...config.declarations,
         ],
         providers: [
-            ...getDefaultProviders(),
+            ...getDefaultProviders(config),
             ...config.providers,
         ],
         schemas: [CUSTOM_ELEMENTS_SCHEMA],
-        imports: [BrowserModule],
+        imports: [
+            BrowserModule,
+            NoopAnimationsModule,
+            TranslateModule.forChild(),
+            ...config.imports,
+        ],
     });
 
     testBedInitialized = true;
@@ -70,6 +121,13 @@ async function renderAngularComponent<T>(component: Type<T>, config: RenderConfi
     return fixture;
 }
 
+/**
+ * Creates a wrapper component for testing.
+ *
+ * @param template The template for the wrapper component.
+ * @param componentClass The class of the component to be wrapped.
+ * @returns The wrapper component class.
+ */
 function createWrapperComponent<U>(template: string, componentClass: Type<U>): Type<WrapperComponent<U>> {
     @Component({ template })
     class HostComponent extends WrapperComponent<U> {
@@ -81,14 +139,24 @@ function createWrapperComponent<U>(template: string, componentClass: Type<U>): T
     return HostComponent;
 }
 
+/**
+ * Gets the default declarations for testing.
+ *
+ * @returns An array of default declarations.
+ */
 function getDefaultDeclarations(): unknown[] {
     return [
-        TranslatePipeStub,
         CoreExternalContentDirectiveStub,
     ];
 }
 
-function getDefaultProviders(): unknown[] {
+/**
+ * Gets the default providers for testing.
+ *
+ * @param config Configuration options for rendering.
+ * @returns An array of default providers.
+ */
+function getDefaultProviders(config: RenderConfig): unknown[] {
     const serviceProviders = DEFAULT_SERVICE_SINGLETON_MOCKS.map(
         ([singleton, mockInstance]) => ({
             provide: singleton.injectionToken,
@@ -98,10 +166,29 @@ function getDefaultProviders(): unknown[] {
 
     return [
         ...serviceProviders,
+        {
+            provide: TranslateStore,
+            useFactory: () => {
+                const store = new TranslateStore();
+
+                store.translations = {
+                    en: config.translations ?? {},
+                };
+
+                return store;
+            },
+        },
+        { provide: UrlSerializer, useClass: DefaultUrlSerializer },
         { provide: CORE_SITE_SCHEMAS, multiple: true, useValue: [] },
     ];
 }
 
+/**
+ * Resolves a service instance from the TestBed.
+ *
+ * @param injectionToken The injection token for the service.
+ * @returns The service instance or null if not found.
+ */
 function resolveServiceInstanceFromTestBed(injectionToken: Exclude<ServiceInjectionToken, string>): Record<string, unknown> | null {
     if (!testBedInitialized) {
         return null;
@@ -110,6 +197,12 @@ function resolveServiceInstanceFromTestBed(injectionToken: Exclude<ServiceInject
     return TestBed.inject(injectionToken) as Record<string, unknown> | null;
 }
 
+/**
+ * Creates a new instance of a service.
+ *
+ * @param injectionToken The injection token for the service.
+ * @returns The new service instance or null if an error occurs.
+ */
 function createNewServiceInstance(injectionToken: Exclude<ServiceInjectionToken, string>): Record<string, unknown> | null {
     try {
         const constructor = injectionToken as { new (): Record<string, unknown> };
@@ -123,16 +216,77 @@ function createNewServiceInstance(injectionToken: Exclude<ServiceInjectionToken,
 export interface RenderConfig {
     declarations: unknown[];
     providers: unknown[];
+    imports: unknown[];
+    translations?: Record<string, string>;
 }
 
-export type WrapperComponentFixture<T> = ComponentFixture<WrapperComponent<T>>;
+export interface RenderPageConfig extends RenderConfig {
+    routeParams: Record<string, unknown>;
+}
+
+export type TestingComponentFixture<T = unknown> = Omit<ComponentFixture<T>, 'nativeElement'> & { nativeElement: Element };
+
+export type WrapperComponentFixture<T = unknown> = TestingComponentFixture<WrapperComponent<T>>;
+
+/**
+ * Finds an element in the fixture's native element.
+ *
+ * @param fixture The testing component fixture.
+ * @param selector The CSS selector for the element.
+ * @param content The text content or regular expression to match.
+ * @returns The element or null if not found.
+ */
+export function findElement<E = HTMLElement>(
+    fixture: TestingComponentFixture,
+    selector: string,
+    content?: string | RegExp,
+): E | null {
+    const elements = fixture.nativeElement.querySelectorAll(selector);
+    const matches = typeof content === 'string'
+        ? (textContent: string | null) => textContent?.includes(content)
+        : (textContent: string | null) => textContent?.match(content ?? '');
+
+    for (let i = 0; i < elements.length; i++) {
+        const element = elements[i];
+
+        if (content && !matches(element.textContent)) {
+            continue;
+        }
+
+        return element as unknown as E;
+    }
+
+    return null;
+}
+
+/**
+ * Requires an element in the fixture's native element.
+ *
+ * @param fixture The testing component fixture.
+ * @param selector The CSS selector for the element.
+ * @param content The text content or regular expression to match.
+ * @returns The element.
+ */
+export function requireElement<E = HTMLElement>(
+    fixture: TestingComponentFixture,
+    selector: string,
+    content?: string | RegExp,
+): E {
+    const element = findElement<E>(fixture, selector, content);
+
+    if (!element) {
+        throw Error(`Could not find '${selector}' element`);
+    }
+
+    return element;
+}
 
 /**
  * Mock a certain class, converting its methods to Mock functions and overriding the specified properties and methods.
  *
  * @param instance Instance to mock.
  * @param overrides Object with the properties or methods to override, or a list of methods to override with an empty function.
- * @return Mock instance.
+ * @returns Mock instance.
  */
 export function mock<T>(
     instance: T | Partial<T> = {},
@@ -140,7 +294,7 @@ export function mock<T>(
 ): T {
     // If overrides is an object, apply them to the instance.
     if (!Array.isArray(overrides)) {
-        Object.assign(instance, overrides);
+        Object.assign(instance as Record<string, unknown>, overrides);
     }
 
     // Convert instance functions to jest functions.
@@ -164,13 +318,21 @@ export function mock<T>(
     return instance as T;
 }
 
-export function mockSingleton<T>(singletonClass: CoreSingletonProxy<T>, instance: T): T;
-export function mockSingleton<T>(singletonClass: CoreSingletonProxy<unknown>, instance?: Record<string, unknown>): T;
+export function mockSingleton<T>(singletonClass: CoreSingletonProxy<T>, instance: T | Partial<T>): T;
 export function mockSingleton<T>(
     singletonClass: CoreSingletonProxy<unknown>,
     methods: string[],
     instance?: Record<string, unknown>,
 ): T;
+
+/**
+ * Mocks a singleton instance for testing purposes.
+ *
+ * @param singleton The singleton class or proxy.
+ * @param methodsOrProperties An array of method names to mock or an object containing property names and values.
+ * @param properties If `methodsOrProperties` is an array, this object contains the properties to mock.
+ * @returns The mocked singleton instance.
+ */
 export function mockSingleton<T>(
     singleton: CoreSingletonProxy<T>,
     methodsOrProperties: string[] | Record<string, unknown> = [],
@@ -181,14 +343,27 @@ export function mockSingleton<T>(
     const methods = Array.isArray(methodsOrProperties) ? methodsOrProperties : [];
     const instance = getServiceInstance(singleton.injectionToken) as T;
     const mockInstance = mock(instance, methods);
+    const mockInstancePrototype = Object.getPrototypeOf(mockInstance);
 
-    Object.assign(mockInstance, properties);
+    for (const [name, value] of Object.entries(properties)) {
+        const descriptor = Object.getOwnPropertyDescriptor(mockInstancePrototype, name);
+
+        if (descriptor && !descriptor.writable) {
+            continue;
+        }
+
+        mockInstance[name] = value;
+    }
 
     singleton.setInstance(mockInstance);
 
     return mockInstance;
 }
 
+/**
+ * Resets the testing environment by marking the test bed as uninitialized and
+ * restoring default service singleton mocks.
+ */
 export function resetTestingEnvironment(): void {
     testBedInitialized = false;
 
@@ -197,6 +372,15 @@ export function resetTestingEnvironment(): void {
     }
 }
 
+/**
+ * Retrieves the service instance corresponding to the provided injection token.
+ * If the injection token is a string, an empty object is returned.
+ * If the service instance is found in the test bed, it is returned.
+ * If not found, a new service instance is created, or an empty object is returned if creation fails.
+ *
+ * @param injectionToken The injection token for the desired service.
+ * @returns The service instance or an empty object.
+ */
 export function getServiceInstance(injectionToken: ServiceInjectionToken): Record<string, unknown> {
     if (typeof injectionToken === 'string') {
         return {};
@@ -207,14 +391,58 @@ export function getServiceInstance(injectionToken: ServiceInjectionToken): Recor
         ?? {};
 }
 
-export async function renderComponent<T>(component: Type<T>, config: Partial<RenderConfig> = {}): Promise<ComponentFixture<T>> {
+/**
+ * Renders a component with the given configuration.
+ *
+ * @param component The Angular component to render.
+ * @param config Configuration options for rendering.
+ * @returns A promise that resolves to the testing component fixture.
+ */
+export async function renderComponent<T>(
+    component: Type<T>,
+    config: Partial<RenderConfig> = {},
+): Promise<TestingComponentFixture<T>> {
     return renderAngularComponent(component, {
         declarations: [],
         providers: [],
+        imports: [],
         ...config,
     });
 }
 
+/**
+ * Renders a page component with the given configuration.
+ *
+ * @param component The Angular component to render.
+ * @param config Configuration options for rendering a page component.
+ * @returns A promise that resolves to the testing component fixture.
+ */
+export async function renderPageComponent<T>(
+    component: Type<T>,
+    config: Partial<RenderPageConfig> = {},
+): Promise<TestingComponentFixture<T>> {
+    mockSingleton(CoreNavigator, mock<CoreNavigatorService>({
+        getRequiredRouteParam<T>(name: string) {
+            if (!config.routeParams?.[name]) {
+                throw new Error();
+            }
+
+            return config.routeParams?.[name] as T;
+        },
+        getRouteParam: <T>(name: string) => config.routeParams?.[name] as T | undefined,
+    }));
+
+    return renderComponent(component, config);
+}
+
+/**
+ * Renders a template with the given configuration.
+ *
+ * @param component The Angular component to wrap in a template.
+ * @param template The template for the wrapper component.
+ * @param config Configuration options for rendering.
+ * @returns A promise that resolves to the wrapper component fixture.
+ */
 export async function renderTemplate<T>(
     component: Type<T>,
     template: string,
@@ -228,11 +456,21 @@ export async function renderTemplate<T>(
         {
             declarations: [],
             providers: [],
+            imports: [],
             ...config,
         },
     );
 }
 
+/**
+ * Renders a wrapper component with the given configuration.
+ *
+ * @param component The Angular component to wrap.
+ * @param tag The HTML tag for the wrapper component.
+ * @param inputs Input attributes for the wrapper component.
+ * @param config Configuration options for rendering.
+ * @returns A promise that resolves to the wrapper component fixture.
+ */
 export async function renderWrapperComponent<T>(
     component: Type<T>,
     tag: string,
@@ -255,4 +493,57 @@ export async function renderWrapperComponent<T>(
  */
 export function agnosticPath(unixPath: string): string {
     return unixPath.replace(/\//g, sep);
+}
+
+/**
+ * Waits a certain time.
+ *
+ * @param time Number of milliseconds.
+ */
+export function wait(time: number): Promise<void> {
+    return new Promise((resolve) => {
+        setTimeout(() => {
+            resolve();
+        }, time);
+    });
+}
+
+/**
+ * Mocks translate service with certain translations.
+ *
+ * @param translations List of translations.
+ */
+export function mockTranslate(translations: Record<string, string> = {}): void {
+    mockSingleton(Translate as CoreSingletonProxy<TranslateService>, {
+        instant: (key, replacements) => {
+            const applyReplacements = (text: string): string => Object.entries(replacements ?? {}).reduce(
+                (text, [name, value]) => text.replace(`{{${name}}}`, value),
+                text,
+            );
+
+            return Array.isArray(key)
+                ? key.map(k => applyReplacements(translations[k] ?? k))
+                : applyReplacements(translations[key] ?? key);
+        },
+    });
+}
+
+/**
+ * Creates a test function that asserts that two types are equal.
+ *
+ * @param equal The equality check function for types A and B.
+ * @returns A test function that asserts equality.
+ */
+export function expectSameTypes<A, B>(equal: Equal<A, B>): () => void {
+    return () => expect(equal).toBe(true);
+}
+
+/**
+ * Creates a test function that always asserts true, used for testing generic types.
+ *
+ * @returns A test function that always asserts true.
+ */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function expectAnyType<T>(): () => void {
+    return () => expect(true).toBe(true);
 }

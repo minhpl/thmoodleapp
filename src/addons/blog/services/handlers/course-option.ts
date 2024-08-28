@@ -20,14 +20,13 @@ import {
     CoreCourseOptionsHandler,
     CoreCourseOptionsHandlerData,
 } from '@features/course/services/course-options-delegate';
-import { CoreCourseUserAdminOrNavOptionIndexed } from '@features/courses/services/courses';
-import { CoreEnrolledCourseDataWithExtraInfoAndOptions } from '@features/courses/services/courses-helper';
+import { CoreCourseAnyCourseData, CoreCourseUserAdminOrNavOptionIndexed } from '@features/courses/services/courses';
 import { CoreFilepool } from '@services/filepool';
 import { CoreSites } from '@services/sites';
 import { CoreWSFile } from '@services/ws';
 import { makeSingleton } from '@singletons';
 import { AddonBlog } from '../blog';
-import { AddonBlogMainMenuHandlerService } from './mainmenu';
+import { ADDON_BLOG_MAINMENU_PAGE_NAME } from '@addons/blog/constants';
 
 /**
  * Course nav handler.
@@ -62,7 +61,7 @@ export class AddonBlogCourseOptionHandlerService implements CoreCourseOptionsHan
     ): Promise<boolean> {
         const enabled = await CoreCourseHelper.hasABlockNamed(courseId, 'blog_menu');
 
-        if (enabled && navOptions && navOptions.blogs !== undefined) {
+        if (enabled && navOptions?.blogs !== undefined) {
             return navOptions.blogs;
         }
 
@@ -76,14 +75,14 @@ export class AddonBlogCourseOptionHandlerService implements CoreCourseOptionsHan
         return {
             title: 'addon.blog.blog',
             class: 'addon-blog-handler',
-            page: AddonBlogMainMenuHandlerService.PAGE_NAME,
+            page: ADDON_BLOG_MAINMENU_PAGE_NAME,
         };
     }
 
     /**
      * @inheritdoc
      */
-    async prefetch(course: CoreEnrolledCourseDataWithExtraInfoAndOptions): Promise<void> {
+    async prefetch(course: CoreCourseAnyCourseData): Promise<void> {
         const siteId = CoreSites.getCurrentSiteId();
 
         const result = await AddonBlog.getEntries({ courseid: course.id });

@@ -38,12 +38,10 @@ export class CoreSecondsToHMSPipe implements PipeTransform {
      * Convert a number of seconds to Hours:Minutes:Seconds.
      *
      * @param seconds Number of seconds.
-     * @return Formatted seconds.
+     * @returns Formatted seconds.
      */
-    transform(seconds: string | number): string {
-        if (!seconds || seconds < 0) {
-            seconds = 0;
-        } else if (typeof seconds == 'string') {
+    transform(seconds: string | number, showHours: boolean = true): string {
+        if (typeof seconds === 'string') {
             // Convert the value to a number.
             const numberSeconds = parseInt(seconds, 10);
             if (isNaN(numberSeconds)) {
@@ -52,6 +50,8 @@ export class CoreSecondsToHMSPipe implements PipeTransform {
                 return seconds;
             }
             seconds = numberSeconds;
+        } else if (!seconds || seconds < 0) {
+            seconds = 0;
         }
 
         // Don't allow decimals.
@@ -62,8 +62,9 @@ export class CoreSecondsToHMSPipe implements PipeTransform {
         const minutes = Math.floor(seconds / CoreConstants.SECONDS_MINUTE);
         seconds -= minutes * CoreConstants.SECONDS_MINUTE;
 
-        return CoreTextUtils.twoDigits(hours) + ':' + CoreTextUtils.twoDigits(minutes) + ':' +
-            CoreTextUtils.twoDigits(seconds);
+        return showHours
+            ? CoreTextUtils.twoDigits(hours) + ':' + CoreTextUtils.twoDigits(minutes) + ':' + CoreTextUtils.twoDigits(seconds)
+            : CoreTextUtils.twoDigits(minutes) + ':' + CoreTextUtils.twoDigits(seconds);
     }
 
 }

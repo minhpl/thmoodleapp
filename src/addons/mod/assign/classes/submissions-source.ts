@@ -126,7 +126,7 @@ export class AddonModAssignSubmissionsSource extends CoreRoutedItemsManagerSourc
                         CoreSites.getCurrentSiteId(),
                     );
                 }
-            } catch (error) {
+            } catch {
                 // Ignore errors, probably user is offline or sync is blocked.
             }
         }
@@ -208,7 +208,12 @@ export class AddonModAssignSubmissionsSource extends CoreRoutedItemsManagerSourc
                             ? AddonModAssignGradingStates.GRADED_FOLLOWUP_SUBMIT
                             : AddonModAssignGradingStates.GRADED;
                     }
+                } else if (assign.teamsubmission) {
+                    // Try to use individual grading status instead of the group one.
+                    const individualSubmission = this.submissionsData.submissions?.find(subm => submission.userid === subm.userid);
+                    submission.gradingstatus = individualSubmission?.gradingstatus ?? submission.gradingstatus;
                 }
+
                 submission.statusColor = AddonModAssign.getSubmissionStatusColor(submission.status);
                 submission.gradingColor = AddonModAssign.getSubmissionGradingStatusColor(
                     submission.gradingstatus,
@@ -259,4 +264,4 @@ export enum AddonModAssignListFilterName {
     NEED_GRADING = 'needgrading',
     DRAFT = 'draft',
     SUBMITTED = 'submitted',
-};
+}

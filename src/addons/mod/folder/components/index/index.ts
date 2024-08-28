@@ -22,6 +22,7 @@ import { Md5 } from 'ts-md5';
 import { AddonModFolder, AddonModFolderFolder, AddonModFolderProvider } from '../../services/folder';
 import { AddonModFolderFolderFormattedData, AddonModFolderHelper } from '../../services/folder-helper';
 import { AddonModFolderModuleHandlerService } from '../../services/handlers/module';
+import { CoreUtils } from '@services/utils/utils';
 
 /**
  * Component that displays a folder.
@@ -39,6 +40,7 @@ export class AddonModFolderIndexComponent extends CoreCourseModuleMainResourceCo
     @Input() subfolder?: AddonModFolderFolderFormattedData; // Subfolder to show.
 
     component = AddonModFolderProvider.COMPONENT;
+    pluginName = 'folder';
     contents?: AddonModFolderFolderFormattedData;
 
     constructor(@Optional() courseContentsPage?: CoreCourseContentsPage) {
@@ -46,7 +48,7 @@ export class AddonModFolderIndexComponent extends CoreCourseModuleMainResourceCo
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         super.ngOnInit();
@@ -71,7 +73,7 @@ export class AddonModFolderIndexComponent extends CoreCourseModuleMainResourceCo
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         await AddonModFolder.invalidateContent(this.module.id, this.courseId);
@@ -119,7 +121,9 @@ export class AddonModFolderIndexComponent extends CoreCourseModuleMainResourceCo
      * @inheritdoc
      */
     protected async logActivity(): Promise<void> {
-        await AddonModFolder.logView(this.module.instance, this.module.name);
+        await CoreUtils.ignoreErrors(AddonModFolder.logView(this.module.instance));
+
+        this.analyticsLogEvent('mod_folder_view_folder');
     }
 
     /**
@@ -134,7 +138,7 @@ export class AddonModFolderIndexComponent extends CoreCourseModuleMainResourceCo
             subfolder: folder,
         };
 
-        const hash = <string> Md5.hashAsciiStr(folder.filepath);
+        const hash = Md5.hashAsciiStr(folder.filepath);
 
         CoreNavigator.navigateToSitePath(
             `${AddonModFolderModuleHandlerService.PAGE_NAME}/${this.courseId}/${this.module.id}/${hash}`,

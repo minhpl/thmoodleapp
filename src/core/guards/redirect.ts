@@ -12,43 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Injectable } from '@angular/core';
-import { CanActivate, CanLoad, UrlTree } from '@angular/router';
+import { CanActivateFn } from '@angular/router';
 import { CoreApp } from '@services/app';
 import { CoreRedirectPayload } from '@services/navigator';
 import { CoreSites } from '@services/sites';
 import { Router } from '@singletons';
 import { CoreConstants } from '../constants';
 
-@Injectable({ providedIn: 'root' })
-export class CoreRedirectGuard implements CanLoad, CanActivate {
-
-    /**
-     * @inheritdoc
-     */
-    canLoad(): Promise<true | UrlTree> {
-        return this.guard();
-    }
-
-    /**
-     * @inheritdoc
-     */
-    canActivate(): Promise<true | UrlTree> {
-        return this.guard();
-    }
-
-    /**
-     * Check if there is a pending redirect and trigger it.
-     */
-    private async guard(): Promise<true | UrlTree> {
-        const redirect = CoreApp.consumeMemoryRedirect();
-
+/**
+ * Guard to check if there is a pending redirect and trigger it.
+ *
+ * @returns True if there's no redirect, redirection route otherwise.
+ */
+export const redirectGuard: CanActivateFn = async () => {
+    const redirect = CoreApp.consumeMemoryRedirect();
         if (!redirect) {
-            return true;
-        }
-
-        // Only accept the redirect if it was stored less than 20 seconds ago.
-        if (!redirect.timemodified || Date.now() - redirect.timemodified > 20000) {
             return true;
         }
 
@@ -85,6 +63,4 @@ export class CoreRedirectGuard implements CanLoad, CanActivate {
         route.queryParams = redirect.redirectOptions?.params || {};
 
         return route;
-    }
-
-}
+};

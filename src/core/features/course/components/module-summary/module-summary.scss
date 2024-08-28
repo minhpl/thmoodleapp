@@ -1,25 +1,29 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host ::ng-deep ion-item[collapsible] ion-label {
     margin-top: 12px;
 }
 
 h1 {
-    font-size: 20px;
+    font-size: var(--mdl-typography-heading4-fontSize);
 }
 
 .core-modulename {
     text-transform: uppercase;
+
     core-mod-icon {
-        padding: 3px;
-        --size: 10px;
-        margin: 0;
+        --module-icon-padding: 0px;
+        --module-legacy-icon-padding: 2px;
+        --module-icon-size: 16px;
+        --module-legacy-icon-size: 12px;
+
+        margin: 0px;
     }
 }
 
 
 ion-item ion-label ion-icon {
-    @include margin-horizontal(0, 4px);
+    @include margin-horizontal(0px, 4px);
     vertical-align: text-top;
 }
 
@@ -34,4 +38,8 @@ ion-item.card-header {
     ion-label {
         margin: 0px;
     }
+}
+
+.core-module-oib-button.hidden {
+    display: none;
 }

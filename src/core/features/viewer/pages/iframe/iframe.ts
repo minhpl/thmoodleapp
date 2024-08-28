@@ -15,8 +15,6 @@
 import { Component, OnInit } from '@angular/core';
 import { CoreNavigator } from '@services/navigator';
 
-import { CoreSites } from '@services/sites';
-
 /**
  * Page to display a URL in an iframe.
  */
@@ -28,30 +26,15 @@ export class CoreViewerIframePage implements OnInit {
 
     title?: string; // Page title.
     url?: string; // Iframe URL.
-    /* Whether the URL should be open with auto-login. Accepts the following values:
-        "yes" -> Always auto-login.
-        "no" -> Never auto-login.
-        "check" -> Auto-login only if it points to the current site. Default value. */
-    autoLogin?: string;
-    finalUrl?: string;
+    autoLogin?: boolean; // Whether to try to use auto-login.
 
     async ngOnInit(): Promise<void> {
         this.title = CoreNavigator.getRouteParam('title');
         this.url = CoreNavigator.getRouteParam('url');
-        this.autoLogin = CoreNavigator.getRouteParam('autoLogin') || 'check';
-
-        if (!this.url) {
-            return;
-        }
-
-        const currentSite = CoreSites.getCurrentSite();
-
-        if (currentSite && (this.autoLogin == 'yes' || (this.autoLogin == 'check' && currentSite.containsUrl(this.url)))) {
-            // Format the URL to add auto-login.
-            this.finalUrl = await currentSite.getAutoLoginUrl(this.url, false);
-        } else {
-            this.finalUrl = this.url;
-        }
+        const autoLoginParam = CoreNavigator.getRouteParam('autoLogin') ?? true;
+        this.autoLogin = typeof autoLoginParam === 'boolean' ?
+            autoLoginParam :
+            autoLoginParam !== 'no'; // Support deprecated values yes/no/check.
     }
 
 }

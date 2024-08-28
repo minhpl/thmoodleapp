@@ -1,18 +1,40 @@
 <!-- Render (no edit). -->
 <ion-item *ngIf="!edit && field && field.name">
     <ion-label>
-        <h2>{{ field.name }}</h2>
-        <p>{{ valueNumber * 1000 | coreFormatDate }}</p>
+        <p class="item-heading">
+            <core-format-text [text]="field.name" [contextLevel]="contextLevel" [contextInstanceId]="contextInstanceId"
+                [courseId]="courseId" [wsNotFiltered]="true" />
+        </p>
+        <p *ngIf="valueNumber">{{ valueNumber * 1000 | coreFormatDate }}</p>
+        <p *ngIf="displayValue">{{ displayValue }}</p>
     </ion-label>
 </ion-item>
 
 <!-- Edit. -->
 <ion-item *ngIf="edit && field && field.shortname && form" class="ion-text-wrap" [formGroup]="form">
     <ion-label position="stacked">
-        <span [core-mark-required]="required">{{ field.name }}</span>
+        <label [core-mark-required]="required" for="profile-field-datetime-{{field.shortname}}-button">
+            <core-format-text [text]="field.name" [contextLevel]="contextLevel" [contextInstanceId]="contextInstanceId"
+                [courseId]="courseId" [wsNotFiltered]="true" />
+        </label>
     </ion-label>
-    <ion-datetime [formControlName]="modelName" [placeholder]="'core.choosedots' | translate" [displayFormat]="format" [max]="max"
-        [min]="min" [monthNames]="monthNames">
-    </ion-datetime>
-    <core-input-errors [control]="form.controls[modelName]"></core-input-errors>
+
+    <ion-datetime-button datetime="profile-field-datetime-{{field.shortname}}" id="profile-field-datetime-{{field.shortname}}-button">
+        <ng-container *ngIf="control?.value === undefined">
+            <span slot="date-target">{{ 'core.choosedots' | translate }}</span>
+            <span slot="time-target">{{ 'core.choosedots' | translate }}</span>
+        </ng-container>
+    </ion-datetime-button>
+    <ion-modal [keepContentsMounted]="true">
+        <ng-template>
+            <ion-datetime id="profile-field-datetime-{{field.shortname}}" [formControlName]="modelName"
+                [presentation]="ionDateTimePresentation" [max]="max" [min]="min" [showDefaultButtons]="true">
+                <span slot="title">
+                    <core-format-text [text]="field.name" [contextLevel]="contextLevel" [contextInstanceId]="contextInstanceId"
+                        [courseId]="courseId" [wsNotFiltered]="true" />
+                </span>
+            </ion-datetime>
+        </ng-template>
+    </ion-modal>
+    <core-input-errors [control]="form.controls[modelName]" />
 </ion-item>

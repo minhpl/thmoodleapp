@@ -14,7 +14,7 @@
 
 import { Injectable } from '@angular/core';
 import { makeSingleton, Translate } from '@singletons';
-import * as moment from 'moment';
+import moment from 'moment-timezone';
 import { AddonModChatMessage, AddonModChatSessionMessage } from './chat';
 
 const patternTo = new RegExp(/^To\s([^:]+):(.*)/);
@@ -31,7 +31,7 @@ export class AddonModChatHelperProvider {
      * @param currentUserId User Id.
      * @param message Message.
      * @param prevMessage Previous message (if any).
-     * @return Message with additional info.
+     * @returns Message with additional info.
      */
     formatMessage(
         currentUserId: number,
@@ -54,6 +54,9 @@ export class AddonModChatHelperProvider {
 
         formattedMessage.showDate = this.showDate(message, prevMessage);
         formattedMessage.beep = (message.message.substring(0, 5) == 'beep ' && message.message.substring(5).trim()) || undefined;
+        if (formattedMessage.beep && !isNaN(Number(formattedMessage.beep))) {
+            formattedMessage.beep = Number(formattedMessage.beep);
+        }
 
         formattedMessage.special = !!formattedMessage.beep || (<AddonModChatSessionMessage> message).issystem ||
             (<AddonModChatMessage> message).system;
@@ -66,7 +69,9 @@ export class AddonModChatHelperProvider {
         if (!formattedMessage.special && formattedMessage.message.match(patternTo)) {
             const matches = formattedMessage.message.match(patternTo);
 
-            formattedMessage.message = `<i><b>${Translate.instant('addon.mod_chat.saidto')} </b>${matches![1]}</i>: ${matches![2]}`;
+            formattedMessage.message = `<em>
+                <strong>${Translate.instant('addon.mod_chat.saidto')} </strong>
+                ${matches![1]}</em>: ${matches![2]}`;
         }
 
         formattedMessage.showUserData = this.showUserData(currentUserId, message, prevMessage);
@@ -81,9 +86,10 @@ export class AddonModChatHelperProvider {
      * Check if the user info should be displayed for the current message.
      * User data is only displayed if the previous message was from another user.
      *
+     * @param currentUserId Current User Id.
      * @param message Current message where to show the user info.
      * @param prevMessage Previous message.
-     * @return Whether user data should be shown.
+     * @returns Whether user data should be shown.
      */
     protected showUserData(
         currentUserId: number,
@@ -99,7 +105,7 @@ export class AddonModChatHelperProvider {
      *
      * @param message Current message where to show the user info.
      * @param nextMessage Next message.
-     * @return Whether user data should be shown.
+     * @returns Whether user data should be shown.
      */
     protected showTail(message: AddonModChatAnyFormattedMessage, nextMessage?: AddonModChatAnyFormattedMessage): boolean {
         return !nextMessage || nextMessage.userid != message.userid || !!nextMessage.showDate || !!nextMessage.special;
@@ -110,7 +116,7 @@ export class AddonModChatHelperProvider {
      *
      * @param message New message object.
      * @param prevMessage Previous message object.
-     * @return True if messages are from diferent days, false othetwise.
+     * @returns True if messages are from diferent days, false othetwise.
      */
     protected showDate(message: AddonModChatAnyFormattedMessage, prevMessage?: AddonModChatAnyFormattedMessage): boolean {
         if (!prevMessage) {
@@ -130,7 +136,7 @@ export const AddonModChatHelper = makeSingleton(AddonModChatHelperProvider);
  */
 type AddonModChatInfoForView = {
     showDate?: boolean; // If date should be displayed before the message.
-    beep?: string; // User id of the beeped user or 'all'.
+    beep?: string | number; // User id of the beeped user or 'all'.
     special?: boolean; // True if is an special message (system, beep or command).
     showUserData?: boolean; // If user data should be displayed.
     showTail?: boolean; // If tail should be displayed (decoration).

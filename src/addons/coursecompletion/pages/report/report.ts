@@ -17,10 +17,13 @@ import {
     AddonCourseCompletionCourseCompletionStatus,
 } from '@addons/coursecompletion/services/coursecompletion';
 import { Component, OnInit } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
+import { CoreUser, CoreUserProfile } from '@features/user/services/user';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
+import { Translate } from '@singletons';
+import { CoreTime } from '@singletons/time';
 
 /**
  * Page that displays the course completion report.
@@ -31,14 +34,31 @@ import { CoreDomUtils } from '@services/utils/dom';
 })
 export class AddonCourseCompletionReportPage implements OnInit {
 
-    protected courseId!: number;
     protected userId!: number;
+    protected logView: () => void;
 
+    courseId!: number;
     completionLoaded = false;
     completion?: AddonCourseCompletionCourseCompletionStatus;
     showSelfComplete = false;
     tracked = true; // Whether completion is tracked.
     statusText?: string;
+    user?: CoreUserProfile;
+
+    constructor() {
+        this.logView = CoreTime.once(() => {
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: 'core_completion_get_course_completion_status',
+                name: Translate.instant('addon.coursecompletion.coursecompletion'),
+                data: {
+                    course: this.courseId,
+                    user: this.userId,
+                },
+                url: `/blocks/completionstatus/details.php?course=${this.courseId}&user=${this.userId}`,
+            });
+        });
+    }
 
     /**
      * @inheritdoc
@@ -63,16 +83,19 @@ export class AddonCourseCompletionReportPage implements OnInit {
     /**
      * Fetch compleiton data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchCompletion(): Promise<void> {
         try {
+            this.user = await CoreUser.getProfile(this.userId, this.courseId, true);
+
             this.completion = await AddonCourseCompletion.getCompletion(this.courseId, this.userId);
 
             this.statusText = AddonCourseCompletion.getCompletedStatusText(this.completion);
             this.showSelfComplete = AddonCourseCompletion.canMarkSelfCompleted(this.userId, this.completion);
 
             this.tracked = true;
+            this.logView();
         } catch (error) {
             if (error && error.errorcode == 'notenroled') {
                 // Not enrolled error, probably a teacher.
@@ -88,7 +111,7 @@ export class AddonCourseCompletionReportPage implements OnInit {
      *
      * @param refresher Refresher instance.
      */
-    async refreshCompletion(refresher?: IonRefresher): Promise<void> {
+    async refreshCompletion(refresher?: HTMLIonRefresherElement): Promise<void> {
         await AddonCourseCompletion.invalidateCourseCompletion(this.courseId, this.userId).finally(() => {
             this.fetchCompletion().finally(() => {
                 refresher?.complete();

@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreCommentsArea } from '@features/comments/services/comments';
-import { CoreCourseSummary, CoreCourseModuleSummary } from '@features/course/services/course';
-import { CorePushNotifications } from '@features/pushnotifications/services/pushnotifications';
+import { CoreCourseSummary } from '@features/course/services/course';
 import { CoreUserSummary } from '@features/user/services/user';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
@@ -43,17 +43,33 @@ export class AddonCompetencyProvider {
     static readonly REVIEW_STATUS_IN_REVIEW = 2;
 
     /**
+     * Check if competencies are enabled in a certain site.
+     *
+     * @param options Site ID or site object.
+     * @returns Whether competencies are enabled.
+     */
+    async areCompetenciesEnabled(options?: {siteId?: string; site?: CoreSite}): Promise<boolean> {
+        const site = options?.site ? options.site : await CoreSites.getSite(options?.siteId);
+
+        if (!site) {
+            return false;
+        }
+
+        return site.canUseAdvancedFeature('enablecompetencies') &&
+            !(site.isFeatureDisabled('CoreMainMenuDelegate_AddonCompetency') &&
+            site.isFeatureDisabled('CoreCourseOptionsDelegate_AddonCompetency') &&
+            site.isFeatureDisabled('CoreUserDelegate_AddonCompetency'));
+    }
+
+    /**
      * Check if all competencies features are disabled.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: whether all competency features are disabled.
+     * @returns Promise resolved with boolean: whether all competency features are disabled.
+     * @deprecated since 4.4. Use areCompetenciesEnabled instead.
      */
     async allCompetenciesDisabled(siteId?: string): Promise<boolean> {
-        const site = await CoreSites.getSite(siteId);
-
-        return site.isFeatureDisabled('CoreMainMenuDelegate_AddonCompetency') &&
-            site.isFeatureDisabled('CoreCourseOptionsDelegate_AddonCompetency') &&
-            site.isFeatureDisabled('CoreUserDelegate_AddonCompetency');
+        return !(await this.areCompetenciesEnabled({ siteId }));
     }
 
     /**
@@ -62,10 +78,15 @@ export class AddonCompetencyProvider {
      * @param courseId Course ID.
      * @param userId User ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: whether the user can view the competencies.
+     * @returns Promise resolved with boolean: whether the user can view the competencies.
      */
     async canViewUserCompetenciesInCourse(courseId: number, userId?: number, siteId?: string): Promise<boolean> {
         if (!CoreSites.isLoggedIn()) {
+            return false;
+        }
+
+        const enabled = await this.areCompetenciesEnabled({ siteId });
+        if (!enabled) {
             return false;
         }
 
@@ -95,7 +116,7 @@ export class AddonCompetencyProvider {
      * Get cache key for user learning plans data WS calls.
      *
      * @param userId User ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getLearningPlansCacheKey(userId: number): string {
         return ROOT_CACHE_KEY + 'userplans:' + userId;
@@ -105,7 +126,7 @@ export class AddonCompetencyProvider {
      * Get cache key for learning plan data WS calls.
      *
      * @param planId Plan ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getLearningPlanCacheKey(planId: number): string {
         return ROOT_CACHE_KEY + 'learningplan:' + planId;
@@ -116,7 +137,7 @@ export class AddonCompetencyProvider {
      *
      * @param planId Plan ID.
      * @param competencyId Competency ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCompetencyInPlanCacheKey(planId: number, competencyId: number): string {
         return ROOT_CACHE_KEY + 'plancompetency:' + planId + ':' + competencyId;
@@ -128,7 +149,7 @@ export class AddonCompetencyProvider {
      * @param courseId Course ID.
      * @param competencyId Competency ID.
      * @param userId User ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCompetencyInCourseCacheKey(courseId: number, competencyId: number, userId: number): string {
         return ROOT_CACHE_KEY + 'coursecompetency:' + userId + ':' + courseId + ':' + competencyId;
@@ -139,7 +160,7 @@ export class AddonCompetencyProvider {
      *
      * @param competencyId Competency ID.
      * @param userId User ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCompetencySummaryCacheKey(competencyId: number, userId: number): string {
         return ROOT_CACHE_KEY + 'competencysummary:' + userId + ':' + competencyId;
@@ -149,7 +170,7 @@ export class AddonCompetencyProvider {
      * Get cache key for course competencies data WS calls.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCourseCompetenciesCacheKey(courseId: number): string {
         return ROOT_CACHE_KEY + 'coursecompetencies:' + courseId;
@@ -160,7 +181,7 @@ export class AddonCompetencyProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return competencies if enabled for the given course, false otherwise.
+     * @returns competencies if enabled for the given course, false otherwise.
      */
     async isPluginForCourseEnabled(courseId: number, siteId?: string): Promise<boolean> {
         if (!CoreSites.isLoggedIn()) {
@@ -175,7 +196,7 @@ export class AddonCompetencyProvider {
      *
      * @param userId ID of the user. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise to be resolved when the plans are retrieved.
+     * @returns Promise to be resolved when the plans are retrieved.
      */
     async getLearningPlans(userId?: number, siteId?: string): Promise<AddonCompetencyPlan[]> {
         const site = await CoreSites.getSite(siteId);
@@ -200,7 +221,7 @@ export class AddonCompetencyProvider {
      *
      * @param planId ID of the plan.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise to be resolved when the plan is retrieved.
+     * @returns Promise to be resolved when the plan is retrieved.
      */
     async getLearningPlan(planId: number, siteId?: string): Promise<AddonCompetencyDataForPlanPageWSResponse> {
         const site = await CoreSites.getSite(siteId);
@@ -223,7 +244,7 @@ export class AddonCompetencyProvider {
      * @param planId ID of the plan.
      * @param competencyId ID of the competency.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise to be resolved when the competency is retrieved.
+     * @returns Promise to be resolved when the competency is retrieved.
      */
     async getCompetencyInPlan(
         planId: number,
@@ -257,7 +278,7 @@ export class AddonCompetencyProvider {
      * @param userId ID of the user. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
-     * @return Promise to be resolved when the competency is retrieved.
+     * @returns Promise to be resolved when the competency is retrieved.
      */
     async getCompetencyInCourse(
         courseId: number,
@@ -295,7 +316,7 @@ export class AddonCompetencyProvider {
      * @param userId ID of the user. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
-     * @return Promise to be resolved when the competency summary is retrieved.
+     * @returns Promise to be resolved when the competency summary is retrieved.
      */
     async getCompetencySummary(
         competencyId: number,
@@ -331,7 +352,7 @@ export class AddonCompetencyProvider {
      * @param userId ID of the user.
      * @param siteId Site ID. If not defined, current site.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
-     * @return Promise to be resolved when the course competencies are retrieved.
+     * @returns Promise to be resolved when the course competencies are retrieved.
      */
     async getCourseCompetencies(
         courseId: number,
@@ -364,7 +385,7 @@ export class AddonCompetencyProvider {
      * @param courseId ID of the course.
      * @param siteId Site ID. If not defined, current site.
      * @param ignoreCache True if it should ignore cached data (it will always fail in offline or server down).
-     * @return Promise to be resolved when the course competencies are retrieved.
+     * @returns Promise to be resolved when the course competencies are retrieved.
      */
     async getCourseCompetenciesPage(
         courseId: number,
@@ -399,7 +420,7 @@ export class AddonCompetencyProvider {
      *
      * @param userId ID of the user. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateLearningPlans(userId?: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -413,7 +434,7 @@ export class AddonCompetencyProvider {
      *
      * @param planId ID of the plan.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateLearningPlan(planId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -427,7 +448,7 @@ export class AddonCompetencyProvider {
      * @param planId ID of the plan.
      * @param competencyId ID of the competency.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateCompetencyInPlan(planId: number, competencyId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -442,7 +463,7 @@ export class AddonCompetencyProvider {
      * @param competencyId ID of the competency.
      * @param userId ID of the user. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateCompetencyInCourse(courseId: number, competencyId: number, userId?: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -457,7 +478,7 @@ export class AddonCompetencyProvider {
      * @param competencyId ID of the competency.
      * @param userId ID of the user. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateCompetencySummary(competencyId: number, userId?: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -472,7 +493,7 @@ export class AddonCompetencyProvider {
      * @param courseId ID of the course.
      * @param userId ID of the user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateCourseCompetencies(courseId: number, userId?: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -495,10 +516,10 @@ export class AddonCompetencyProvider {
      * @param planId ID of the plan.
      * @param competencyId ID of the competency.
      * @param planStatus Current plan Status to decide what action should be logged.
-     * @param name Name of the competency.
+     * @param name Deprecated, not used anymore.
      * @param userId User ID. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
     async logCompetencyInPlanView(
         planId: number,
@@ -525,12 +546,6 @@ export class AddonCompetencyProvider {
             ? 'core_competency_user_competency_plan_viewed'
             : 'core_competency_user_competency_viewed_in_plan';
 
-        CorePushNotifications.logViewEvent(competencyId, name, 'competency', wsName, {
-            planid: planId,
-            planstatus: planStatus,
-            userid: userId,
-        }, siteId);
-
         await site.write(wsName, params, preSets);
     }
 
@@ -539,10 +554,10 @@ export class AddonCompetencyProvider {
      *
      * @param courseId ID of the course.
      * @param competencyId ID of the competency.
-     * @param name Name of the competency.
+     * @param name Deprecated, not used anymore.
      * @param userId User ID. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
     async logCompetencyInCourseView(
         courseId: number,
@@ -564,14 +579,7 @@ export class AddonCompetencyProvider {
             typeExpected: 'boolean',
         };
 
-        const wsName = 'core_competency_user_competency_viewed_in_course';
-
-        CorePushNotifications.logViewEvent(competencyId, name, 'competency', 'wsName', {
-            courseid: courseId,
-            userid: userId,
-        }, siteId);
-
-        await site.write(wsName, params, preSets);
+        await site.write('core_competency_user_competency_viewed_in_course', params, preSets);
     }
 
     /**
@@ -580,7 +588,7 @@ export class AddonCompetencyProvider {
      * @param competencyId ID of the competency.
      * @param name Name of the competency.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
     async logCompetencyView(competencyId: number, name?: string, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -593,10 +601,7 @@ export class AddonCompetencyProvider {
             typeExpected: 'boolean',
         };
 
-        const wsName = 'core_competency_competency_viewed';
-        CorePushNotifications.logViewEvent(competencyId, name, 'competency', wsName, {}, siteId);
-
-        await site.write(wsName, params, preSets);
+        await site.write('core_competency_competency_viewed', params, preSets);
     }
 
 }
@@ -893,12 +898,14 @@ type AddonCompetencyDataForUserCompetencySummaryInCourseWSParams = {
 };
 
 /**
- * Data returned by competency's user_competency_summary_in_course_exporter.
+ * Data returned by tool_lp_data_for_user_competency_summary_in_course WS.
+ *
+ * WS Description: Load a summary of a user competency.
  */
 export type AddonCompetencyDataForUserCompetencySummaryInCourseWSResponse = {
     usercompetencysummary: AddonCompetencyDataForUserCompetencySummaryWSResponse;
     course: CoreCourseSummary;
-    coursemodules: CoreCourseModuleSummary[]; // Coursemodules.
+    coursemodules: AddonCompetencyCourseModuleInfo[]; // Coursemodules.
     plans: AddonCompetencyPlan[]; // @since 3.7. Plans.
     pluginbaseurl: string; // @since 3.7. Pluginbaseurl.
 };
@@ -1025,7 +1032,7 @@ export type AddonCompetencyDataForCourseCompetenciesPageWSResponse = {
 export type AddonCompetencyDataForCourseCompetenciesPageCompetency = {
     competency: AddonCompetencyCompetency;
     coursecompetency: AddonCompetencyCourseCompetency;
-    coursemodules: CoreCourseModuleSummary[];
+    coursemodules: AddonCompetencyCourseModuleInfo[];
     usercompetencycourse?: AddonCompetencyUserCompetencyCourse;
     ruleoutcomeoptions: {
         value: number; // The option value.
@@ -1034,6 +1041,13 @@ export type AddonCompetencyDataForCourseCompetenciesPageCompetency = {
     }[];
     comppath: AddonCompetencyPath;
     plans: AddonCompetencyPlan[]; // @since 3.7.
+};
+
+type AddonCompetencyCourseModuleInfo = {
+    id: number; // Id.
+    name: string; // Name.
+    url?: string; // Url.
+    iconurl: string; // Iconurl.
 };
 
 /**

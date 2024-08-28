@@ -54,7 +54,7 @@ export class CoreSupressEventsDirective implements OnInit {
      * Initialize event listeners.
      */
     ngOnInit(): void {
-        if (this.onClick.observers.length == 0) {
+        if (!this.onClick.observed) {
             CoreLogger.getInstance('CoreSupressEventsDirective')
                 .error('No onClick output was defined causing this directive to fail', this.element);
 
@@ -80,7 +80,7 @@ export class CoreSupressEventsDirective implements OnInit {
 
         // Suppress the events.
         for (const evName of events) {
-            this.element.addEventListener(evName, this.stopBubble.bind(this));
+            this.element.addEventListener(evName, (event) => this.stopBubble(event));
         }
 
         // Now listen to "click" events.

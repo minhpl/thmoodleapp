@@ -1,4 +1,4 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
     .core-login-onboarding-step {
@@ -25,5 +25,9 @@
         .button-block {
             margin-top: 20px;
         }
+    }
+
+    h1 {
+        font-size: var(--mdl-typography-heading3-fontSize);
     }
 }

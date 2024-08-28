@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { AfterViewInit, Component, OnDestroy, ViewChild } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreSplitViewComponent } from '@components/split-view/split-view';
 import {
@@ -27,6 +26,10 @@ import { AddonCompetencyPlanCompetenciesSource } from '@addons/competency/classe
 import { AddonCompetencyCourseCompetenciesSource } from '@addons/competency/classes/competency-course-competencies-source';
 import { CoreListItemsManager } from '@classes/items-management/list-items-manager';
 import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/routed-items-manager-sources-tracker';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreSites } from '@services/sites';
+import { CoreTime } from '@singletons/time';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Page that displays the list of competencies of a learning plan.
@@ -45,9 +48,14 @@ export class AddonCompetencyCompetenciesPage implements AfterViewInit, OnDestroy
     >;
 
     title = '';
+    contextLevel?: ContextLevel;
+    contextInstanceId?: number;
+
+    protected logView: () => void;
 
     constructor() {
         const planId = CoreNavigator.getRouteNumberParam('planId');
+        this.logView = CoreTime.once(() => this.performLogView());
 
         if (!planId) {
             const courseId = CoreNavigator.getRequiredRouteNumberParam('courseId');
@@ -79,7 +87,7 @@ export class AddonCompetencyCompetenciesPage implements AfterViewInit, OnDestroy
     /**
      * Fetches the competencies and updates the view.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchCompetencies(): Promise<void> {
         try {
@@ -93,9 +101,15 @@ export class AddonCompetencyCompetenciesPage implements AfterViewInit, OnDestroy
                 }
 
                 this.title = source.plan.plan.name;
+                this.contextLevel = ContextLevel.USER;
+                this.contextInstanceId = source.user?.id || source.plan.plan.userid;
             } else {
                 this.title = Translate.instant('addon.competency.coursecompetencies');
+                this.contextLevel = ContextLevel.COURSE;
+                this.contextInstanceId = source.COURSE_ID;
             }
+
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'Error getting competencies data.');
         }
@@ -106,7 +120,7 @@ export class AddonCompetencyCompetenciesPage implements AfterViewInit, OnDestroy
      *
      * @param refresher Refresher.
      */
-    async refreshCompetencies(refresher?: IonRefresher): Promise<void> {
+    async refreshCompetencies(refresher?: HTMLIonRefresherElement): Promise<void> {
         await this.competencies.getSource().invalidateCache();
 
         this.competencies.getSource().setDirty(true);
@@ -120,6 +134,44 @@ export class AddonCompetencyCompetenciesPage implements AfterViewInit, OnDestroy
      */
     ngOnDestroy(): void {
         this.competencies.destroy();
+    }
+
+    /**
+     * Log view.
+     */
+    protected performLogView(): void {
+        const source = this.competencies.getSource();
+
+        if (source instanceof AddonCompetencyPlanCompetenciesSource) {
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+                ws: 'tool_lp_data_for_plan_page',
+                name: this.title,
+                data: {
+                    category: 'competency',
+                    planid: source.PLAN_ID,
+                },
+                url: `/admin/tool/lp/plan.php?id=${source.PLAN_ID}`,
+            });
+
+            return;
+        }
+
+        if (source.USER_ID && source.USER_ID !== CoreSites.getCurrentSiteUserId()) {
+            // Only log event when viewing own competencies. In LMS viewing students competencies uses a different view.
+            return;
+        }
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+            ws: 'tool_lp_data_for_course_competencies_page',
+            name: this.title,
+            data: {
+                category: 'competency',
+                courseid: source.COURSE_ID,
+            },
+            url: `/admin/tool/lp/coursecompetencies.php?courseid=${source.COURSE_ID}`,
+        });
     }
 
 }

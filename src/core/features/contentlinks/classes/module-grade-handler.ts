@@ -58,7 +58,7 @@ export class CoreContentLinksModuleGradeHandler extends CoreContentLinksHandlerB
      * @param url The URL to treat.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param courseId Course ID related to the URL. Optional but recommended.
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
     getActions(
         siteIds: string[],
@@ -67,7 +67,7 @@ export class CoreContentLinksModuleGradeHandler extends CoreContentLinksHandlerB
         courseId?: number,
     ): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
 
-        courseId = Number(courseId || params.courseid || params.cid);
+        const courseIdentifier = Number(courseId || params.courseid || params.cid);
 
         return [{
             action: async (siteId): Promise<void> => {
@@ -76,20 +76,20 @@ export class CoreContentLinksModuleGradeHandler extends CoreContentLinksHandlerB
                 const site = await CoreSites.getSite(siteId);
                 if (!params.userid || Number(params.userid) == site.getUserId()) {
                     // No user specified or current user. Navigate to module.
-                    CoreCourseHelper.navigateToModule(
+                    await CoreCourseHelper.navigateToModule(
                         Number(params.id),
                         {
-                            courseId,
+                            courseId: courseIdentifier,
                             modName: this.useModNameToGetModule ? this.modName : undefined,
                             siteId,
                         },
                     );
                 } else if (this.canReview) {
                     // Use the goToReview function.
-                    this.goToReview(url, params, courseId!, siteId);
+                    await this.goToReview(url, params, courseIdentifier, siteId);
                 } else {
                     // Not current user and cannot review it in the app, open it in browser.
-                    site.openInBrowserWithAutoLogin(url);
+                    await site.openInBrowserWithAutoLogin(url);
                 }
 
                 modal.dismiss();
@@ -104,7 +104,7 @@ export class CoreContentLinksModuleGradeHandler extends CoreContentLinksHandlerB
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param courseId Course ID related to the URL.
      * @param siteId Site to use.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async goToReview(
         url: string, // eslint-disable-line @typescript-eslint/no-unused-vars

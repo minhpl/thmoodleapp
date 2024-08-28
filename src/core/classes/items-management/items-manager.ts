@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { CoreSilentError } from '@classes/errors/silenterror';
 import { CoreItemsManagerSource } from './items-manager-source';
 
 /**
@@ -45,7 +46,7 @@ export abstract class CoreItemsManager<
      */
     getSource(): Source {
         if (!this.source) {
-            throw new Error('Source is missing from items manager');
+            throw new CoreSilentError('Source is missing from items manager');
         }
 
         return this.source.instance;
@@ -91,7 +92,7 @@ export abstract class CoreItemsManager<
     /**
      * Get selected item.
      *
-     * @return Selected item, null if none.
+     * @returns Selected item, null if none.
      */
     getSelectedItem(): Item | null {
         return this.selectedItem;
@@ -103,6 +104,10 @@ export abstract class CoreItemsManager<
      * @param item Item, null if none.
      */
     setSelectedItem(item: Item | null): void {
+        if (item === this.selectedItem) {
+            return;
+        }
+
         this.selectedItem = item;
 
         this.listeners.forEach(listener => listener.onSelectedItemUpdated?.call(listener, item));
@@ -160,7 +165,7 @@ export abstract class CoreItemsManager<
      * Get item by ID.
      *
      * @param id ID
-     * @return Item, null if not found.
+     * @returns Item, null if not found.
      */
     getItemById(id: string | number): Item | null {
         return this.itemsMap?.[id] ?? null;
@@ -170,7 +175,7 @@ export abstract class CoreItemsManager<
      * Get an ID to identify an item.
      *
      * @param item Data about the item.
-     * @return Item ID.
+     * @returns Item ID.
      */
     abstract getItemId(item: Item): string | number;
 

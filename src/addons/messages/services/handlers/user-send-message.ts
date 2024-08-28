@@ -15,7 +15,11 @@
 import { Injectable } from '@angular/core';
 import { Params } from '@angular/router';
 import { CoreUserProfile } from '@features/user/services/user';
-import { CoreUserDelegateService, CoreUserProfileHandler, CoreUserProfileHandlerData } from '@features/user/services/user-delegate';
+import {
+    CoreUserProfileHandlerType,
+    CoreUserProfileHandler,
+     CoreUserProfileHandlerData,
+} from '@features/user/services/user-delegate';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
 import { makeSingleton } from '@singletons';
@@ -29,7 +33,7 @@ export class AddonMessagesSendMessageUserHandlerService implements CoreUserProfi
 
     name = 'AddonMessages:sendMessage';
     priority = 1000;
-    type = CoreUserDelegateService.TYPE_COMMUNICATION;
+    type = CoreUserProfileHandlerType.BUTTON;
 
     /**
      * @inheritdoc
@@ -58,7 +62,7 @@ export class AddonMessagesSendMessageUserHandlerService implements CoreUserProfi
     /**
      * Returns the data needed to render the handler.
      *
-     * @return Data needed to render the handler.
+     * @returns Data needed to render the handler.
      */
     getDisplayData(): CoreUserProfileHandlerData {
         return {
@@ -71,10 +75,9 @@ export class AddonMessagesSendMessageUserHandlerService implements CoreUserProfi
 
                 const pageParams: Params = {
                     showKeyboard: true,
-                    userId: user.id,
                     hideInfo: true,
                 };
-                CoreNavigator.navigateToSitePath('/messages/discussion', { params: pageParams });
+                CoreNavigator.navigateToSitePath(`/messages/discussion/user/${user.id}`, { params: pageParams });
             },
         };
     }

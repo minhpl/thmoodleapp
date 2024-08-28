@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
@@ -20,29 +20,17 @@ import { CoreCourseModulePrefetchDelegate } from '@features/course/services/modu
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
 import { CoreCronDelegate } from '@services/cron';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { AddonModSurveyComponentsModule } from './components/components.module';
 import { ADDON_MOD_SURVEY_OFFLINE_SITE_SCHEMA } from './services/database/survey';
 import { AddonModSurveyIndexLinkHandler } from './services/handlers/index-link';
 import { AddonModSurveyListLinkHandler } from './services/handlers/list-link';
-import { AddonModSurveyModuleHandler, AddonModSurveyModuleHandlerService } from './services/handlers/module';
-import { AddonModSurveyPrefetchHandler } from './services/handlers/prefetch';
-import { AddonModSurveySyncCronHandler } from './services/handlers/sync-cron';
-import { AddonModSurveyProvider } from './services/survey';
-import { AddonModSurveyHelperProvider } from './services/survey-helper';
-import { AddonModSurveyOfflineProvider } from './services/survey-offline';
-import { AddonModSurveySyncProvider } from './services/survey-sync';
-
-// List of providers (without handlers).
-export const ADDON_MOD_SURVEY_SERVICES: Type<unknown>[] = [
-    AddonModSurveyProvider,
-    AddonModSurveyHelperProvider,
-    AddonModSurveySyncProvider,
-    AddonModSurveyOfflineProvider,
-];
+import { AddonModSurveyModuleHandler } from './services/handlers/module';
+import { getPrefetchHandlerInstance } from './services/handlers/prefetch';
+import { getCronHandlerInstance } from './services/handlers/sync-cron';
+import { ADDON_MOD_SURVEY_PAGE_NAME } from '@addons/mod/survey/constants';
 
 const routes: Routes = [
     {
-        path: AddonModSurveyModuleHandlerService.PAGE_NAME,
+        path: ADDON_MOD_SURVEY_PAGE_NAME,
         loadChildren: () => import('./survey-lazy.module').then(m => m.AddonModSurveyLazyModule),
     },
 ];
@@ -50,7 +38,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModSurveyComponentsModule,
     ],
     providers: [
         {
@@ -62,9 +49,10 @@ const routes: Routes = [
             provide: APP_INITIALIZER,
             multi: true,
             useValue: () => {
+                CoreCourseModulePrefetchDelegate.registerHandler(getPrefetchHandlerInstance());
+                CoreCronDelegate.register(getCronHandlerInstance());
+
                 CoreCourseModuleDelegate.registerHandler(AddonModSurveyModuleHandler.instance);
-                CoreCourseModulePrefetchDelegate.registerHandler(AddonModSurveyPrefetchHandler.instance);
-                CoreCronDelegate.register(AddonModSurveySyncCronHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModSurveyIndexLinkHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModSurveyListLinkHandler.instance);
             },

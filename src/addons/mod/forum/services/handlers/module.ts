@@ -13,17 +13,16 @@
 // limitations under the License.
 
 import { Injectable, Type } from '@angular/core';
-import { AddonModForum, AddonModForumProvider } from '../forum';
+import { AddonModForum, AddonModForumProvider, AddonModForumTracking } from '../forum';
 import { makeSingleton, Translate } from '@singletons';
 import { CoreEvents } from '@singletons/events';
-import { CoreSites } from '@services/sites';
-import { CoreUtils } from '@services/utils/utils';
+import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreCourseModuleHandler, CoreCourseModuleHandlerData } from '@features/course/services/module-delegate';
 import { CoreConstants, ModPurpose } from '@/core/constants';
-import { AddonModForumIndexComponent } from '../../components/index';
 import { CoreModuleHandlerBase } from '@features/course/classes/module-base-handler';
 import { CoreCourseModuleData } from '@features/course/services/course-helper';
-import { CoreIonicColorNames } from '@singletons/colors';
+import { CoreTextUtils } from '@services/utils/text';
+import { CoreUser } from '@features/user/services/user';
 
 /**
  * Handler to support forum modules.
@@ -58,8 +57,30 @@ export class AddonModForumModuleHandlerService extends CoreModuleHandlerBase imp
     async getData(module: CoreCourseModuleData, courseId: number): Promise<CoreCourseModuleHandlerData> {
         const data = await super.getData(module, courseId);
 
+        const customData = module.customdata ?
+            CoreTextUtils.parseJSON<{ trackingtype?: string | number } | ''>(module.customdata, {}) : {};
+        const trackingType = typeof customData !== 'string' && customData.trackingtype !== undefined ?
+            Number(customData.trackingtype) : undefined;
+
+        if (trackingType === AddonModForumTracking.OFF) {
+            // Tracking is disabled in forum.
+            data.extraBadge = '';
+
+            return data;
+        }
+
+        if (trackingType === AddonModForumTracking.OPTIONAL) {
+            // Forum has tracking optional, check if user has tracking enabled.
+            const user = await CoreUser.getProfile(CoreSites.getCurrentSiteUserId());
+
+            if (user.trackforums === 0) {
+                data.extraBadge = '';
+
+                return data;
+            }
+        }
+
         if ('afterlink' in module && !!module.afterlink) {
-            data.extraBadgeColor = undefined;
             const match = />(\d+)[^<]+/.exec(module.afterlink);
             data.extraBadge = match ? Translate.instant('addon.mod_forum.unreadpostsnumber', { $a : match[1] }) : '';
         } else {
@@ -87,6 +108,8 @@ export class AddonModForumModuleHandlerService extends CoreModuleHandlerBase imp
      * @inheritdoc
      */
     async getMainComponent(): Promise<Type<unknown> | undefined> {
+        const { AddonModForumIndexComponent } = await import('../../components/index');
+
         return AddonModForumIndexComponent;
     }
 
@@ -113,15 +136,14 @@ export class AddonModForumModuleHandlerService extends CoreModuleHandlerBase imp
         }
 
         data.extraBadge = Translate.instant('core.loading');
-        data.extraBadgeColor = CoreIonicColorNames.DARK;
-
-        await CoreUtils.ignoreErrors(AddonModForum.invalidateForumData(courseId));
 
         try {
             // Handle unread posts.
-            const forum = await AddonModForum.getForum(courseId, moduleId, { siteId });
+            const forum = await AddonModForum.getForum(courseId, moduleId, {
+                readingStrategy: CoreSitesReadingStrategy.PREFER_NETWORK,
+                siteId,
+            });
 
-            data.extraBadgeColor = undefined;
             data.extraBadge = forum.unreadpostscount
                 ? Translate.instant(
                     'addon.mod_forum.unreadpostsnumber',
@@ -130,7 +152,6 @@ export class AddonModForumModuleHandlerService extends CoreModuleHandlerBase imp
                 : '';
         } catch {
             // Ignore errors.
-            data.extraBadgeColor = undefined;
             data.extraBadge = '';
         }
     }

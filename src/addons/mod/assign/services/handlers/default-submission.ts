@@ -15,8 +15,10 @@
 import { Injectable } from '@angular/core';
 import { CoreWSFile } from '@services/ws';
 import { Translate } from '@singletons';
-import { AddonModAssignPlugin } from '../assign';
+import { AddonModAssignAssign, AddonModAssignPlugin, AddonModAssignSavePluginData, AddonModAssignSubmission } from '../assign';
 import { AddonModAssignSubmissionHandler } from '../submission-delegate';
+import { CoreFormFields } from '@singletons/form';
+import { AddonModAssignSubmissionsDBRecordFormatted } from '../assign-offline';
 
 /**
  * Default handler used when a submission plugin doesn't have a specific implementation.
@@ -28,66 +30,78 @@ export class AddonModAssignDefaultSubmissionHandler implements AddonModAssignSub
     type = 'base';
 
     /**
-     * Whether the plugin can be edited in offline for existing submissions. In general, this should return false if the
-     * plugin uses Moodle filters. The reason is that the app only prefetches filtered data, and the user should edit
-     * unfiltered data.
-     *
-     * @return Boolean or promise resolved with boolean: whether it can be edited in offline.
+     * @inheritdoc
      */
-    canEditOffline(): boolean | Promise<boolean> {
+    canEditOffline(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): boolean | Promise<boolean> {
         return false;
     }
 
     /**
-     * Check if a plugin has no data.
-     *
-     * @return Whether the plugin is empty.
+     * @inheritdoc
      */
-    isEmpty(): boolean {
+    isEmpty(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): boolean {
         return true;
     }
 
     /**
-     * Should clear temporary data for a cancelled submission.
+     * @inheritdoc
      */
-    clearTmpData(): void {
+    clearTmpData(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        inputData: CoreFormFields, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): void {
         // Nothing to do.
     }
 
     /**
-     * This function will be called when the user wants to create a new submission based on the previous one.
-     * It should add to pluginData the data to send to server based in the data in plugin (previous attempt).
-     *
-     * @return If the function is async, it should return a Promise resolved when done.
+     * @inheritdoc
      */
-    copySubmissionData(): void {
+    copySubmissionData(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        pluginData: AddonModAssignSavePluginData, // eslint-disable-line @typescript-eslint/no-unused-vars
+        userId?: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): void | Promise<void> {
         // Nothing to do.
     }
 
     /**
-     * Delete any stored data for the plugin and submission.
-     *
-     * @return If the function is async, it should return a Promise resolved when done.
+     * @inheritdoc
      */
-    deleteOfflineData(): void {
+    deleteOfflineData(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        offlineData: AddonModAssignSubmissionsDBRecordFormatted, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): void | Promise<void> {
         // Nothing to do.
     }
 
     /**
-     * Get files used by this plugin.
-     * The files returned by this function will be prefetched when the user prefetches the assign.
-     *
-     * @return The files (or promise resolved with the files).
+     * @inheritdoc
      */
-    getPluginFiles(): CoreWSFile[] {
+    getPluginFiles(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+        ): CoreWSFile[] | Promise<CoreWSFile[]> {
         return [];
     }
 
     /**
-     * Get a readable name to use for the plugin.
-     *
-     * @param plugin The plugin object.
-     * @return The plugin name.
+     * @inheritdoc
      */
     getPluginName(plugin: AddonModAssignPlugin): string {
         // Check if there's a translated string for the plugin.
@@ -108,93 +122,92 @@ export class AddonModAssignDefaultSubmissionHandler implements AddonModAssignSub
     }
 
     /**
-     * Get the size of data (in bytes) this plugin will send to copy a previous submission.
-     *
-     * @param assign The assignment.
-     * @param plugin The plugin object.
-     * @return The size (or promise resolved with size).
+     * @inheritdoc
      */
-    getSizeForCopy(): number {
+    getSizeForCopy(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): number | Promise<number> {
         return 0;
     }
 
     /**
-     * Get the size of data (in bytes) this plugin will send to add or edit a submission.
-     *
-     * @param assign The assignment.
-     * @param submission The submission.
-     * @param plugin The plugin object.
-     * @return The size (or promise resolved with size).
+     * @inheritdoc
      */
-    getSizeForEdit(): number {
+    getSizeForEdit(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        inputData: CoreFormFields, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): number | Promise<number> {
         return 0;
     }
 
     /**
-     * Check if the submission data has changed for this plugin.
-     *
-     * @param assign The assignment.
-     * @param submission The submission.
-     * @param plugin The plugin object.
-     * @param inputData Data entered by the user for the submission.
-     * @return Boolean (or promise resolved with boolean): whether the data has changed.
+     * @inheritdoc
      */
-    hasDataChanged(): boolean {
+    async hasDataChanged(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        inputData: CoreFormFields, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): Promise<boolean> {
         return false;
     }
 
     /**
-     * Whether or not the handler is enabled on a site level.
-     *
-     * @return True or promise resolved with true if enabled.
+     * @inheritdoc
      */
     async isEnabled(): Promise<boolean> {
         return true;
     }
 
     /**
-     * Whether or not the handler is enabled for edit on a site level.
-     *
-     * @return Whether or not the handler is enabled for edit on a site level.
+     * @inheritdoc
      */
-    isEnabledForEdit(): boolean {
+    isEnabledForEdit(): boolean | Promise<boolean> {
         return false;
     }
 
     /**
-     * Prefetch any required data for the plugin.
-     * This should NOT prefetch files. Files to be prefetched should be returned by the getPluginFiles function.
-     *
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
-    async prefetch(): Promise<void> {
+    async prefetch(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): Promise<void> {
         return;
     }
 
     /**
-     * Prepare and add to pluginData the data to send to the server based on the input data.
-     *
-     * @param assign The assignment.
-     * @param submission The submission.
-     * @param plugin The plugin object.
-     * @param inputData Data entered by the user for the submission.
-     * @param pluginData Object where to store the data to send.
-     * @param offline Whether the user is editing in offline.
-     * @param userId User ID. If not defined, site's current user.
-     * @param siteId Site ID. If not defined, current site.
-     * @return If the function is async, it should return a Promise resolved when done.
+     * @inheritdoc
      */
-    prepareSubmissionData(): void {
+    prepareSubmissionData(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        inputData: CoreFormFields, // eslint-disable-line @typescript-eslint/no-unused-vars
+        pluginData: AddonModAssignSavePluginData, // eslint-disable-line @typescript-eslint/no-unused-vars
+        offline?: boolean, // eslint-disable-line @typescript-eslint/no-unused-vars
+        userId?: number, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): void | Promise<void> {
         // Nothing to do.
     }
 
     /**
-     * Prepare and add to pluginData the data to send to the server based on the offline data stored.
-     * This will be used when performing a synchronization.
-     *
-     * @return If the function is async, it should return a Promise resolved when done.
+     * @inheritdoc
      */
-    prepareSyncData(): void {
+    prepareSyncData(
+        assign: AddonModAssignAssign, // eslint-disable-line @typescript-eslint/no-unused-vars
+        submission: AddonModAssignSubmission, // eslint-disable-line @typescript-eslint/no-unused-vars
+        plugin: AddonModAssignPlugin, // eslint-disable-line @typescript-eslint/no-unused-vars
+        offlineData: AddonModAssignSubmissionsDBRecordFormatted, // eslint-disable-line @typescript-eslint/no-unused-vars
+        pluginData: AddonModAssignSavePluginData, // eslint-disable-line @typescript-eslint/no-unused-vars
+        siteId?: string, // eslint-disable-line @typescript-eslint/no-unused-vars
+    ): void | Promise<void> {
         // Nothing to do.
     }
 

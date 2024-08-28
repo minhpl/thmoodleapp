@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { AfterViewInit, Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
-import { IonSlides } from '@ionic/angular';
-import { ModalController, Translate } from '@singletons';
+import { Component, ElementRef, Input, OnInit, ViewChild } from '@angular/core';
+import { DomSanitizer, ModalController, Translate } from '@singletons';
 import { CoreMath } from '@singletons/math';
+import { Swiper } from 'swiper';
+import { SwiperOptions } from 'swiper/types';
+import { CoreSwiper } from '@singletons/swiper';
+import { SafeResourceUrl } from '@angular/platform-browser';
 
 /**
  * Modal component to view an image.
@@ -25,44 +28,59 @@ import { CoreMath } from '@singletons/math';
     templateUrl: 'image.html',
     styleUrls: ['image.scss'],
 })
-export class CoreViewerImageComponent implements OnInit, AfterViewInit {
+export class CoreViewerImageComponent implements OnInit {
 
-    @ViewChild(IonSlides) protected slides?: IonSlides;
+    protected swiper?: Swiper;
+    @ViewChild('swiperRef') set swiperRef(swiperRef: ElementRef) {
+        /**
+         * This setTimeout waits for Ionic's async initialization to complete.
+         * Otherwise, an outdated swiper reference will be used.
+         */
+        setTimeout(() => {
+            const swiper = CoreSwiper.initSwiperIfAvailable(this.swiper, swiperRef, this.swiperOpts);
+            if (!swiper) {
+                return;
+            }
+
+            this.swiper = swiper;
+
+            this.swiper.zoom.enable();
+        });
+    }
 
     @Input() title = ''; // Modal title.
     @Input() image = ''; // Image URL.
     @Input() component?: string; // Component to use in external-content.
     @Input() componentId?: string | number; // Component ID to use in external-content.
 
-    slidesOpts = {
+    dataUrl?: SafeResourceUrl;
+
+    private static readonly MAX_RATIO = 8;
+    private static readonly MIN_RATIO = 0.5;
+
+    protected swiperOpts: SwiperOptions = {
+        freeMode: true,
         slidesPerView: 1,
         centerInsufficientSlides: true,
-        centerSlides: true,
+        centeredSlides: true,
         zoom: {
-            maxRatio: 8,
-            minRatio: 0.5, // User can zoom out to 0.5 only using pinch gesture.
+            maxRatio: CoreViewerImageComponent.MAX_RATIO,
+            minRatio: CoreViewerImageComponent.MIN_RATIO,
+            toggle: true,
         },
     };
-
-    protected zoomRatio = 1;
-
-    slidesSwiper: any; // eslint-disable-line @typescript-eslint/no-explicit-any
-
-    constructor(protected element: ElementRef<HTMLElement>) {
-    }
 
     /**
      * @inheritdoc
      */
     ngOnInit(): void {
         this.title = this.title || Translate.instant('core.imageviewer');
-    }
 
-    /**
-     * @inheritdoc
-     */
-    async ngAfterViewInit(): Promise<void> {
-        this.slidesSwiper = await this.slides?.getSwiper();
+        if (this.image.startsWith('data:')) {
+            // It's a data image, sanitize it so it can be rendered.
+            // Don't sanitize other images because they load fine and they need to be treated by core-external-content.
+            this.dataUrl = DomSanitizer.bypassSecurityTrustResourceUrl(this.image);
+        }
     }
 
     /**
@@ -75,30 +93,21 @@ export class CoreViewerImageComponent implements OnInit, AfterViewInit {
     /**
      * Zoom In or Out.
      *
-     * @param zoomIn: True to zoom in, false to zoom out.
+     * @param zoomIn True to zoom in, false to zoom out.
      */
     zoom(zoomIn = true): void {
-        const imageElement = this.element.nativeElement.querySelector('img');
-
-        if (!this.slidesSwiper || !imageElement) {
+        if (!this.swiper) {
             return;
         }
 
+        let zoomRatio = this.swiper.zoom.scale;
         zoomIn
-            ? this.zoomRatio *= 2
-            : this.zoomRatio /= 2;
+            ? zoomRatio *= 2
+            : zoomRatio /= 2;
 
-        // Using 1 as minimum for manual zoom.
-        this.zoomRatio = CoreMath.clamp(this.zoomRatio, 1, this.slidesOpts.zoom.maxRatio);
+        zoomRatio = CoreMath.clamp(zoomRatio, CoreViewerImageComponent.MIN_RATIO, CoreViewerImageComponent.MAX_RATIO);
 
-        if (this.zoomRatio > 1) {
-            this.slidesSwiper.zoom.in();
-
-            imageElement.style.transform =
-                'translate3d(0px, 0px, 0px) scale(' + this.zoomRatio + ')';
-        } else {
-            this.slidesSwiper.zoom.out();
-        }
+        this.swiper.zoom.in(zoomRatio);
     }
 
 }

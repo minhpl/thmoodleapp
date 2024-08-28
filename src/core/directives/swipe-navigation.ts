@@ -12,13 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { CoreConstants } from '@/core/constants';
 import {  AfterViewInit, Directive, ElementRef, Input, OnDestroy } from '@angular/core';
 import { CoreSwipeNavigationItemsManager } from '@classes/items-management/swipe-navigation-items-manager';
 import { CoreSwipeNavigationTourComponent } from '@components/swipe-navigation-tour/swipe-navigation-tour';
 import { CoreUserTours } from '@features/usertours/services/user-tours';
 import { Gesture, GestureDetail } from '@ionic/angular';
-import { CoreScreen } from '@services/screen';
-import { GestureController, Platform } from '@singletons';
+import { CorePlatform } from '@services/platform';
+import { GestureController } from '@singletons';
 
 const ACTIVATION_THRESHOLD = 150;
 const SWIPE_FRICTION = 0.6;
@@ -35,7 +36,6 @@ const SWIPE_FRICTION = 0.6;
 })
 export class CoreSwipeNavigationDirective implements AfterViewInit, OnDestroy {
 
-    // eslint-disable-next-line @angular-eslint/no-input-rename
     @Input('core-swipe-navigation') manager?: CoreSwipeNavigationItemsManager;
 
     protected element: HTMLElement;
@@ -43,10 +43,15 @@ export class CoreSwipeNavigationDirective implements AfterViewInit, OnDestroy {
 
     constructor(el: ElementRef) {
         this.element = el.nativeElement;
+
+        if (CoreConstants.enableDevTools()) {
+            this.element['swipeNavigation'] = this;
+            this.element.classList.add('uses-swipe-navigation');
+        }
     }
 
     get enabled(): boolean {
-        return CoreScreen.isMobile && !!this.manager;
+        return !!this.manager;
     }
 
     /**
@@ -73,11 +78,8 @@ export class CoreSwipeNavigationDirective implements AfterViewInit, OnDestroy {
                 this.onRelease(ev);
             },
         });
-        this.swipeGesture.enable();
 
-        // Show user tour.
         const source = this.manager?.getSource();
-
         if (!source) {
             return;
         }
@@ -85,11 +87,13 @@ export class CoreSwipeNavigationDirective implements AfterViewInit, OnDestroy {
         await source.waitForLoaded();
 
         const items = source.getItems() ?? [];
-
         if (!this.enabled || items.length < 2) {
             return;
         }
 
+        this.swipeGesture.enable();
+
+        // Show user tour.
         await CoreUserTours.showIfPending({
             id: 'swipe-navigation',
             component: CoreSwipeNavigationTourComponent,
@@ -105,7 +109,7 @@ export class CoreSwipeNavigationDirective implements AfterViewInit, OnDestroy {
             return;
         }
 
-        Platform.isRTL
+        CorePlatform.isRTL
             ? this.manager?.navigateToPreviousItem()
             : this.manager?.navigateToNextItem();
     }
@@ -118,33 +122,37 @@ export class CoreSwipeNavigationDirective implements AfterViewInit, OnDestroy {
             return;
         }
 
-        Platform.isRTL
+        CorePlatform.isRTL
             ? this.manager?.navigateToNextItem()
             : this.manager?.navigateToPreviousItem();
     }
 
     /**
      * Check whether there is an item to the right of the current selection.
+     *
+     * @returns If has an item to the right.
      */
     protected async hasItemRight(): Promise<boolean> {
         if (!this.manager) {
             return false;
         }
 
-        return Platform.isRTL
+        return CorePlatform.isRTL
             ? await this.manager.hasNextItem()
             : await this.manager.hasPreviousItem();
     }
 
     /**
      * Check whether there is an item to the left of the current selection.
+     *
+     * @returns If has an item to the left.
      */
     protected async hasItemLeft(): Promise<boolean> {
         if (!this.manager) {
             return false;
         }
 
-        return Platform.isRTL
+        return CorePlatform.isRTL
             ? await this.manager.hasPreviousItem()
             : await this.manager.hasNextItem();
     }

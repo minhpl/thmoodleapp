@@ -16,7 +16,7 @@ import { Injectable } from '@angular/core';
 
 import { CoreFilterDefaultHandler } from '@features/filter/services/handlers/default-filter';
 import { CoreFilterFormatTextOptions } from '@features/filter/services/filter';
-import { CoreSite } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { makeSingleton } from '@singletons';
 
 /**
@@ -33,7 +33,7 @@ export class AddonFilterTexHandlerService extends CoreFilterDefaultHandler {
      *
      * @param options Options.
      * @param site Site.
-     * @return Whether filter should be applied.
+     * @returns Whether filter should be applied.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     shouldBeApplied(options: CoreFilterFormatTextOptions, site?: CoreSite): boolean {

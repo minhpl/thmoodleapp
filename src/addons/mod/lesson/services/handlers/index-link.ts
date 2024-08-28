@@ -43,7 +43,7 @@ export class AddonModLessonIndexLinkHandlerService extends CoreContentLinksModul
      * @param url The URL to treat.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param courseId Course ID related to the URL. Optional but recommended.
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
     getActions(
         siteIds: string[],
@@ -52,16 +52,16 @@ export class AddonModLessonIndexLinkHandlerService extends CoreContentLinksModul
         courseId?: number,
     ): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
 
-        courseId = Number(courseId || params.courseid || params.cid);
+        const cId = Number(courseId || params.courseid || params.cid);
 
         return [{
-            action: (siteId): void => {
+            action: async (siteId): Promise<void> => {
                 /* Ignore the pageid param. If we open the lesson player with a certain page and the user hasn't started
                    the lesson, an error is thrown: could not find lesson_timer records. */
                 if (params.userpassword) {
-                    this.navigateToModuleWithPassword(parseInt(params.id, 10), courseId!, params.userpassword, siteId);
+                    await this.navigateToModuleWithPassword(parseInt(params.id, 10), cId, params.userpassword, siteId);
                 } else {
-                    CoreCourseHelper.navigateToModule(parseInt(params.id, 10), {
+                    await CoreCourseHelper.navigateToModule(parseInt(params.id, 10), {
                         courseId,
                         siteId,
                     });
@@ -77,7 +77,7 @@ export class AddonModLessonIndexLinkHandlerService extends CoreContentLinksModul
      * @param courseId Course ID.
      * @param password Password.
      * @param siteId Site ID.
-     * @return Promise resolved when navigated.
+     * @returns Promise resolved when navigated.
      */
     protected async navigateToModuleWithPassword(
         moduleId: number,

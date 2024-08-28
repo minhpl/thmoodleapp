@@ -16,6 +16,7 @@ import { Injectable } from '@angular/core';
 import { CoreCourse, CoreCourseBlock } from '@features/course/services/course';
 import { CoreBlockDelegate } from './block-delegate';
 import { makeSingleton } from '@singletons';
+import { CoreSite } from '@classes/sites/site';
 
 /**
  * Service that provides helper functions for blocks.
@@ -26,17 +27,18 @@ export class CoreBlockHelperProvider {
     /**
      * Return if it get course blocks options is enabled for the current site.
      *
-     * @return true if enabled, false otherwise.
+     * @param site Site. If not defined, current site.
+     * @returns true if enabled, false otherwise.
      */
-    canGetCourseBlocks(): boolean {
-        return CoreCourse.canGetCourseBlocks() && !CoreBlockDelegate.areBlocksDisabledInCourses();
+    canGetCourseBlocks(site?: CoreSite): boolean {
+        return CoreCourse.canGetCourseBlocks(site) && !CoreBlockDelegate.areBlocksDisabledInCourses(site);
     }
 
     /**
      * Returns the list of blocks for the selected course.
      *
      * @param courseId Course ID.
-     * @return List of supported blocks.
+     * @returns List of supported blocks.
      */
     async getCourseBlocks(courseId: number): Promise<CoreCourseBlock[]> {
         const canGetBlocks = this.canGetCourseBlocks();
@@ -58,7 +60,7 @@ export class CoreBlockHelperProvider {
      * Returns if the course has any block.
      *
      * @param courseId Course ID.
-     * @return Wether course has blocks.
+     * @returns Wether course has blocks.
      */
     async hasCourseBlocks(courseId: number): Promise<boolean> {
         try {

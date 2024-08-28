@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import { Component, Input, Optional, ViewChild, OnInit, OnDestroy } from '@angular/core';
+import { CoreError } from '@classes/errors/error';
 import { CoreTabsComponent } from '@components/tabs/tabs';
 import { CoreCourseModuleMainActivityComponent } from '@features/course/classes/main-activity-component';
 import { CoreCourseContentsPage } from '@features/course/pages/contents/contents';
@@ -55,7 +56,7 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
     @Input() group = 0;
 
     component = AddonModFeedbackProvider.COMPONENT;
-    moduleName = 'feedback';
+    pluginName = 'feedback';
     feedback?: AddonModFeedbackWSFeedback;
     goPage?: number;
     items: AddonModFeedbackItem[] = [];
@@ -139,7 +140,18 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
             return; // Shouldn't happen.
         }
 
-        await AddonModFeedback.logView(this.feedback.id, this.feedback.name);
+        await AddonModFeedback.logView(this.feedback.id);
+
+        this.callAnalyticsLogEvent();
+    }
+
+    /**
+     * Call analytics.
+     */
+    protected callAnalyticsLogEvent(): void {
+        this.analyticsLogEvent('mod_feedback_view_feedback', {
+            url: this.tab === 'analysis' ? `/mod/feedback/analysis.php?id=${this.module.id}` : undefined,
+        });
     }
 
     /**
@@ -224,7 +236,7 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
     /**
      * Convenience function to get feedback overview data.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchFeedbackOverviewData(): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -258,8 +270,7 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
     /**
      * Convenience function to get feedback analysis data.
      *
-     * @param accessData Retrieved access data.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchFeedbackAnalysisData(): Promise<void> {
         try {
@@ -279,7 +290,7 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
      * Fetch Group info data.
      *
      * @param cmId Course module ID.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchGroupInfo(cmId: number): Promise<void> {
         this.groupInfo = await CoreGroups.getActivityGroupInfo(cmId);
@@ -291,7 +302,7 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
      * Parse the analysis info to show the info correctly formatted.
      *
      * @param item Item to parse.
-     * @return Parsed item.
+     * @returns Parsed item.
      */
     protected parseAnalysisInfo(item: AddonModFeedbackItem): AddonModFeedbackItem {
         switch (item.typ) {
@@ -334,15 +345,16 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
                     return label;
                 });
 
-                item.chartData = parsedData.map((dataItem) => <number> dataItem.answercount);
+                item.chartData = parsedData.map((dataItem) => Number(dataItem.answercount));
 
-                if (item.typ == 'multichoicerated') {
+                if (item.typ === 'multichoicerated') {
                     item.average = parsedData.reduce((prev, current) => prev + Number(current.avg), 0.0);
                 }
 
                 const subtype = item.presentation.charAt(0);
 
-                const single = subtype != 'c';
+                // Display bar chart if there are no answers to avoid division by 0 error.
+                const single = subtype !== 'c' && item.chartData.some((count) => count > 0);
                 item.chartType = single ? 'doughnut' : 'bar';
                 item.templateName = 'chart';
                 break;
@@ -428,10 +440,15 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
      * @param tabName New tab name.
      */
     tabChanged(tabName: string): void {
+        const tabHasChanged = this.tab !== undefined && this.tab !== tabName;
         this.tab = tabName;
 
         if (!this.tabsLoaded[this.tab]) {
             this.loadContent(false, false, true);
+        }
+
+        if (tabHasChanged) {
+            this.callAnalyticsLogEvent();
         }
     }
 
@@ -439,7 +456,7 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
      * Set group to see the analysis.
      *
      * @param groupId Group ID.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async setGroup(groupId: number): Promise<void> {
         this.group = groupId;
@@ -478,18 +495,15 @@ export class AddonModFeedbackIndexComponent extends CoreCourseModuleMainActivity
      * @inheritdoc
      */
     protected sync(): Promise<AddonModFeedbackSyncResult> {
-        return AddonModFeedbackSync.syncFeedback(this.feedback!.id);
+        if (!this.feedback) {
+            throw new CoreError('Cannot sync without a feedback.');
+        }
+
+        return AddonModFeedbackSync.syncFeedback(this.feedback.id);
     }
 
     /**
      * @inheritdoc
-     */
-    protected hasSyncSucceed(result: AddonModFeedbackSyncResult): boolean {
-        return result.updated;
-    }
-
-    /**
-     * Component being destroyed.
      */
     ngOnDestroy(): void {
         super.ngOnDestroy();

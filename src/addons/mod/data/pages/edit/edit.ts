@@ -41,7 +41,10 @@ import {
 } from '../../services/data';
 import { AddonModDataHelper } from '../../services/data-helper';
 import { CoreDom } from '@singletons/dom';
-import { AddonModDataEntryFieldInitialized } from '../../classes/field-plugin-component';
+import { AddonModDataEntryFieldInitialized } from '../../classes/base-field-plugin-component';
+import { CoreTextUtils } from '@services/utils/text';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Page that displays the view edit page.
@@ -64,6 +67,7 @@ export class AddonModDataEditPage implements OnInit {
     protected initialSelectedGroup?: number;
     protected isEditing = false;
     protected originalData: AddonModDataEntryFields = {};
+    protected logView: () => void;
 
     entry?: AddonModDataEntry;
     fields: Record<number, AddonModDataField> = {};
@@ -93,6 +97,20 @@ export class AddonModDataEditPage implements OnInit {
     constructor() {
         this.siteId = CoreSites.getCurrentSiteId();
         this.editForm = new FormGroup({});
+
+        this.logView = CoreTime.once(() => {
+            if (!this.database) {
+                return;
+            }
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: this.isEditing ? 'mod_data_update_entry' : 'mod_data_add_entry',
+                name: this.title,
+                data: { databaseid: this.database.id, category: 'data' },
+                url: '/mod/data/edit.php?' + (this.isEditing ? `d=${this.database.id}&rid=${this.entryId}` : `id=${this.moduleId}`),
+            });
+        });
     }
 
     /**
@@ -122,7 +140,7 @@ export class AddonModDataEditPage implements OnInit {
     /**
      * Check if we can leave the page or not and ask to confirm the lost of data.
      *
-     * @return True if we can leave, false otherwise.
+     * @returns True if we can leave, false otherwise.
      */
     async canLeave(): Promise<boolean> {
         if (this.forceLeave || !this.entry) {
@@ -152,7 +170,7 @@ export class AddonModDataEditPage implements OnInit {
      * Fetch the entry data.
      *
      * @param refresh To refresh all downloaded data.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchEntryData(refresh = false): Promise<void> {
         try {
@@ -179,7 +197,7 @@ export class AddonModDataEditPage implements OnInit {
 
                 if (refresh) {
                     groupInfo = await CoreGroups.getActivityGroupInfo(this.database.coursemodule);
-                    if (groupInfo.visibleGroups && groupInfo.groups?.length) {
+                    if (groupInfo.visibleGroups && groupInfo.groups.length) {
                         // There is a bug in Moodle with All participants and visible groups (MOBILE-3597). Remove it.
                         groupInfo.groups = groupInfo.groups.filter(group => group.id !== 0);
                         groupInfo.defaultGroupId = groupInfo.groups[0].id;
@@ -229,6 +247,7 @@ export class AddonModDataEditPage implements OnInit {
             }
 
             this.editFormRender = this.displayEditFields();
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'core.course.errorgetmodule', true);
         }
@@ -240,7 +259,7 @@ export class AddonModDataEditPage implements OnInit {
      * Saves data.
      *
      * @param e Event.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async save(e: Event): Promise<void> {
         e.preventDefault();
@@ -270,7 +289,7 @@ export class AddonModDataEditPage implements OnInit {
             const modal = await CoreDomUtils.showModalLoading('core.sending', true);
 
             // Create an ID to assign files.
-            const entryTemp = this.entryId ? this.entryId : - (new Date().getTime());
+            const entryTemp = this.entryId ? this.entryId : - (Date.now());
             let editData: AddonModDataEntryWSField[] = [];
 
             try {
@@ -368,9 +387,18 @@ export class AddonModDataEditPage implements OnInit {
                             }
                         });
                     }
+
                     this.jsData!.errors = this.errors;
 
                     this.scrollToFirstError();
+
+                    if (updateEntryResult.generalnotifications?.length) {
+                        CoreDomUtils.showAlertWithOptions({
+                            header: Translate.instant('core.notice'),
+                            message: CoreTextUtils.buildMessage(updateEntryResult.generalnotifications),
+                            buttons: [Translate.instant('core.ok')],
+                        });
+                    }
                 }
             } finally {
                 modal.dismiss();
@@ -384,7 +412,7 @@ export class AddonModDataEditPage implements OnInit {
      * Set group to see the database.
      *
      * @param groupId Group identifier to set.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     setGroup(groupId: number): Promise<void> {
         this.selectedGroup = groupId;
@@ -396,7 +424,7 @@ export class AddonModDataEditPage implements OnInit {
     /**
      * Displays Edit Search Fields.
      *
-     * @return Generated HTML.
+     * @returns Generated HTML.
      */
     protected displayEditFields(): string {
         this.jsData = {
@@ -405,7 +433,7 @@ export class AddonModDataEditPage implements OnInit {
             form: this.editForm,
             database: this.database,
             errors: this.errors,
-            onFieldInit: this.onFieldInit.bind(this),
+            onFieldInit: (data) => this.onFieldInit(data),
         };
 
         let template = AddonModDataHelper.getTemplate(this.database!, AddonModDataTemplateType.ADD, this.fieldsArray);
@@ -428,7 +456,33 @@ export class AddonModDataEditPage implements OnInit {
             replaceRegEx = new RegExp(replace, 'gi');
 
             template = template.replace(replaceRegEx, 'field_' + field.id);
+
+            // Replace the field name tag.
+            replace = '[[' + field.name + '#name]]';
+            replace = replace.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+            replaceRegEx = new RegExp(replace, 'gi');
+
+            template = template.replace(replaceRegEx, field.name);
+
+            // Replace the field description tag.
+            replace = '[[' + field.name + '#description]]';
+            replace = replace.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+            replaceRegEx = new RegExp(replace, 'gi');
+
+            template = template.replace(replaceRegEx, field.description);
         });
+
+        const regex = new RegExp('##otherfields##', 'gi');
+
+        if (template.match(regex)) {
+            const unusedFields = this.fieldsArray.filter(field => !template.includes(`[field]="fields[${field.id}]`)).map((field) =>
+                `<p><strong>${field.name}</strong></p>` +
+                '<p><addon-mod-data-field-plugin [class.has-errors]="!!errors[' + field.id + ']" mode="edit" \
+                [field]="fields[' + field.id + ']" [value]="contents[' + field.id + ']" [form]="form" [database]="database" \
+                [error]="errors[' + field.id + ']" (onFieldInit)="onFieldInit($event)"></addon-mod-data-field-plugin><p>');
+
+            template = template.replace(regex, unusedFields.join(''));
+        }
 
         // Editing tags is not supported.
         const replaceRegEx = new RegExp('##tags##', 'gi');
@@ -464,7 +518,7 @@ export class AddonModDataEditPage implements OnInit {
     /**
      * Return to the entry list (previous page) discarding temp data.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async returnToEntryList(): Promise<void> {
         const inputData = this.editForm.value;

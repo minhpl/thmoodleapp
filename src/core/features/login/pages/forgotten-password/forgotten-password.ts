@@ -17,10 +17,14 @@ import { FormBuilder, FormGroup, Validators } from '@angular/forms';
 
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
-import { Translate, Platform } from '@singletons';
-import { CoreWSExternalWarning } from '@services/ws';
+import { Translate } from '@singletons';
 import { CoreNavigator } from '@services/navigator';
 import { CoreForms } from '@singletons/form';
+import { CorePlatform } from '@services/platform';
+import { CoreSitePublicConfigResponse, CoreUnauthenticatedSite } from '@classes/sites/unauthenticated-site';
+import { CoreUserSupportConfig } from '@features/user/classes/support/support-config';
+import { CoreUserGuestSupportConfig } from '@features/user/classes/support/guest-support-config';
+import { CoreSitesFactory } from '@services/sites-factory';
 
 /**
  * Page to recover a forgotten password.
@@ -34,18 +38,18 @@ export class CoreLoginForgottenPasswordPage implements OnInit {
     @ViewChild('resetPasswordForm') formElement?: ElementRef;
 
     myForm!: FormGroup;
-    siteUrl!: string;
+    site!: CoreUnauthenticatedSite;
     autoFocus!: boolean;
+    supportConfig?: CoreUserSupportConfig;
+    canContactSupport?: boolean;
+    wasPasswordResetRequestedRecently = false;
 
-    constructor(
-        protected formBuilder: FormBuilder,
-    ) {
-    }
+    constructor(protected formBuilder: FormBuilder) {}
 
     /**
      * Initialize the component.
      */
-    ngOnInit(): void {
+    async ngOnInit(): Promise<void> {
         const siteUrl = CoreNavigator.getRouteParam<string>('siteUrl');
         if (!siteUrl) {
             CoreDomUtils.showErrorModal('Site URL not supplied.');
@@ -54,12 +58,18 @@ export class CoreLoginForgottenPasswordPage implements OnInit {
             return;
         }
 
-        this.siteUrl = siteUrl;
-        this.autoFocus = Platform.is('tablet');
+        const siteConfig = CoreNavigator.getRouteParam<CoreSitePublicConfigResponse>('siteConfig');
+
+        this.site = CoreSitesFactory.makeUnauthenticatedSite(siteUrl, siteConfig);
+        this.autoFocus = CorePlatform.is('tablet');
         this.myForm = this.formBuilder.group({
             field: ['username', Validators.required],
             value: [CoreNavigator.getRouteParam<string>('username') || '', Validators.required],
         });
+
+        this.supportConfig = siteConfig && new CoreUserGuestSupportConfig(this.site, siteConfig);
+        this.canContactSupport = this.supportConfig?.canContactSupport();
+        this.wasPasswordResetRequestedRecently = await CoreLoginHelper.wasPasswordResetRequestedRecently(siteUrl);
     }
 
     /**
@@ -81,43 +91,37 @@ export class CoreLoginForgottenPasswordPage implements OnInit {
         }
 
         const modal = await CoreDomUtils.showModalLoading('core.sending', true);
-        const isMail = field == 'email';
+        const isMail = field === 'email';
 
         try {
             const response = await CoreLoginHelper.requestPasswordReset(
-                this.siteUrl,
+                this.site.getURL(),
                 isMail ? '' : value,
                 isMail ? value : '',
             );
 
-            if (response.status == 'dataerror') {
-                // Error in the data sent.
-                this.showError(isMail, response.warnings!);
-            } else if (response.status == 'emailpasswordconfirmnotsent' || response.status == 'emailpasswordconfirmnoemail') {
+            if (response.status === 'dataerror') {
+                // Show an error from the warnings.
+                const warning = response.warnings?.find((warning) =>
+                    (warning.item === 'email' && isMail) || (warning.item === 'username' && !isMail));
+                if (warning) {
+                    CoreDomUtils.showErrorModal(warning.message);
+                }
+            } else if (response.status === 'emailpasswordconfirmnotsent' || response.status === 'emailpasswordconfirmnoemail') {
                 // Error, not found.
                 CoreDomUtils.showErrorModal(response.notice);
             } else {
                 // Success.
                 CoreForms.triggerFormSubmittedEvent(this.formElement, true);
 
-                CoreDomUtils.showAlert(Translate.instant('core.success'), response.notice);
-                CoreNavigator.back();
+                await CoreDomUtils.showAlert(Translate.instant('core.success'), response.notice);
+                await CoreNavigator.back();
+                await CoreLoginHelper.passwordResetRequested(this.site.getURL());
             }
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
         } finally {
             modal.dismiss();
-        }
-    }
-
-    // Show an error from the warnings.
-    protected showError(isMail: boolean, warnings: CoreWSExternalWarning[]): void {
-        for (let i = 0; i < warnings.length; i++) {
-            const warning = warnings[i];
-            if ((warning.item == 'email' && isMail) || (warning.item == 'username' && !isMail)) {
-                CoreDomUtils.showErrorModal(warning.message);
-                break;
-            }
         }
     }
 

@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnChanges, Input, ViewChild, Output, EventEmitter } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
+import { Component, OnChanges, Input, ViewChild, HostBinding } from '@angular/core';
 
 import { CoreCourseFormatComponent } from '@features/course/components/course-format/course-format';
-import { CoreCourseModuleCompletionData, CoreCourseSection } from '@features/course/services/course-helper';
+import { CoreCourseSection } from '@features/course/services/course-helper';
 import { CoreCourseFormatDelegate } from '@features/course/services/format-delegate';
 import { CoreCourseAnyCourseData } from '@features/courses/services/courses';
 import { CoreSitePlugins, CoreSitePluginsContent } from '@features/siteplugins/services/siteplugins';
@@ -37,8 +36,6 @@ export class CoreSitePluginsCourseFormatComponent implements OnChanges {
     @Input() initialSectionId?: number; // The section to load first (by ID).
     @Input() initialSectionNumber?: number; // The section to load first (by number).
     @Input() moduleId?: number; // The module ID to scroll to. Must be inside the initial selected section.
-    // Notify when any module completion changes. @deprecated since 4.0, now we use CoreEvents.
-    @Output() completionChanged = new EventEmitter<CoreCourseModuleCompletionData>();
 
     // Special input, allows access to the parent instance properties and methods.
     // Please notice that all the other inputs/outputs are also accessible through this instance, so they could be removed.
@@ -47,14 +44,14 @@ export class CoreSitePluginsCourseFormatComponent implements OnChanges {
 
     @ViewChild(CoreSitePluginsPluginContentComponent) content?: CoreSitePluginsPluginContentComponent;
 
-    component?: string;
+    @HostBinding('class') component?: string;
     method?: string;
     args?: Record<string, unknown>;
     initResult?: CoreSitePluginsContent | null;
     data?: Record<string, unknown>;
 
     /**
-     * Detect changes on input properties.
+     * @inheritdoc
      */
     ngOnChanges(): void {
         if (!this.course || !this.course.format) {
@@ -83,7 +80,6 @@ export class CoreSitePluginsCourseFormatComponent implements OnChanges {
             initialSectionId: this.initialSectionId,
             initialSectionNumber: this.initialSectionNumber,
             moduleId: this.moduleId,
-            completionChanged: this.completionChanged,
             coreCourseFormatComponent: this.coreCourseFormatComponent,
         };
     }
@@ -94,9 +90,9 @@ export class CoreSitePluginsCourseFormatComponent implements OnChanges {
      * @param refresher Refresher.
      * @param done Function to call when done.
      * @param afterCompletionChange Whether the refresh is due to a completion change.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async doRefresh(refresher?: IonRefresher, done?: () => void, afterCompletionChange?: boolean): Promise<void> {
+    async doRefresh(refresher?: HTMLIonRefresherElement, done?: () => void, afterCompletionChange?: boolean): Promise<void> {
         await this.content?.refreshContent(afterCompletionChange);
     }
 

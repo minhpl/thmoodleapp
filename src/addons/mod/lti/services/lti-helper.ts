@@ -16,11 +16,13 @@ import { Injectable } from '@angular/core';
 
 import { CoreCourse } from '@features/course/services/course';
 import { CoreCourseModuleData } from '@features/course/services/course-helper';
+import { CorePlatform } from '@services/platform';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
-import { makeSingleton, Platform } from '@singletons';
+import { makeSingleton } from '@singletons';
 import { CoreEvents } from '@singletons/events';
 import { AddonModLti, AddonModLtiLti } from './lti';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Service that provides some helper functions for LTI.
@@ -38,7 +40,7 @@ export class AddonModLtiHelperProvider {
     }
 
     watchPendingCompletions(): void {
-        Platform.resume.subscribe(() => {
+        CorePlatform.resume.subscribe(() => {
             // User went back to the app, check pending completions.
             for (const moduleId in this.pendingCheckCompletion) {
                 const data = this.pendingCheckCompletion[moduleId];
@@ -55,7 +57,7 @@ export class AddonModLtiHelperProvider {
      * @param module Module.
      * @param lti LTI instance. If not provided it will be obtained.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async getDataAndLaunch(courseId: number, module: CoreCourseModuleData, lti?: AddonModLtiLti, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -85,7 +87,7 @@ export class AddonModLtiHelperProvider {
             const launchData = await AddonModLti.getLtiLaunchData(lti.id);
 
             // "View" LTI without blocking the UI.
-            this.logViewAndCheckCompletion(courseId, module, lti.id, lti.name, siteId);
+            this.logViewAndCheckCompletion(courseId, module, lti.id, siteId);
 
             // Launch LTI.
             return AddonModLti.launch(launchData.endpoint, launchData.parameters);
@@ -102,24 +104,30 @@ export class AddonModLtiHelperProvider {
      * @param courseId Course ID.
      * @param module Module.
      * @param ltiId LTI id.
-     * @param name Name of the lti.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async logViewAndCheckCompletion(
         courseId: number,
         module: CoreCourseModuleData,
         ltiId: number,
-        name?: string,
         siteId?: string,
     ): Promise<void> {
         try {
-            await AddonModLti.logView(ltiId, name, siteId);
+            await AddonModLti.logView(ltiId,siteId);
 
             CoreCourse.checkModuleCompletion(courseId, module.completiondata);
-        } catch (error) {
+        } catch {
             // Ignore errors.
         }
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM,
+            ws: 'mod_lti_view_lti',
+            name: module.name,
+            data: { id: module.instance, category: 'lti' },
+            url: `/mod/lti/view.php?id=${module.id}`,
+        });
     }
 
 }

@@ -24,13 +24,13 @@ import {
     CoreSitePluginsContent,
     CoreSitePluginsCourseModuleHandlerData,
     CoreSitePluginsPlugin,
-    CoreSitePluginsProvider,
 } from '@features/siteplugins/services/siteplugins';
 import { CoreNavigationOptions, CoreNavigator } from '@services/navigator';
 import { CoreLogger } from '@singletons/logger';
 import { CoreSitePluginsBaseHandler } from './base-handler';
 import { CoreEvents } from '@singletons/events';
 import { CoreUtils } from '@services/utils/utils';
+import { CORE_SITE_PLUGINS_UPDATE_COURSE_CONTENT } from '@features/siteplugins/constants';
 
 /**
  * Handler to support a module using a site plugin.
@@ -56,7 +56,7 @@ export class CoreSitePluginsModuleHandler extends CoreSitePluginsBaseHandler imp
 
         if (initResult?.jsResult && initResult.jsResult.supportsFeature) {
             // The init result defines a function to check if a feature is supported, use it.
-            this.supportsFeature = initResult.jsResult.supportsFeature.bind(initResult.jsResult);
+            this.supportsFeature = (feature) => initResult.jsResult.supportsFeature(feature);
         }
     }
 
@@ -76,7 +76,7 @@ export class CoreSitePluginsModuleHandler extends CoreSitePluginsBaseHandler imp
             module.description = '';
 
             return {
-                icon: await CoreCourse.getModuleIconSrc(module.modname, icon),
+                icon: CoreCourse.getModuleIconSrc(module.modname, icon),
                 title: title || '',
                 a11yTitle: '',
                 class: this.handlerSchema.displaydata?.class,
@@ -87,9 +87,10 @@ export class CoreSitePluginsModuleHandler extends CoreSitePluginsBaseHandler imp
         const showDowloadButton = this.handlerSchema.downloadbutton;
         const handlerData: CoreCourseModuleHandlerData = {
             title: module.name,
-            icon: await CoreCourse.getModuleIconSrc(module.modname, icon),
+            icon: CoreCourse.getModuleIconSrc(module.modname, icon),
             class: this.handlerSchema.displaydata?.class,
             showDownloadButton: showDowloadButton !== undefined ? showDowloadButton : hasOffline,
+            hasCustomCmListItem: this.handlerSchema.hascustomcmlistitem ?? false,
         };
 
         if (this.handlerSchema.method) {
@@ -113,7 +114,7 @@ export class CoreSitePluginsModuleHandler extends CoreSitePluginsBaseHandler imp
             this.loadCoursePageTemplate(module, courseId, handlerData, method);
 
             // Allow updating the data via event.
-            CoreEvents.on(CoreSitePluginsProvider.UPDATE_COURSE_CONTENT, (data) => {
+            CoreEvents.on(CORE_SITE_PLUGINS_UPDATE_COURSE_CONTENT, (data) => {
                 if (data.cmId === module.id) {
                     this.loadCoursePageTemplate(module, courseId, handlerData, method, !data.alreadyFetched);
                 }
@@ -128,7 +129,7 @@ export class CoreSitePluginsModuleHandler extends CoreSitePluginsBaseHandler imp
      *
      * @param module Module.
      * @param forCoursePage Whether the data will be used to render the course page.
-     * @return Bool.
+     * @returns Bool.
      */
     protected shouldOnlyDisplayDescription(module: CoreCourseModuleData, forCoursePage?: boolean): boolean {
         if (forCoursePage && this.handlerSchema.coursepagemethod) {
@@ -150,7 +151,7 @@ export class CoreSitePluginsModuleHandler extends CoreSitePluginsBaseHandler imp
     /**
      * Check whether the module supports NO_VIEW_LINK.
      *
-     * @return Bool if defined, undefined if not specified.
+     * @returns Bool if defined, undefined if not specified.
      */
     supportsNoViewLink(): boolean | undefined {
         return <boolean | undefined> (this.supportsFeature ?
@@ -166,7 +167,7 @@ export class CoreSitePluginsModuleHandler extends CoreSitePluginsBaseHandler imp
      * @param handlerData Handler data.
      * @param method Method to call.
      * @param refresh Whether to refresh the data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadCoursePageTemplate(
         module: CoreCourseModuleData,

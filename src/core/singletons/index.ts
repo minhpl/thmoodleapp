@@ -16,17 +16,16 @@ import {
     AbstractType,
     ApplicationInitStatus,
     ApplicationRef,
-    ComponentFactoryResolver as ComponentFactoryResolverService,
     Injector,
     NgZone as NgZoneService,
     Type,
+    EnvironmentInjector,
 } from '@angular/core';
 import { Router as RouterService } from '@angular/router';
 import { HttpClient } from '@angular/common/http';
 import { DomSanitizer as DomSanitizerService } from '@angular/platform-browser';
 
 import {
-    Platform as PlatformService,
     AngularDelegate as AngularDelegateService,
     AlertController as AlertControllerService,
     LoadingController as LoadingControllerService,
@@ -38,31 +37,23 @@ import {
     PopoverController as PopoverControllerService,
 } from '@ionic/angular';
 
-import { Badge as BadgeService } from '@ionic-native/badge/ngx';
-import { Camera as CameraService } from '@ionic-native/camera/ngx';
-import { Chooser as ChooserService } from '@ionic-native/chooser/ngx';
-import { Clipboard as ClipboardService } from '@ionic-native/clipboard/ngx';
-import { Diagnostic as DiagnosticService } from '@ionic-native/diagnostic/ngx';
-import { Device as DeviceService } from '@ionic-native/device/ngx';
-import { File as FileService } from '@ionic-native/file/ngx';
-import { FileOpener as FileOpenerService } from '@ionic-native/file-opener/ngx';
-import { FileTransfer as FileTransferService } from '@ionic-native/file-transfer/ngx';
-import { Geolocation as GeolocationService } from '@ionic-native/geolocation/ngx';
-import { HTTP } from '@ionic-native/http/ngx';
-import { InAppBrowser as InAppBrowserService } from '@ionic-native/in-app-browser/ngx';
-import { WebView as WebViewService } from '@ionic-native/ionic-webview/ngx';
-import { Keyboard as KeyboardService } from '@ionic-native/keyboard/ngx';
-import { LocalNotifications as LocalNotificationsService } from '@ionic-native/local-notifications/ngx';
-import { Media as MediaService } from '@ionic-native/media/ngx';
-import { MediaCapture as MediaCaptureService } from '@ionic-native/media-capture/ngx';
-import { Network as NetworkService } from '@ionic-native/network/ngx';
-import { Push as PushService } from '@ionic-native/push/ngx';
-import { QRScanner as QRScannerService } from '@ionic-native/qr-scanner/ngx';
-import { StatusBar as StatusBarService } from '@ionic-native/status-bar/ngx';
-import { SplashScreen as SplashScreenService } from '@ionic-native/splash-screen/ngx';
-import { SQLite as SQLiteService } from '@ionic-native/sqlite/ngx';
-import { WebIntent as WebIntentService } from '@ionic-native/web-intent/ngx';
-import { Zip as ZipService } from '@ionic-native/zip/ngx';
+import { Badge as BadgeService } from '@awesome-cordova-plugins/badge/ngx';
+import { Camera as CameraService } from '@awesome-cordova-plugins/camera/ngx';
+import { Clipboard as ClipboardService } from '@awesome-cordova-plugins/clipboard/ngx';
+import { Device as DeviceService } from '@awesome-cordova-plugins/device/ngx';
+import { File as FileService } from '@awesome-cordova-plugins/file/ngx';
+import { FileOpener as FileOpenerService } from '@awesome-cordova-plugins/file-opener/ngx';
+import { Geolocation as GeolocationService } from '@awesome-cordova-plugins/geolocation/ngx';
+import { HTTP } from '@awesome-cordova-plugins/http/ngx';
+import { InAppBrowser as InAppBrowserService } from '@awesome-cordova-plugins/in-app-browser/ngx';
+import { WebView as WebViewService } from '@awesome-cordova-plugins/ionic-webview/ngx';
+import { Keyboard as KeyboardService } from '@awesome-cordova-plugins/keyboard/ngx';
+import { LocalNotifications as LocalNotificationsService } from '@awesome-cordova-plugins/local-notifications/ngx';
+import { MediaCapture as MediaCaptureService } from '@awesome-cordova-plugins/media-capture/ngx';
+import { StatusBar as StatusBarService } from '@awesome-cordova-plugins/status-bar/ngx';
+import { SplashScreen as SplashScreenService } from '@awesome-cordova-plugins/splash-screen/ngx';
+import { SQLite as SQLiteService } from '@awesome-cordova-plugins/sqlite/ngx';
+import { WebIntent as WebIntentService } from '@awesome-cordova-plugins/web-intent/ngx';
 
 import { TranslateService } from '@ngx-translate/core';
 
@@ -77,6 +68,8 @@ const singletonsInjector = new CorePromisedValue<Injector>();
 
 /**
  * Helper to create a method that proxies calls to the underlying singleton instance.
+ *
+ * @returns Function.
  */
 // eslint-disable-next-line
 let createSingletonMethodProxy = (instance: any, method: Function, property: string | number | symbol) => method.bind(instance);
@@ -120,9 +113,9 @@ export function setCreateSingletonMethodProxy(method: typeof createSingletonMeth
  *
  * @param injectionToken Injection token used to resolve the service. This is usually the service class if the provider was
  * defined using a class or the string used in the `provide` key if it was defined using an object.
- * @return Singleton proxy.
+ * @returns Singleton proxy.
  */
-export function makeSingleton<Service extends object = object>( // eslint-disable-line @typescript-eslint/ban-types
+export function makeSingleton<Service extends object = object>(
     injectionToken: Type<Service> | AbstractType<Service> | Type<unknown> | string,
 ): CoreSingletonProxy<Service> {
     const singleton = {
@@ -143,6 +136,8 @@ export function makeSingleton<Service extends object = object>( // eslint-disabl
                 throw new Error('Can\'t resolve a singleton instance without an injector');
             }
 
+            // @todo Check type to avoid deprecation.
+            // eslint-disable-next-line deprecation/deprecation
             const instance = injector.get(injectionToken);
 
             singleton.setInstance(instance);
@@ -174,28 +169,20 @@ export function makeSingleton<Service extends object = object>( // eslint-disabl
 
 // Convert ionic-native services to singleton.
 export const Badge = makeSingleton(BadgeService);
-export const Chooser = makeSingleton(ChooserService);
 export const Clipboard = makeSingleton(ClipboardService);
-export const Diagnostic = makeSingleton(DiagnosticService);
 export const File = makeSingleton(FileService);
 export const FileOpener = makeSingleton(FileOpenerService);
-export const FileTransfer = makeSingleton(FileTransferService);
 export const Geolocation = makeSingleton(GeolocationService);
 export const InAppBrowser = makeSingleton(InAppBrowserService);
 export const Keyboard = makeSingleton(KeyboardService);
 export const LocalNotifications = makeSingleton(LocalNotificationsService);
-export const Media = makeSingleton(MediaService);
 export const MediaCapture = makeSingleton(MediaCaptureService);
 export const NativeHttp = makeSingleton(HTTP);
-export const Network = makeSingleton(NetworkService);
-export const Push = makeSingleton(PushService);
-export const QRScanner = makeSingleton(QRScannerService);
 export const StatusBar = makeSingleton(StatusBarService);
 export const SplashScreen = makeSingleton(SplashScreenService);
 export const SQLite = makeSingleton(SQLiteService);
 export const WebIntent = makeSingleton(WebIntentService);
 export const WebView = makeSingleton(WebViewService);
-export const Zip = makeSingleton(ZipService);
 
 export const Camera = makeSingleton(CameraService);
 
@@ -204,11 +191,9 @@ export const Device = makeSingleton(DeviceService);
 // Convert some Angular and Ionic injectables to singletons.
 export const NgZone = makeSingleton(NgZoneService);
 export const Http = makeSingleton(HttpClient);
-export const Platform = makeSingleton(PlatformService);
 export const ActionSheetController = makeSingleton(ActionSheetControllerService);
 export const AngularDelegate = makeSingleton(AngularDelegateService);
 export const AlertController = makeSingleton(AlertControllerService);
-export const ComponentFactoryResolver = makeSingleton(ComponentFactoryResolverService);
 export const LoadingController = makeSingleton(LoadingControllerService);
 export const ModalController = makeSingleton(ModalControllerService);
 export const PopoverController = makeSingleton(PopoverControllerService);
@@ -221,11 +206,14 @@ export const Router = makeSingleton(RouterService);
 export const DomSanitizer = makeSingleton(DomSanitizerService);
 
 // Convert external libraries injectables.
-export const Translate = makeSingleton(TranslateService);
+export const Translate: Omit<CoreSingletonProxy<TranslateService>, 'instant'> & {
+    instant(keys: string[]): string[];
+    instant(key: string, interpolateParams?: Record<string, unknown>): string;
+} = makeSingleton(TranslateService);
 
 // Async singletons.
 export const AngularFrameworkDelegate = asyncInstance(async () => {
     const injector = await singletonsInjector;
 
-    return AngularDelegate.create(ComponentFactoryResolver.instance, injector);
+    return AngularDelegate.create(injector.get(EnvironmentInjector), injector);
 });

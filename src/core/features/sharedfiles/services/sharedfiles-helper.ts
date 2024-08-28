@@ -13,17 +13,16 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 
 import { CoreCanceledError } from '@classes/errors/cancelederror';
 import { CoreFileUploader } from '@features/fileuploader/services/fileuploader';
 import { CoreFileUploaderHandlerResult } from '@features/fileuploader/services/fileuploader-delegate';
-import { CoreApp } from '@services/app';
 import { CoreFile } from '@services/file';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
-import { AlertController, ApplicationInit, makeSingleton, Platform, Translate } from '@singletons';
+import { AlertController, ApplicationInit, makeSingleton, Translate } from '@singletons';
 import { CoreEvents } from '@singletons/events';
 import { CoreLogger } from '@singletons/logger';
 import { CoreSharedFilesListModalComponent } from '../components/list-modal/list-modal';
@@ -31,6 +30,7 @@ import { CoreSharedFiles } from './sharedfiles';
 import { SHAREDFILES_PAGE_NAME } from '../sharedfiles.module';
 import { CoreSharedFilesChooseSitePage } from '../pages/choose-site/choose-site';
 import { CoreError } from '@classes/errors/error';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Helper service to share files with the app.
@@ -48,7 +48,7 @@ export class CoreSharedFilesHelperProvider {
      * Initialize.
      */
     initialize(): void {
-        if (!CoreApp.isIOS()) {
+        if (!CorePlatform.isIOS()) {
             return;
         }
 
@@ -57,7 +57,7 @@ export class CoreSharedFilesHelperProvider {
         // Check if there are new files at app start and when the app is resumed.
         this.searchIOSNewSharedFiles();
 
-        Platform.resume.subscribe(() => {
+        CorePlatform.resume.subscribe(() => {
             // Wait a bit to make sure that APP_LAUNCHED_URL is treated before this callback.
             setTimeout(() => {
                 if (Date.now() - lastCheck < 1000) {
@@ -84,7 +84,7 @@ export class CoreSharedFilesHelperProvider {
      *
      * @param originalName Original name.
      * @param newName New name.
-     * @return Promise resolved with the name to use when the user chooses. Rejected if user cancels.
+     * @returns Promise resolved with the name to use when the user chooses. Rejected if user cancels.
      */
     async askRenameReplace(originalName: string, newName: string): Promise<string> {
         const alert = await AlertController.create({
@@ -137,7 +137,7 @@ export class CoreSharedFilesHelperProvider {
     /**
      * Whether the user is already choosing a site to store a shared file.
      *
-     * @return Whether the user is already choosing a site to store a shared file.
+     * @returns Whether the user is already choosing a site to store a shared file.
      */
     protected isChoosingSite(): boolean {
         return CoreNavigator.getCurrentRoute({ pageComponent: CoreSharedFilesChooseSitePage }) !== null;
@@ -147,7 +147,7 @@ export class CoreSharedFilesHelperProvider {
      * Open the view to select a shared file.
      *
      * @param mimetypes List of supported mimetypes. If undefined, all mimetypes supported.
-     * @return Promise resolved when a file is picked, rejected if file picker is closed without selecting a file.
+     * @returns Promise resolved when a file is picked, rejected if file picker is closed without selecting a file.
      */
     async pickSharedFile(mimetypes?: string[]): Promise<CoreFileUploaderHandlerResult> {
         const file = await CoreDomUtils.openModal<FileEntry>({
@@ -177,7 +177,7 @@ export class CoreSharedFilesHelperProvider {
      *
      * @param fileEntry The file entry to delete.
      * @param isInbox Whether the file is in the Inbox folder.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected removeSharedFile(fileEntry: FileEntry, isInbox?: boolean): Promise<void> {
         if (isInbox) {
@@ -193,7 +193,7 @@ export class CoreSharedFilesHelperProvider {
      * If more than one file is found, treat only the first one.
      *
      * @param path Path to a file received when launching the app.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async searchIOSNewSharedFiles(path?: string): Promise<void> {
         try {
@@ -227,7 +227,7 @@ export class CoreSharedFilesHelperProvider {
             } else if (siteIds.length == 1) {
                 return this.storeSharedFileInSite(fileEntry, siteIds[0], !path);
             } else if (!this.isChoosingSite()) {
-                this.goToChooseSite(fileEntry.toURL(), !path);
+                this.goToChooseSite(CoreFile.getFileEntryURL(fileEntry), !path);
             }
         } catch (error) {
             if (error) {
@@ -242,7 +242,7 @@ export class CoreSharedFilesHelperProvider {
      * @param fileEntry Shared file entry.
      * @param siteId Site ID. If not defined, current site.
      * @param isInbox Whether the file is in the Inbox folder.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async storeSharedFileInSite(fileEntry: FileEntry, siteId?: string, isInbox?: boolean): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();

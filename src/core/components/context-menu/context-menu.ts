@@ -20,7 +20,7 @@ import { CoreUtils } from '@services/utils/utils';
 import { Translate } from '@singletons';
 import { CoreContextMenuItemComponent } from './context-menu-item';
 import { CoreContextMenuPopoverComponent } from './context-menu-popover';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 
 /**
  * This component adds a button (usually in the navigation bar) that displays a context menu popover.
@@ -31,9 +31,15 @@ import { CoreComponentsRegistry } from '@singletons/components-registry';
 })
 export class CoreContextMenuComponent implements OnInit, OnDestroy {
 
-    @Input() icon?: string; // Icon to be shown on the navigation bar. Default: Kebab menu icon.
-    @Input() title?: string; // Text to be shown on the top of the popover.
+    @Input() icon = 'ellipsis-vertical'; // Icon to be shown on the navigation bar. Default: Kebab menu icon.
     @Input('aria-label') ariaLabel?: string; // Aria label to be shown on the top of the popover.
+
+    /**
+     * Title to be shown on the top of the popover.
+     *
+     * @deprecated since 4.4. Use aria-label instead.
+     */
+    @Input() title?: string; // Text to be shown on the top of the popover.
 
     hideMenu = true; // It will be unhidden when items are added.
     uniqueId: string;
@@ -61,15 +67,14 @@ export class CoreContextMenuComponent implements OnInit, OnDestroy {
         // Calculate the unique ID.
         this.uniqueId = 'core-context-menu-' + CoreUtils.getUniqueId('CoreContextMenuComponent');
 
-        CoreComponentsRegistry.register(elementRef.nativeElement, this);
+        CoreDirectivesRegistry.register(elementRef.nativeElement, this);
     }
 
     /**
      * @inheritdoc
      */
     ngOnInit(): void {
-        this.icon = this.icon || 'ellipsis-vertical';
-        this.ariaLabel = this.ariaLabel || this.title || Translate.instant('core.displayoptions');
+        this.ariaLabel = this.ariaLabel || Translate.instant('core.displayoptions');
     }
 
     /**
@@ -82,7 +87,7 @@ export class CoreContextMenuComponent implements OnInit, OnDestroy {
             // All items were moved to the "parent" menu. Add the item in there.
             this.parentContextMenu.addItem(item);
 
-            if (this.itemsMovedToParent.indexOf(item) == -1) {
+            if (this.itemsMovedToParent.indexOf(item) === -1) {
                 this.itemsMovedToParent.push(item);
             }
         } else if (this.items.indexOf(item) == -1) {
@@ -182,10 +187,8 @@ export class CoreContextMenuComponent implements OnInit, OnDestroy {
                 event,
                 component: CoreContextMenuPopoverComponent,
                 componentProps: {
-                    title: this.title,
                     items: this.items,
                 },
-                showBackdrop: true,
                 id: this.uniqueId,
             });
 

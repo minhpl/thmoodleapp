@@ -14,13 +14,40 @@
 
 import { NgModule, Type } from '@angular/core';
 import { CoreContentLinksComponentsModule } from './components/components.module';
-import { CoreContentLinksDelegateService } from './services/contentlinks-delegate';
-import { CoreContentLinksHelperProvider } from './services/contentlinks-helper';
 
-export const CORE_CONTENTLINKS_SERVICES: Type<unknown>[] = [
-    CoreContentLinksDelegateService,
-    CoreContentLinksHelperProvider,
-];
+/**
+ * Get content links services.
+ *
+ * @returns Content links services.
+ */
+export async function getContentLinksServices(): Promise<Type<unknown>[]> {
+    const { CoreContentLinksDelegateService } = await import('@features/contentlinks/services/contentlinks-delegate');
+    const { CoreContentLinksHelperProvider } = await import('@features/contentlinks/services/contentlinks-helper');
+
+    return [
+        CoreContentLinksDelegateService,
+        CoreContentLinksHelperProvider,
+    ];
+}
+
+/**
+ * Get content links exported objects.
+ *
+ * @returns Content links exported objects.
+ */
+export async function getContentLinksExportedObjects(): Promise<Record<string, unknown>> {
+    const { CoreContentLinksHandlerBase } = await import ('@features/contentlinks/classes/base-handler');
+    const { CoreContentLinksModuleGradeHandler } = await import ('@features/contentlinks/classes/module-grade-handler');
+    const { CoreContentLinksModuleIndexHandler } = await import ('@features/contentlinks/classes/module-index-handler');
+
+    /* eslint-disable @typescript-eslint/naming-convention */
+    return {
+        CoreContentLinksHandlerBase,
+        CoreContentLinksModuleGradeHandler,
+        CoreContentLinksModuleIndexHandler,
+    };
+    /* eslint-enable @typescript-eslint/naming-convention */
+}
 
 @NgModule({
     imports: [

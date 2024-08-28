@@ -20,16 +20,16 @@ import { CoreCourseFormatDelegate } from '../../services/format-delegate';
 import { CoreCourseOptionsDelegate } from '../../services/course-options-delegate';
 import { CoreCourseAnyCourseData } from '@features/courses/services/courses';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { CoreCourse, CoreCourseModuleCompletionStatus, CoreCourseWSSection } from '@features/course/services/course';
+import { CoreCourse, CoreCourseProvider, CoreCourseWSSection } from '@features/course/services/course';
 import { CoreCourseHelper, CoreCourseModuleData } from '@features/course/services/course-helper';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreNavigationOptions, CoreNavigator } from '@services/navigator';
 import { CONTENTS_PAGE_NAME } from '@features/course/course.module';
 import { CoreDomUtils } from '@services/utils/dom';
-import { CoreCourseSummaryPage } from '../course-summary/course-summary';
 import { CoreCoursesHelper, CoreCourseWithImageAndColor } from '@features/courses/services/courses-helper';
 import { CoreColors } from '@singletons/colors';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
+import { CoreSites } from '@services/sites';
 
 /**
  * Page that displays the list of courses the user is enrolled in.
@@ -50,10 +50,12 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
     tabs: CourseTab[] = [];
     loaded = false;
     progress?: number;
+    fullScreenEnabled = false;
 
     protected currentPagePath = '';
+    protected fullScreenObserver: CoreEventObserver;
     protected selectTabObserver: CoreEventObserver;
-    protected completionObserver: CoreEventObserver;
+    protected progressObserver: CoreEventObserver;
     protected sections: CoreCourseWSSection[] = []; // List of course sections.
     protected firstTabName?: string;
     protected module?: CoreCourseModuleData;
@@ -73,7 +75,7 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
                 if (data.sectionId) {
                     this.contentsTab.pageParams.sectionId = data.sectionId;
                 }
-                if (data.sectionNumber) {
+                if (data.sectionNumber !== undefined) {
                     this.contentsTab.pageParams.sectionNumber = data.sectionNumber;
                 }
 
@@ -88,32 +90,19 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
             }
         });
 
-        // The completion of any of the modules have changed.
-        this.completionObserver = CoreEvents.on(CoreEvents.MANUAL_COMPLETION_CHANGED, (data) => {
-            if (data.completion.courseId != this.course?.id) {
+        const siteId = CoreSites.getCurrentSiteId();
+
+        this.progressObserver = CoreEvents.on(CoreCourseProvider.PROGRESS_UPDATED, (data) => {
+            if (!this.course || this.course.id !== data.courseId || !('progress' in this.course)) {
                 return;
             }
 
-            if (data.completion.valueused !== false || !this.course || !('progress' in this.course) ||
-                    typeof this.course.progress != 'number') {
-                return;
-            }
-
-            // If the completion value is not used, the page won't be reloaded, so update the progress bar.
-            const completionModules = (<CoreCourseModuleData[]> [])
-                .concat(...this.sections.map((section) => section.modules))
-                .map((module) => module.completion && module.completion > 0 ? 1 : module.completion)
-                .reduce((accumulator, currentValue) => (accumulator || 0) + (currentValue || 0), 0);
-
-            const moduleProgressPercent = 100 / (completionModules || 1);
-            // Use min/max here to avoid floating point rounding errors over/under-flowing the progress bar.
-            if (data.completion.state === CoreCourseModuleCompletionStatus.COMPLETION_COMPLETE) {
-                this.course.progress = Math.min(100, this.course.progress + moduleProgressPercent);
-            } else {
-                this.course.progress = Math.max(0, this.course.progress - moduleProgressPercent);
-            }
-
+            this.course.progress = data.progress;
             this.updateProgress();
+        }, siteId);
+
+        this.fullScreenObserver = CoreEvents.on(CoreEvents.FULL_SCREEN_CHANGED, (event: { enabled: boolean }) => {
+            this.fullScreenEnabled = event.enabled;
         });
     }
 
@@ -122,7 +111,7 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
      */
     async ngOnInit(): Promise<void> {
         // Increase route depth.
-        const path = CoreNavigator.getRouteFullPath(this.route.snapshot);
+        const path = CoreNavigator.getRouteFullPath(this.route);
 
         CoreNavigator.increaseRouteDepth(path.replace(/(\/deep)+/, ''));
 
@@ -138,29 +127,24 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
 
         this.firstTabName = CoreNavigator.getRouteParam('selectedTab');
         this.module = CoreNavigator.getRouteParam<CoreCourseModuleData>('module');
-        this.isGuest = !!CoreNavigator.getRouteBooleanParam('isGuest');
+        this.isGuest = CoreNavigator.getRouteBooleanParam('isGuest') ??
+            (!!this.course && (await CoreCourseHelper.courseUsesGuestAccessInfo(this.course.id)).guestAccess);
+
         this.modNavOptions = CoreNavigator.getRouteParam<CoreNavigationOptions>('modNavOptions');
         this.openModule = CoreNavigator.getRouteBooleanParam('openModule') ?? true; // If false, just scroll to module.
-        if (!this.modNavOptions) {
-            // Fallback to old way of passing params. @deprecated since 4.0.
-            const modParams = CoreNavigator.getRouteParam<Params>('modParams');
-            if (modParams) {
-                this.modNavOptions = { params: modParams };
-            }
-        }
-
         this.currentPagePath = CoreNavigator.getCurrentPath();
-        this.contentsTab.page = CoreText.concatenatePaths(this.currentPagePath, this.contentsTab.page);
+        this.contentsTab.page = CorePath.concatenatePaths(this.currentPagePath, this.contentsTab.page);
         this.contentsTab.pageParams = {
             course: this.course,
             sectionId: CoreNavigator.getRouteNumberParam('sectionId'),
             sectionNumber: CoreNavigator.getRouteNumberParam('sectionNumber'),
+            blockInstanceId: CoreNavigator.getRouteNumberParam('blockInstanceId'),
             isGuest: this.isGuest,
         };
 
         if (this.module) {
             this.contentsTab.pageParams.moduleId = this.module.id;
-            if (!this.contentsTab.pageParams.sectionId && !this.contentsTab.pageParams.sectionNumber) {
+            if (!this.contentsTab.pageParams.sectionId && this.contentsTab.pageParams.sectionNumber === undefined) {
                 // No section specified, use module section.
                 this.contentsTab.pageParams.sectionId = this.module.section;
             }
@@ -194,7 +178,7 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
     /**
      * Load course option handlers.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadCourseHandlers(): Promise<void> {
         if (!this.course) {
@@ -208,7 +192,7 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
 
         // Create the full path.
         handlers.forEach((handler, index) => {
-            handler.data.page = CoreText.concatenatePaths(this.currentPagePath, handler.data.page);
+            handler.data.page = CorePath.concatenatePaths(this.currentPagePath, handler.data.page);
             handler.data.pageParams = handler.data.pageParams || {};
 
             // Check if this handler should be the first selected tab.
@@ -234,7 +218,7 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
     /**
      * Load title for the page.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadBasinInfo(): Promise<void> {
         if (!this.course) {
@@ -263,11 +247,12 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
      * @inheritdoc
      */
     ngOnDestroy(): void {
-        const path = CoreNavigator.getRouteFullPath(this.route.snapshot);
+        const path = CoreNavigator.getRouteFullPath(this.route);
 
         CoreNavigator.decreaseRouteDepth(path.replace(/(\/deep)+/, ''));
         this.selectTabObserver?.off();
-        this.completionObserver?.off();
+        this.progressObserver?.off();
+        this.fullScreenObserver?.off();
     }
 
     /**
@@ -288,17 +273,9 @@ export class CoreCourseIndexPage implements OnInit, OnDestroy {
      * Open the course summary
      */
     openCourseSummary(): void {
-        if (!this.course) {
-            return;
+        if (this.course) {
+            CoreCourseHelper.openCourseSummary(this.course);
         }
-
-        CoreDomUtils.openSideModal<void>({
-            component: CoreCourseSummaryPage,
-            componentProps: {
-                courseId: this.course.id,
-                course: this.course,
-            },
-        });
     }
 
     /**

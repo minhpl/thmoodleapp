@@ -17,42 +17,75 @@ import { Routes } from '@angular/router';
 
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { CoreCourseComponentsModule } from './components/components.module';
-import { CoreCourseDirectivesModule } from './directives/directives.module';
-import { CoreCourseFormatModule } from './format/formats.module';
+import { CoreCourseFormatModule } from '@features/course/format/formats.module';
 import { SITE_SCHEMA, OFFLINE_SITE_SCHEMA } from './services/database/course';
 import { SITE_SCHEMA as LOG_SITE_SCHEMA } from './services/database/log';
 import { SITE_SCHEMA as PREFETCH_SITE_SCHEMA } from './services/database/module-prefetch';
-import { CoreCourseIndexRoutingModule } from './pages/index/index-routing.module';
-import { CoreCourseModulePrefetchDelegate, CoreCourseModulePrefetchDelegateService } from './services/module-prefetch-delegate';
+import { CoreCourseModulePrefetchDelegate } from './services/module-prefetch-delegate';
 import { CoreCronDelegate } from '@services/cron';
 import { CoreCourseLogCronHandler } from './services/handlers/log-cron';
 import { CoreCourseSyncCronHandler } from './services/handlers/sync-cron';
 import { CoreTagAreaDelegate } from '@features/tag/services/tag-area-delegate';
 import { CoreCourseTagAreaHandler } from './services/handlers/course-tag-area';
 import { CoreCourseModulesTagAreaHandler } from './services/handlers/modules-tag-area';
-import { CoreCourse, CoreCourseProvider } from './services/course';
-import { CoreCourseHelperProvider } from './services/course-helper';
-import { CoreCourseLogHelperProvider } from './services/log-helper';
-import { CoreCourseFormatDelegateService } from './services/format-delegate';
-import { CoreCourseModuleDelegateService } from './services/module-delegate';
-import { CoreCourseOptionsDelegateService } from './services/course-options-delegate';
-import { CoreCourseOfflineProvider } from './services/course-offline';
-import { CoreCourseSyncProvider } from './services/sync';
+import { CoreCourse } from './services/course';
 import { COURSE_INDEX_PATH } from '@features/course/course-lazy.module';
 import { buildRegExpUrlMatcher } from '@/app/app-routing.module';
+import { CoreCourseIndexRoutingModule } from '@features/course/course-routing.module';
 
-export const CORE_COURSE_SERVICES: Type<unknown>[] = [
-    CoreCourseProvider,
-    CoreCourseHelperProvider,
-    CoreCourseLogHelperProvider,
-    CoreCourseFormatDelegateService,
-    CoreCourseModuleDelegateService,
-    CoreCourseModulePrefetchDelegateService,
-    CoreCourseOptionsDelegateService,
-    CoreCourseOfflineProvider,
-    CoreCourseSyncProvider,
-];
+/**
+ * Get course services.
+ *
+ * @returns Course services.
+ */
+export async function getCourseServices(): Promise<Type<unknown>[]> {
+    const { CoreCourseProvider } = await import('@features/course/services/course');
+    const { CoreCourseHelperProvider } = await import('@features/course/services/course-helper');
+    const { CoreCourseLogHelperProvider } = await import('@features/course/services/log-helper');
+    const { CoreCourseFormatDelegateService } = await import('@features/course/services/format-delegate');
+    const { CoreCourseModuleDelegateService } = await import('@features/course/services/module-delegate');
+    const { CoreCourseModulePrefetchDelegateService } = await import('@features/course/services/module-prefetch-delegate');
+    const { CoreCourseOptionsDelegateService } = await import('@features/course/services/course-options-delegate');
+    const { CoreCourseOfflineProvider } = await import('@features/course/services/course-offline');
+    const { CoreCourseSyncProvider } = await import('@features/course/services/sync');
+
+    return [
+        CoreCourseProvider,
+        CoreCourseHelperProvider,
+        CoreCourseLogHelperProvider,
+        CoreCourseFormatDelegateService,
+        CoreCourseModuleDelegateService,
+        CoreCourseModulePrefetchDelegateService,
+        CoreCourseOptionsDelegateService,
+        CoreCourseOfflineProvider,
+        CoreCourseSyncProvider,
+    ];
+}
+
+/**
+ * Get course exported objects.
+ *
+ * @returns Course exported objects.
+ */
+export async function getCourseExportedObjects(): Promise<Record<string, unknown>> {
+    const { CoreCourseActivityPrefetchHandlerBase } = await import('@features/course/classes/activity-prefetch-handler');
+    const { CoreCourseResourcePrefetchHandlerBase } = await import('@features/course/classes/resource-prefetch-handler');
+    const { CoreCourseAccessDataType } = await import('@features/course/services/course');
+    const { CoreCourseUnsupportedModuleComponent } =
+        await import ('@features/course/components/unsupported-module/unsupported-module');
+    const { CoreCourseFormatSingleActivityComponent } =
+        await import ('@features/course/format/singleactivity/components/singleactivity');
+
+    /* eslint-disable @typescript-eslint/naming-convention */
+    return {
+        CoreCourseActivityPrefetchHandlerBase,
+        CoreCourseResourcePrefetchHandlerBase,
+        CoreCourseUnsupportedModuleComponent,
+        CoreCourseFormatSingleActivityComponent,
+        CoreCourseAccessDataType,
+    };
+    /* eslint-enable @typescript-eslint/naming-convention */
+}
 
 export const COURSE_PAGE_NAME = 'course';
 export const CONTENTS_PAGE_NAME = 'contents';
@@ -68,7 +101,7 @@ const routes: Routes = [
 const courseIndexRoutes: Routes = [
     {
         path: CONTENTS_PAGE_NAME,
-        loadChildren: () => import('./pages/contents/contents.module').then(m => m.CoreCourseContentsPageModule),
+        loadChildren: () => import('@features/course/course-contents-lazy.module').then(m => m.CoreCourseContentsLazyModule),
     },
 ];
 
@@ -77,10 +110,7 @@ const courseIndexRoutes: Routes = [
         CoreCourseIndexRoutingModule.forChild({ children: courseIndexRoutes }),
         CoreMainMenuTabRoutingModule.forChild(routes),
         CoreCourseFormatModule,
-        CoreCourseComponentsModule,
-        CoreCourseDirectivesModule,
     ],
-    exports: [CoreCourseIndexRoutingModule],
     providers: [
         {
             provide: CORE_SITE_SCHEMAS,

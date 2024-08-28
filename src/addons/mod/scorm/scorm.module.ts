@@ -12,35 +12,26 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
+import { CoreCourseHelper } from '@features/course/services/course-helper';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
 import { CoreCronDelegate } from '@services/cron';
 import { CorePluginFileDelegate } from '@services/plugin-file-delegate';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { AddonModScormComponentsModule } from './components/components.module';
 import { OFFLINE_SITE_SCHEMA } from './services/database/scorm';
 import { AddonModScormGradeLinkHandler } from './services/handlers/grade-link';
 import { AddonModScormIndexLinkHandler } from './services/handlers/index-link';
 import { AddonModScormListLinkHandler } from './services/handlers/list-link';
 import { AddonModScormModuleHandler, AddonModScormModuleHandlerService } from './services/handlers/module';
+import { AddonModScormPlayerLinkHandler } from './services/handlers/player-link';
 import { AddonModScormPluginFileHandler } from './services/handlers/pluginfile';
 import { AddonModScormPrefetchHandler } from './services/handlers/prefetch';
 import { AddonModScormSyncCronHandler } from './services/handlers/sync-cron';
 import { AddonModScormProvider } from './services/scorm';
-import { AddonModScormHelperProvider } from './services/scorm-helper';
-import { AddonModScormOfflineProvider } from './services/scorm-offline';
-import { AddonModScormSyncProvider } from './services/scorm-sync';
-
-export const ADDON_MOD_SCORM_SERVICES: Type<unknown>[] = [
-    AddonModScormProvider,
-    AddonModScormOfflineProvider,
-    AddonModScormHelperProvider,
-    AddonModScormSyncProvider,
-];
 
 const routes: Routes = [
     {
@@ -52,7 +43,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModScormComponentsModule,
     ],
     providers: [
         {
@@ -70,7 +60,10 @@ const routes: Routes = [
                 CoreContentLinksDelegate.registerHandler(AddonModScormGradeLinkHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModScormIndexLinkHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModScormListLinkHandler.instance);
+                CoreContentLinksDelegate.registerHandler(AddonModScormPlayerLinkHandler.instance);
                 CorePluginFileDelegate.registerHandler(AddonModScormPluginFileHandler.instance);
+
+                CoreCourseHelper.registerModuleReminderClick(AddonModScormProvider.COMPONENT);
             },
         },
     ],

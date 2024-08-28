@@ -23,11 +23,21 @@ import { AddonBadgesUserHandler } from './services/handlers/user';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
 import { CorePushNotificationsDelegate } from '@features/pushnotifications/services/push-delegate';
 import { AddonBadgesPushClickHandler } from './services/handlers/push-click';
-import { AddonBadgesProvider } from './services/badges';
+import { CoreTagAreaDelegate } from '@features/tag/services/tag-area-delegate';
+import { AddonBadgesTagAreaHandler } from './services/handlers/tag-area';
 
-export const ADDON_BADGES_SERVICES: Type<unknown>[] = [
-    AddonBadgesProvider,
-];
+/**
+ * Get badges services.
+ *
+ * @returns Returns badges services.
+ */
+export async function getBadgesServices(): Promise<Type<unknown>[]> {
+    const { AddonBadgesProvider } = await import('@addons/badges/services/badges');
+
+    return [
+        AddonBadgesProvider,
+    ];
+}
 
 const mainMenuRoutes: Routes = [
     {
@@ -49,6 +59,7 @@ const mainMenuRoutes: Routes = [
                 CoreContentLinksDelegate.registerHandler(AddonBadgesBadgeLinkHandler.instance);
                 CoreUserDelegate.registerHandler(AddonBadgesUserHandler.instance);
                 CorePushNotificationsDelegate.registerClickHandler(AddonBadgesPushClickHandler.instance);
+                CoreTagAreaDelegate.registerHandler(AddonBadgesTagAreaHandler.instance);
             },
         },
     ],

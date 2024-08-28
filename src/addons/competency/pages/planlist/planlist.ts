@@ -13,13 +13,16 @@
 // limitations under the License.
 
 import { AfterViewInit, Component, OnDestroy, ViewChild } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreSplitViewComponent } from '@components/split-view/split-view';
 import { CoreNavigator } from '@services/navigator';
 import { AddonCompetencyPlanFormatted, AddonCompetencyPlansSource } from '@addons/competency/classes/competency-plans-source';
 import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/routed-items-manager-sources-tracker';
 import { CoreListItemsManager } from '@classes/items-management/list-items-manager';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreSites } from '@services/sites';
+import { Translate } from '@singletons';
 
 /**
  * Page that displays the list of learning plans.
@@ -34,11 +37,23 @@ export class AddonCompetencyPlanListPage implements AfterViewInit, OnDestroy {
 
     plans: CoreListItemsManager<AddonCompetencyPlanFormatted, AddonCompetencyPlansSource>;
 
+    protected logView: () => void;
+
     constructor() {
-        const userId = CoreNavigator.getRouteNumberParam('userId');
+        const userId = CoreNavigator.getRouteNumberParam('userId') ?? CoreSites.getCurrentSiteUserId();
         const source = CoreRoutedItemsManagerSourcesTracker.getOrCreateSource(AddonCompetencyPlansSource, [userId]);
 
         this.plans = new CoreListItemsManager(source, AddonCompetencyPlanListPage);
+
+        this.logView = CoreTime.once(async () => {
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+                ws: 'tool_lp_data_for_plans_page',
+                name: Translate.instant('addon.competency.userplans'),
+                data: { userid: userId },
+                url: `/admin/tool/lp/plans.php?userid=${userId}`,
+            });
+        });
     }
 
     /**
@@ -53,11 +68,13 @@ export class AddonCompetencyPlanListPage implements AfterViewInit, OnDestroy {
     /**
      * Fetches the learning plans and updates the view.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchLearningPlans(): Promise<void> {
         try {
             await this.plans.load();
+
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'Error getting learning plans data.');
         }
@@ -68,7 +85,7 @@ export class AddonCompetencyPlanListPage implements AfterViewInit, OnDestroy {
      *
      * @param refresher Refresher.
      */
-    async refreshLearningPlans(refresher: IonRefresher): Promise<void> {
+    async refreshLearningPlans(refresher: HTMLIonRefresherElement): Promise<void> {
         await this.plans.getSource().invalidateCache();
 
         this.plans.getSource().setDirty(true);

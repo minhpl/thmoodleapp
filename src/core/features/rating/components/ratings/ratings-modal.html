@@ -1,11 +1,11 @@
 <ion-header>
     <ion-toolbar>
         <ion-title>
-            <h2>{{ 'core.rating.ratings' | translate }}</h2>
+            <h1>{{ 'core.rating.ratings' | translate }}</h1>
         </ion-title>
         <ion-buttons slot="end">
-            <ion-button fill="clear" (click)="closeModal()" [attr.aria-label]="'core.close' | translate">
-                <ion-icon slot="icon-only" name="fas-times" aria-hidden="true"></ion-icon>
+            <ion-button fill="clear" (click)="closeModal()" [ariaLabel]="'core.close' | translate">
+                <ion-icon slot="icon-only" name="fas-xmark" aria-hidden="true" />
             </ion-button>
         </ion-buttons>
     </ion-toolbar>
@@ -14,9 +14,9 @@
     <core-loading [hideUntil]="loaded">
         <ion-list *ngIf="ratings.length > 0">
             <ion-item class="ion-text-wrap" *ngFor="let rating of ratings">
-                <core-user-avatar [user]="rating" [courseId]="courseId" slot="start"></core-user-avatar>
+                <core-user-avatar [user]="rating" [courseId]="courseId" slot="start" />
                 <ion-label>
-                    <h2>{{ rating.userfullname }}</h2>
+                    <p class="item-heading">{{ rating.userfullname }}</p>
                     <p>{{ rating.rating }}</p>
                 </ion-label>
                 <ion-note slot="end" *ngIf="rating.timemodified">
@@ -24,7 +24,6 @@
                 </ion-note>
             </ion-item>
         </ion-list>
-        <core-empty-box *ngIf="ratings.length == 0" icon="fas-star-half-alt" [message]="'core.rating.noratings' | translate">
-        </core-empty-box>
+        <core-empty-box *ngIf="ratings.length === 0" icon="fas-star-half-stroke" [message]="'core.rating.noratings' | translate" />
     </core-loading>
 </ion-content>

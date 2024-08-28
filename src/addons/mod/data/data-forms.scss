@@ -1,94 +1,43 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 // Edit and search modal.
 :host {
-    --input-border-color: var(--stroke);
-    --input-border-width: 1px;
-    --select-border-width: 0px;
-
-    ::ng-deep {
-        table {
-            width: 100%;
-        }
-        td {
-            vertical-align: top;
-        }
-
-        .addon-data-latlong {
-            display: flex;
-        }
-    }
 
     .addon-data-advanced-search {
         padding: 16px;
         width: 100%;
     }
 
-    .addon-data-contents form,
+    .addon-data-edit-entry form,
     form .addon-data-advanced-search {
         background-color: var(--ion-item-background);
 
         ::ng-deep {
-
-            ion-input {
-                border-bottom: var(--input-border-width) solid var(--input-border-color);
-                &.has-focus,
-                &.has-focus.ion-valid,
-                &.ion-touched.ion-invalid {
-                    --input-border-width: 2px;
+            table {
+                width: 100%;
+                tbody {
+                    display: block;
                 }
 
-                &.has-focus {
-                    --input-border-color: var(--primary);
-                }
-                &.has-focus.ion-valid {
-                    --input-border-color: var(--success);
-                }
-                &.ion-touched.ion-invalid {
-                    --input-border-color: var(--danger);
+                td {
+                    vertical-align: top;
                 }
             }
 
-            core-rich-text-editor {
-                border-bottom: var(--select-border-width) solid var(--input-border-color);
-
-                &.ion-touched.ng-valid,
-                &.ion-touched.ng-invalid {
-                    --select-border-width: 2px;
-                }
-
-                &.ion-touched.ng-valid {
-                    --input-border-color: var(--success);
-                }
-                &.ion-touched.ng-invalid {
-                    --input-border-color: var(--danger);
-                }
-            }
-            ion-select {
-                border-bottom: var(--select-border-width) solid var(--input-border-color);
-
-                &.ion-touched.ion-valid,
-                &.ion-touched.ion-invalid {
-                    --select-border-width: 2px;
-                }
-
-                &.ion-touched.ion-valid {
-                    --input-border-color: var(--success);
-                }
-                &.ion-touched.ion-invalid {
-                    --input-border-color: var(--danger);
-                }
+            .edit-field,
+            .search-field {
+                border-bottom: 1px solid var(--stroke);
             }
 
-            .has-errors ion-input.ion-invalid {
-                --input-border-width: 2px;
-                --input-border-color: var(--danger);
-            }
-
-            .has-errors ion-select.ion-invalid,
-            .has-errors core-rich-text-editor.ng-invalid {
-                --select-border-width: 2px;
-                --input-border-color: var(--danger);
+            .has-errors {
+                .input-highlight,
+                .select-highlight,
+                .textarea-highlight {
+                    transform: scale(1);
+                }
+                core-rich-text-editor.ion-touched.ng-invalid {
+                    --stroke: var(--danger);
+                }
             }
 
             .core-mark-required {

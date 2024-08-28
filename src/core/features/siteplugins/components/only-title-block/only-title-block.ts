@@ -35,7 +35,7 @@ export class CoreSitePluginsOnlyTitleBlockComponent extends CoreBlockBaseCompone
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         super.ngOnInit();
@@ -58,7 +58,7 @@ export class CoreSitePluginsOnlyTitleBlockComponent extends CoreBlockBaseCompone
             contextlevel: this.contextLevel,
             instanceid: this.instanceId,
         };
-        const hash = <string> Md5.hashAsciiStr(JSON.stringify(args));
+        const hash = Md5.hashAsciiStr(JSON.stringify(args));
 
         CoreNavigator.navigateToSitePath(
             `siteplugins/content/${handler.plugin.component}/${handler.handlerSchema.method}/${hash}`,

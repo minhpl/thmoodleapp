@@ -12,13 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { CoreConstants } from '@/core/constants';
 import { Component, OnInit } from '@angular/core';
+import { FAQ_QRCODE_INFO_DONE, ONBOARDING_DONE } from '@features/login/constants';
+import { CoreSettingsHelper } from '@features/settings/services/settings-helper';
 import { CoreSitePlugins } from '@features/siteplugins/services/siteplugins';
 import { CoreUserTours } from '@features/usertours/services/user-tours';
+import { CoreCacheManager } from '@services/cache-manager';
+import { CoreConfig } from '@services/config';
+import { CoreFile } from '@services/file';
+import { CoreNavigator } from '@services/navigator';
+import { CorePlatform } from '@services/platform';
 import { CoreSites } from '@services/sites';
-import { CoreDomUtils } from '@services/utils/dom';
+import { CoreDomUtils, ToastDuration } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
-import { Platform } from '@singletons';
 
 /**
  * Page that displays the developer options.
@@ -39,19 +46,29 @@ export class CoreSettingsDevPage implements OnInit {
     pluginStylesCount = 0;
     sitePlugins: CoreSitePluginsBasicInfo[] = [];
     userToursEnabled = true;
+    stagingSitesCount = 0;
+    enableStagingSites?: boolean;
+    previousEnableStagingSites?: boolean;
 
     disabledFeatures: string[] = [];
 
     siteId: string | undefined;
 
     async ngOnInit(): Promise<void> {
-        this.rtl = Platform.isRTL;
+        this.rtl = CorePlatform.isRTL;
         this.RTLChanged();
 
         this.forceSafeAreaMargins = document.documentElement.classList.contains('force-safe-area-margins');
         this.safeAreaChanged();
 
         this.siteId = CoreSites.getCurrentSite()?.getId();
+
+        this.stagingSitesCount = CoreConstants.CONFIG.sites.filter((site) => site.staging).length;
+
+        if (this.stagingSitesCount) {
+            this.enableStagingSites = await CoreSettingsHelper.hasEnabledStagingSites();
+            this.previousEnableStagingSites = this.enableStagingSites;
+        }
 
         if (!this.siteId) {
             return;
@@ -89,7 +106,7 @@ export class CoreSettingsDevPage implements OnInit {
 
         const disabledFeatures = (await CoreSites.getCurrentSite()?.getPublicConfig())?.tool_mobile_disabledfeatures;
 
-        this.disabledFeatures = disabledFeatures?.split(',') || [];
+        this.disabledFeatures = disabledFeatures?.split(',').filter(feature => feature.trim().length > 0) ?? [];
     }
 
     /**
@@ -138,6 +155,13 @@ export class CoreSettingsDevPage implements OnInit {
     }
 
     /**
+     * Open error log.
+     */
+    openErrorLog(): void {
+        CoreNavigator.navigate('error-log');
+    }
+
+    /**
      * Copies site info.
      */
     copyInfo(): void {
@@ -149,7 +173,53 @@ export class CoreSettingsDevPage implements OnInit {
      */
     async resetUserTours(): Promise<void> {
         await CoreUserTours.resetTours();
+
+        await CoreConfig.delete(ONBOARDING_DONE);
+        await CoreConfig.delete(FAQ_QRCODE_INFO_DONE);
+
         CoreDomUtils.showToast('User tours have been reseted');
+    }
+
+    /**
+     * Invalidate app caches.
+     */
+    async invalidateCaches(): Promise<void> {
+        const success = await CoreDomUtils.showOperationModals('Invalidating caches', true, async () => {
+            await CoreCacheManager.invalidate();
+
+            return true;
+        });
+
+        if (!success) {
+            return;
+        }
+
+        await CoreDomUtils.showToast('Caches invalidated', true, ToastDuration.LONG);
+    }
+
+    /**
+     * Delete all data from the app.
+     */
+    async clearFileStorage(): Promise<void> {
+        const sites = await CoreSites.getSitesIds();
+        await CoreFile.clearDeletedSitesFolder(sites);
+        await CoreFile.clearTmpFolder();
+
+        CoreDomUtils.showToast('File storage cleared');
+    }
+
+    async setEnabledStagingSites(enabled: boolean): Promise<void> {
+        if (this.enableStagingSites === this.previousEnableStagingSites) {
+            return;
+        }
+
+        try {
+            await CoreSettingsHelper.setEnabledStagingSites(enabled);
+            this.previousEnableStagingSites = enabled;
+        } catch (error) {
+            this.enableStagingSites = !enabled;
+            CoreDomUtils.showErrorModal(error);
+        }
     }
 
 }

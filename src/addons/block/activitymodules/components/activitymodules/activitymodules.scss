@@ -1,13 +1,7 @@
 :host {
-    --mod-icon-filter: brightness(0);
-
     core-mod-icon {
-        background: transparent;
-        margin: 0;
-        --filter: var(--mod-icon-filter);
+        --margin-vertical: 0px;
+        --margin-end: 12px;
+        --module-icon-size: 24px;
     }
-}
-
-:host-context(body.dark) {
-    --mod-icon-filter: brightness(0) invert(1);
 }

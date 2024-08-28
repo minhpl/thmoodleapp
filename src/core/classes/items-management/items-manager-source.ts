@@ -37,6 +37,15 @@ export abstract class CoreItemsManagerSource<Item = unknown> {
     }
 
     /**
+     * Check whether the source is dirty.
+     *
+     * @returns Whether the source is dirty.
+     */
+    isDirty(): boolean {
+        return this.dirty;
+    }
+
+    /**
      * Check whether data is loaded.
      *
      * @returns Whether data is loaded.
@@ -48,7 +57,7 @@ export abstract class CoreItemsManagerSource<Item = unknown> {
     /**
      * Return a promise that is resolved when the data is loaded.
      *
-     * @return Promise.
+     * @returns Promise.
      */
     waitForLoaded(): Promise<void> {
         return this.loadedPromise;
@@ -88,6 +97,7 @@ export abstract class CoreItemsManagerSource<Item = unknown> {
     reset(): void {
         this.items = null;
         this.dirty = false;
+        this.loaded = false;
 
         this.listeners.forEach(listener => listener.onReset?.call(listener));
     }

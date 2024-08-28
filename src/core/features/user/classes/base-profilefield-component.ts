@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { ContextLevel } from '@/core/constants';
 import { Component, Input, OnInit } from '@angular/core';
 import { FormGroup, Validators, FormControl } from '@angular/forms';
 
@@ -24,7 +25,7 @@ import { CoreUserProfileField } from '@features/user/services/user';
 @Component({
     template: '',
 })
-export abstract class CoreUserProfileFieldBaseComponent implements OnInit {
+export abstract class CoreUserProfileFieldBaseComponent<T = string> implements OnInit {
 
     @Input() field?: AuthEmailSignupProfileField | CoreUserProfileField; // The profile field to be rendered.
     @Input() signup = false; // True if editing the field in signup. Defaults to false.
@@ -32,19 +33,20 @@ export abstract class CoreUserProfileFieldBaseComponent implements OnInit {
     @Input() disabled = false; // True if disabled. Defaults to false.
     @Input() form?: FormGroup; // Form where to add the form control. Required if edit=true or signup=true.
     @Input() registerAuth?: string; // Register auth method. E.g. 'email'.
-    @Input() contextLevel?: string; // The context level.
+    @Input() contextLevel?: ContextLevel; // The context level.
     @Input() contextInstanceId?: number; // The instance ID related to the context.
     @Input() courseId?: number; // Course ID the field belongs to (if any). It can be used to improve performance with filters.
 
-    control?: FormControl;
+    control?: FormControl<T>;
     modelName = '';
     value?: string;
     required?: boolean;
+    valueNotFiltered?: boolean;
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
-    ngOnInit(): void {
+    async ngOnInit(): Promise<void> {
         if (!this.field) {
             return;
         }
@@ -60,7 +62,6 @@ export abstract class CoreUserProfileFieldBaseComponent implements OnInit {
 
             return;
         }
-
     }
 
     /**
@@ -69,7 +70,8 @@ export abstract class CoreUserProfileFieldBaseComponent implements OnInit {
      * @param field Field to render.
      */
     protected initForNonEdit(field: CoreUserProfileField): void {
-        this.value = field.value;
+        this.value = field.displayvalue ?? field.value;
+        this.valueNotFiltered = field.displayvalue === undefined || field.displayvalue === null;
     }
 
     /**
@@ -88,15 +90,18 @@ export abstract class CoreUserProfileFieldBaseComponent implements OnInit {
     /**
      * Create the Form control.
      *
-     * @return Form control.
+     * @returns Form control.
      */
-    protected createFormControl(field: AuthEmailSignupProfileField): FormControl {
+    protected createFormControl(field: AuthEmailSignupProfileField): FormControl<T> {
         const formData = {
-            value: field.defaultdata,
+            value: (field.defaultdata ?? '') as T,
             disabled: this.disabled,
         };
 
-        return new FormControl(formData, this.required && !field.locked ? Validators.required : null);
+        return new FormControl(formData, {
+            validators: this.required && !field.locked ? Validators.required : null,
+            nonNullable: true,
+        });
     }
 
 }

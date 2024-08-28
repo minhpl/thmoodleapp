@@ -14,8 +14,8 @@
 
 import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
-import { CoreApp } from '@services/app';
+import { CoreSite } from '@classes/sites/site';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreWSExternalWarning } from '@services/ws';
@@ -23,6 +23,8 @@ import { makeSingleton } from '@singletons';
 import { CoreEvents } from '@singletons/events';
 import { CoreCommentsOffline } from './comments-offline';
 import { CoreCommentsSyncAutoSyncData, CoreCommentsSyncProvider } from './comments-sync';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { ContextLevel } from '@/core/constants';
 
 const ROOT_CACHE_KEY = 'mmComments:';
 
@@ -75,11 +77,11 @@ export class CoreCommentsProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: true if comment was sent to server, false if stored in device.
+     * @returns Promise resolved with boolean: true if comment was sent to server, false if stored in device.
      */
     async addComment(
         content: string,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -95,7 +97,7 @@ export class CoreCommentsProvider {
             return false;
         };
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // App is offline, store the comment.
             return storeOffline();
         }
@@ -123,11 +125,11 @@ export class CoreCommentsProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when added, rejected otherwise.
+     * @returns Promise resolved when added, rejected otherwise.
      */
     async addCommentOnline(
         content: string,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -152,7 +154,7 @@ export class CoreCommentsProvider {
             this.invalidateCommentsData(contextLevel, instanceId, component, itemId, area, siteId),
         );
 
-        return commentsResponse![0];
+        return commentsResponse[0];
     }
 
     /**
@@ -160,15 +162,15 @@ export class CoreCommentsProvider {
      *
      * @param comments Comments to save.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when added, rejected otherwise. Promise resolved doesn't mean that comments
+     * @returns Promise resolved when added, rejected otherwise. Promise resolved doesn't mean that comments
      *         have been added, the resolve param can contain errors for comments not sent.
      */
     async addCommentsOnline(
         comments: CoreCommentsCommentBasicData[],
         siteId?: string,
-    ): Promise<CoreCommentsAddCommentsWSResponse | undefined> {
+    ): Promise<CoreCommentsAddCommentsWSResponse> {
         if (!comments || !comments.length) {
-            return;
+            return [];
         }
 
         const site = await CoreSites.getSite(siteId);
@@ -176,31 +178,57 @@ export class CoreCommentsProvider {
             comments: comments,
         };
 
-        return await site.write('core_comment_add_comments', data);
+        return site.write('core_comment_add_comments', data);
     }
 
     /**
-     * Check if Calendar is disabled in a certain site.
+     * Check if comments are disabled in a certain site.
      *
      * @param site Site. If not defined, use current site.
-     * @return Whether it's disabled.
+     * @returns Whether it's disabled.
+     * @deprecated since 4.4. Use areCommentsEnabledInSite instead.
      */
     areCommentsDisabledInSite(site?: CoreSite): boolean {
-        site = site || CoreSites.getCurrentSite();
-
-        return !!site?.isFeatureDisabled('NoDelegate_CoreComments');
+        return !this.areCommentsEnabledInSite(site);
     }
 
     /**
      * Check if comments are disabled in a certain site.
      *
      * @param siteId Site Id. If not defined, use current site.
-     * @return Promise resolved with true if disabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if disabled, rejected or resolved with false otherwise.
+     * @deprecated since 4.4. Use areCommentsEnabled instead.
      */
     async areCommentsDisabled(siteId?: string): Promise<boolean> {
+        return !this.areCommentsEnabled(siteId);
+    }
+
+    /**
+     * Check if comments are enabled in a certain site.
+     *
+     * @param site Site. If not defined, use current site.
+     * @returns Whether it's enabled.
+     */
+    areCommentsEnabledInSite(site?: CoreSite): boolean {
+        site = site || CoreSites.getCurrentSite();
+
+        if (!site) {
+            return false;
+        }
+
+        return site.canUseAdvancedFeature('usecomments') && !site.isFeatureDisabled('NoDelegate_CoreComments');
+    }
+
+    /**
+     * Check if comments are enabled in a certain site.
+     *
+     * @param siteId Site Id. If not defined, use current site.
+     * @returns Promise resolved with true if enabled, rejected or resolved with false otherwise.
+     */
+    async areCommentsEnabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
 
-        return this.areCommentsDisabledInSite(site);
+        return this.areCommentsEnabledInSite(site);
     }
 
     /**
@@ -208,8 +236,9 @@ export class CoreCommentsProvider {
      *
      * @param comment Comment object to delete.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when deleted (with true if deleted in online, false otherwise), rejected otherwise. Promise resolved
-     *         doesn't mean that comments have been deleted, the resolve param can contain errors for comments not deleted.
+     * @returns Promise resolved when deleted (with true if deleted in online, false otherwise), rejected otherwise.
+     *  Promise resolved doesn't mean that comments have been deleted,the resolve param can contain errors for comment
+     *  not deleted.
      */
     async deleteComment(comment: CoreCommentsCommentBasicData, siteId?: string): Promise<boolean> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -230,8 +259,12 @@ export class CoreCommentsProvider {
 
         // Convenience function to store the action to be synchronized later.
         const storeOffline = async (): Promise<boolean> => {
+            if (!comment.id) {
+                return false;
+            }
+
             await CoreCommentsOffline.deleteComment(
-                comment.id!,
+                comment.id,
                 comment.contextlevel,
                 comment.instanceid,
                 comment.component,
@@ -243,7 +276,7 @@ export class CoreCommentsProvider {
             return false;
         };
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // App is offline, store the comment.
             return storeOffline();
         }
@@ -281,12 +314,12 @@ export class CoreCommentsProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when deleted, rejected otherwise. Promise resolved doesn't mean that comments
+     * @returns Promise resolved when deleted, rejected otherwise. Promise resolved doesn't mean that comments
      *         have been deleted, the resolve param can contain errors for comments not deleted.
      */
     async deleteCommentsOnline(
         commentIds: number[],
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -310,14 +343,14 @@ export class CoreCommentsProvider {
      * Returns whether WS to add/delete comments are available in site.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with true if available, resolved with false or rejected otherwise.
+     * @returns Promise resolved with true if available, resolved with false or rejected otherwise.
      * @since 3.8
      */
     async isAddCommentsAvailable(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
 
         // First check if it's disabled.
-        if (this.areCommentsDisabledInSite(site)) {
+        if (!this.areCommentsEnabledInSite(site)) {
             return false;
         }
 
@@ -332,10 +365,10 @@ export class CoreCommentsProvider {
      * @param component Component name.
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCommentsCacheKey(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -349,9 +382,9 @@ export class CoreCommentsProvider {
      *
      * @param contextLevel Contextlevel system, course, user...
      * @param instanceId The Instance id of item associated with the context level.
-     * @return Cache key.
+     * @returns Cache key.
      */
-    protected getCommentsPrefixCacheKey(contextLevel: string, instanceId: number): string {
+    protected getCommentsPrefixCacheKey(contextLevel: ContextLevel, instanceId: number): string {
         return ROOT_CACHE_KEY + 'comments:' + contextLevel + ':' + instanceId;
     }
 
@@ -365,10 +398,10 @@ export class CoreCommentsProvider {
      * @param area String comment area. Default empty.
      * @param page Page number (0 based). Default 0.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the comments.
+     * @returns Promise resolved with the comments.
      */
     async getComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -414,10 +447,10 @@ export class CoreCommentsProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Comments count with plus sign if needed.
+     * @returns Comments count with plus sign if needed.
      */
     async getCommentsCount(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -479,10 +512,10 @@ export class CoreCommentsProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateCommentsData(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -511,9 +544,9 @@ export class CoreCommentsProvider {
      * @param contextLevel Contextlevel system, course, user...
      * @param instanceId The Instance id of item associated with the context level.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
-    async invalidateCommentsByInstance(contextLevel: string, instanceId: number, siteId?: string): Promise<void> {
+    async invalidateCommentsByInstance(contextLevel: ContextLevel, instanceId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
         await site.invalidateWsCacheForKeyStartingWith(this.getCommentsPrefixCacheKey(contextLevel, instanceId));
@@ -555,7 +588,7 @@ type CoreCommentsAddCommentsWSParams = {
 
 export type CoreCommentsCommentBasicData = {
     id?: number; // Comment ID.
-    contextlevel: string; // Contextlevel system, course, user...
+    contextlevel: ContextLevel; // Contextlevel system, course, user...
     instanceid: number; // The id of item associated with the contextlevel.
     component: string; // Component.
     content: string; // Component.
@@ -596,7 +629,7 @@ type CoreCommentsDeleteCommentsWSParams = {
  * Params of core_comment_get_comments WS.
  */
 type CoreCommentsGetCommentsWSParams = {
-    contextlevel: string; // Contextlevel system, course, user...
+    contextlevel: ContextLevel; // Contextlevel system, course, user...
     instanceid: number; // The Instance id of item associated with the context level.
     component: string; // Component.
     itemid: number; // Associated id.
@@ -620,7 +653,7 @@ export type CoreCommentsGetCommentsWSResponse = {
  * Data sent by COMMENTS_COUNT_CHANGED_EVENT event.
  */
 export type CoreCommentsCountChangedEventData = {
-    contextLevel: string;
+    contextLevel: ContextLevel;
     instanceId: number;
     component: string;
     itemId: number;
@@ -632,7 +665,7 @@ export type CoreCommentsCountChangedEventData = {
  * Data sent by REFRESH_COMMENTS_EVENT event.
  */
 export type CoreCommentsRefreshCommentsEventData = {
-    contextLevel?: string;
+    contextLevel?: ContextLevel;
     instanceId?: number;
     component?: string;
     itemId?: number;

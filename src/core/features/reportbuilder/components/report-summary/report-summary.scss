@@ -1,0 +1,14 @@
+@use "theme/globals" as *;
+
+.filters-info {
+    padding-bottom: 1rem;
+}
+
+ion-footer {
+    ion-icon {
+        font-size:  var(--mdl-typography-icon-fontSize-sm);
+        color: $blue;
+        margin-right: .3rem;
+        vertical-align: middle;
+    }
+}

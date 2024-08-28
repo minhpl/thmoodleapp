@@ -23,6 +23,7 @@ import { Injectable, Type } from '@angular/core';
 import { CoreWSFile } from '@services/ws';
 import { makeSingleton } from '@singletons';
 import { AddonModAssignFeedbackEditPdfComponent } from '../component/editpdf';
+import type { IAddonModAssignFeedbackPluginComponent } from '@addons/mod/assign/classes/base-feedback-plugin-component';
 
 /**
  * Handler for edit pdf feedback plugin.
@@ -34,23 +35,14 @@ export class AddonModAssignFeedbackEditPdfHandlerService implements AddonModAssi
     type = 'editpdf';
 
     /**
-     * Return the Component to use to display the plugin data.
-     * It's recommended to return the class of the component, but you can also return an instance of the component.
-     *
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @inheritdoc
      */
-    getComponent(): Type<unknown> {
+    getComponent(): Type<IAddonModAssignFeedbackPluginComponent> {
         return AddonModAssignFeedbackEditPdfComponent;
     }
 
     /**
-     * Get files used by this plugin.
-     * The files returned by this function will be prefetched when the user prefetches the assign.
-     *
-     * @param assign The assignment.
-     * @param submission The submission.
-     * @param plugin The plugin object.
-     * @return The files (or promise resolved with the files).
+     * @inheritdoc
      */
     getPluginFiles(
         assign: AddonModAssignAssign,
@@ -61,9 +53,7 @@ export class AddonModAssignFeedbackEditPdfHandlerService implements AddonModAssi
     }
 
     /**
-     * Whether or not the handler is enabled on a site level.
-     *
-     * @return True or promise resolved with true if enabled.
+     * @inheritdoc
      */
     async isEnabled(): Promise<boolean> {
         return true;

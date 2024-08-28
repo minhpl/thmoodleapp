@@ -18,6 +18,8 @@ import { AddonModBook, AddonModBookBookWSData, AddonModBookNumbering, AddonModBo
 import { CoreCourseContentsPage } from '@features/course/pages/contents/contents';
 import { CoreCourse } from '@features/course/services/course';
 import { CoreNavigator } from '@services/navigator';
+import { AddonModBookModuleHandlerService } from '../../services/handlers/module';
+import { CoreUtils } from '@services/utils/utils';
 
 /**
  * Component that displays a book entry page.
@@ -28,6 +30,7 @@ import { CoreNavigator } from '@services/navigator';
 })
 export class AddonModBookIndexComponent extends CoreCourseModuleMainResourceComponent implements OnInit, OnDestroy {
 
+    pluginName = 'book';
     showNumbers = true;
     addPadding = true;
     showBullets = false;
@@ -61,9 +64,16 @@ export class AddonModBookIndexComponent extends CoreCourseModuleMainResourceComp
     }
 
     /**
+     * @inheritdoc
+     */
+    protected async invalidateContent(): Promise<void> {
+        await AddonModBook.invalidateContent(this.module.id, this.courseId);
+    }
+
+    /**
      * Load book data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadBook(): Promise<void> {
         this.book = await AddonModBook.getBook(this.courseId, this.module.id);
@@ -82,7 +92,7 @@ export class AddonModBookIndexComponent extends CoreCourseModuleMainResourceComp
     /**
      * Load book TOC.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadTOC(): Promise<void> {
         const contents = await CoreCourse.getModuleContents(this.module, this.courseId);
@@ -94,7 +104,9 @@ export class AddonModBookIndexComponent extends CoreCourseModuleMainResourceComp
      * @inheritdoc
      */
     protected async logActivity(): Promise<void> {
-        AddonModBook.logView(this.module.instance, undefined, this.module.name);
+        await CoreUtils.ignoreErrors(AddonModBook.logView(this.module.instance));
+
+        this.analyticsLogEvent('mod_book_view_book');
     }
 
     /**
@@ -102,14 +114,11 @@ export class AddonModBookIndexComponent extends CoreCourseModuleMainResourceComp
      *
      * @param chapterId Chapter to open, undefined for last chapter viewed.
      */
-    openBook(chapterId?: number): void {
-        CoreNavigator.navigate('contents', {
-            params: {
-                cmId: this.module.id,
-                courseId: this.courseId,
-                chapterId,
-            },
-        });
+    async openBook(chapterId?: number): Promise<void> {
+        await CoreNavigator.navigateToSitePath(
+            `${AddonModBookModuleHandlerService.PAGE_NAME}/${this.courseId}/${this.module.id}/contents`,
+            { params: { chapterId } },
+        );
 
         this.hasStartedBook = true;
     }

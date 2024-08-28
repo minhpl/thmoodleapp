@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { Injectable } from '@angular/core';
 import { CoreCourseResourcePrefetchHandlerBase } from '@features/course/classes/resource-prefetch-handler';
 import { CoreCourse, CoreCourseAnyModuleData } from '@features/course/services/course';
@@ -36,18 +36,18 @@ export class AddonModResourcePrefetchHandlerService extends CoreCourseResourcePr
     /**
      * @inheritdoc
      */
-    determineStatus(module: CoreCourseAnyModuleData, status: string): string {
-        if (status == CoreConstants.DOWNLOADED && module) {
+    determineStatus(module: CoreCourseAnyModuleData, status: DownloadStatus): DownloadStatus {
+        if (status === DownloadStatus.DOWNLOADED && module) {
             // If the main file is an external file, always display the module as outdated.
             if ('contentsinfo' in module && module.contentsinfo) {
                 if (module.contentsinfo.repositorytype) {
                     // It's an external file.
-                    return CoreConstants.OUTDATED;
+                    return DownloadStatus.OUTDATED;
                 }
             } else if (module.contents) {
                 const mainFile = module.contents[0];
                 if (mainFile && mainFile.isexternalfile) {
-                    return CoreConstants.OUTDATED;
+                    return DownloadStatus.OUTDATED;
                 }
             }
         }
@@ -61,8 +61,8 @@ export class AddonModResourcePrefetchHandlerService extends CoreCourseResourcePr
     async downloadOrPrefetch(module: CoreCourseModuleData, courseId: number, prefetch?: boolean): Promise<void> {
         let dirPath: string | undefined;
 
-        if (AddonModResourceHelper.isDisplayedInIframe(module)) {
-            dirPath = await CoreFilepool.getPackageDirPathByUrl(CoreSites.getCurrentSiteId(), module.url!);
+        if (AddonModResourceHelper.isDisplayedInIframe(module) && module.url !== undefined) {
+            dirPath = await CoreFilepool.getPackageDirPathByUrl(CoreSites.getCurrentSiteId(), module.url);
         }
 
         const promises: Promise<unknown>[] = [];

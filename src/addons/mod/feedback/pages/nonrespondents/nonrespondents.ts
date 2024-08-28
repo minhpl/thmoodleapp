@@ -13,13 +13,14 @@
 // limitations under the License.
 
 import { Component, OnInit } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
 import { CoreGroupInfo, CoreGroups } from '@services/groups';
 import { CoreNavigator } from '@services/navigator';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
 import { AddonModFeedback, AddonModFeedbackWSFeedback } from '../../services/feedback';
 import { AddonModFeedbackHelper, AddonModFeedbackNonRespondent } from '../../services/feedback-helper';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Page that displays feedback non respondents.
@@ -31,10 +32,11 @@ import { AddonModFeedbackHelper, AddonModFeedbackNonRespondent } from '../../ser
 export class AddonModFeedbackNonRespondentsPage implements OnInit {
 
     protected cmId!: number;
-    protected courseId!: number;
     protected feedback?: AddonModFeedbackWSFeedback;
     protected page = 0;
+    protected logView: () => void;
 
+    courseId!: number;
     selectedGroup!: number;
     groupInfo?: CoreGroupInfo;
     users: AddonModFeedbackNonRespondent[] = [];
@@ -42,6 +44,22 @@ export class AddonModFeedbackNonRespondentsPage implements OnInit {
     canLoadMore = false;
     loaded = false;
     loadMoreError = false;
+
+    constructor() {
+        this.logView = CoreTime.once(() => {
+            if (!this.feedback) {
+                return;
+            }
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+                ws: 'mod_feedback_get_non_respondents',
+                name: this.feedback.name,
+                data: { feedbackid: this.feedback.id, category: 'feedback' },
+                url: `/mod/feedback/show_nonrespondents.php?id=${this.cmId}&courseid=${this.courseId}`,
+            });
+        });
+    }
 
     /**
      * @inheritdoc
@@ -66,7 +84,7 @@ export class AddonModFeedbackNonRespondentsPage implements OnInit {
      * Fetch all the data required for the view.
      *
      * @param refresh Empty events array first.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchData(refresh: boolean = false): Promise<void> {
         this.page = 0;
@@ -81,6 +99,8 @@ export class AddonModFeedbackNonRespondentsPage implements OnInit {
             this.selectedGroup = CoreGroups.validateGroupId(this.selectedGroup, this.groupInfo);
 
             await this.loadGroupUsers(this.selectedGroup);
+
+            this.logView();
         } catch (message) {
             CoreDomUtils.showErrorModalDefault(message, 'core.course.errorgetmodule', true);
 
@@ -95,7 +115,7 @@ export class AddonModFeedbackNonRespondentsPage implements OnInit {
      * Load Group responses.
      *
      * @param groupId If defined it will change group if not, it will load more users for the same group.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadGroupUsers(groupId?: number): Promise<void> {
         this.loadMoreError = false;
@@ -153,7 +173,7 @@ export class AddonModFeedbackNonRespondentsPage implements OnInit {
      *
      * @param refresher Refresher.
      */
-    async refreshFeedback(refresher: IonRefresher): Promise<void> {
+    async refreshFeedback(refresher: HTMLIonRefresherElement): Promise<void> {
         try {
             const promises: Promise<void>[] = [];
 

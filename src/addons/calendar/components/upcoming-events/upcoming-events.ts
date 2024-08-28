@@ -25,6 +25,10 @@ import { AddonCalendarHelper, AddonCalendarFilter } from '../../services/calenda
 import { AddonCalendarOffline } from '../../services/calendar-offline';
 import { CoreCategoryData, CoreCourses } from '@features/courses/services/courses';
 import { CoreConstants } from '@/core/constants';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreUrlUtils } from '@services/utils/url';
+import { CoreTime } from '@singletons/time';
+import { Translate } from '@singletons';
 
 /**
  * Component that displays upcoming events.
@@ -32,7 +36,7 @@ import { CoreConstants } from '@/core/constants';
 @Component({
     selector: 'addon-calendar-upcoming-events',
     templateUrl: 'addon-calendar-upcoming-events.html',
-    styleUrls: ['../../calendar-common.scss', 'upcoming-events.scss'],
+    styleUrls: ['../../calendar-common.scss'],
 })
 export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, OnDestroy {
 
@@ -54,6 +58,7 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
     protected lookAhead = 0;
     protected timeFormat?: string;
     protected differ: KeyValueDiffer<unknown, unknown>; // To detect changes in the data input.
+    protected logView: () => void;
 
     // Observers.
     protected undeleteEventObserver: CoreEventObserver;
@@ -84,6 +89,23 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
         );
 
         this.differ = differs.find([]).create();
+
+        this.logView = CoreTime.once(() => {
+            const params = {
+                course: this.filter?.courseId,
+            };
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+                ws: 'core_calendar_get_calendar_upcoming_view',
+                name: Translate.instant('addon.calendar.upcomingevents'),
+                data: {
+                    ...params,
+                    category: 'calendar',
+                },
+                url: CoreUrlUtils.addParamsToUrl('/calendar/view.php?view=upcoming', params),
+            });
+        });
     }
 
     /**
@@ -107,7 +129,7 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
     /**
      * Fetch data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async fetchData(): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -148,8 +170,9 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
         try {
             await Promise.all(promises);
 
-            this.fetchEvents();
+            await this.fetchEvents();
 
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'addon.calendar.errorloadevents', true);
         }
@@ -160,7 +183,7 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
     /**
      * Fetch upcoming events.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async fetchEvents(): Promise<void> {
         // Don't pass courseId and categoryId, we'll filter them locally.
@@ -185,7 +208,7 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
     /**
      * Load categories to be able to filter events.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadCategories(): Promise<void> {
         if (this.categoriesRetrieved) {
@@ -217,7 +240,7 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
     /**
      * Refresh events.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async refreshData(): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -246,7 +269,7 @@ export class AddonCalendarUpcomingEventsComponent implements OnInit, DoCheck, On
     /**
      * Merge online events with the offline events of that period.
      *
-     * @return Merged events.
+     * @returns Merged events.
      */
     protected mergeEvents(): AddonCalendarEventToDisplay[] {
         if (!this.offlineEvents.length && !this.deletedEvents.length) {

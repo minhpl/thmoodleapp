@@ -31,7 +31,7 @@ export interface AddonMessageOutputHandler extends CoreDelegateHandler {
      * Returns the data needed to render the handler.
      *
      * @param processor The processor object.
-     * @return Data.
+     * @returns Data.
      */
     getDisplayData(processor: Record<string, unknown>): AddonMessageOutputHandlerData;
 }
@@ -75,14 +75,14 @@ export class AddonMessageOutputDelegateService extends CoreDelegate<AddonMessage
     protected handlerNameProperty = 'processorName';
 
     constructor() {
-        super('AddonMessageOutputDelegate', true);
+        super('AddonMessageOutputDelegate');
     }
 
     /**
      * Get the display data of the handler.
      *
      * @param processor The processor object.
-     * @return Data.
+     * @returns Data.
      */
     getDisplayData(processor: Record<string, unknown>): AddonMessageOutputHandlerData | undefined {
         return this.executeFunctionOnEnabled(<string> processor.name, 'getDisplayData', [processor]);

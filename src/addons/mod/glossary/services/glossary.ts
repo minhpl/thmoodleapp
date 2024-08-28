@@ -14,23 +14,25 @@
 
 import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreCourseCommonModWSOptions } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreFileUploaderStoreFilesResult } from '@features/fileuploader/services/fileuploader';
 import { CoreRatingInfo } from '@features/rating/services/rating';
 import { CoreTagItem } from '@features/tag/services/tag';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites, CoreSitesCommonWSOptions, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreWSExternalFile, CoreWSExternalWarning } from '@services/ws';
 import { makeSingleton, Translate } from '@singletons';
+import { CoreEvents } from '@singletons/events';
 import { AddonModGlossaryEntryDBRecord, ENTRIES_TABLE_NAME } from './database/glossary';
 import { AddonModGlossaryOffline } from './glossary-offline';
-import { AddonModGlossaryAutoSyncData, AddonModGlossarySyncProvider } from './glossary-sync';
-import { CoreFileEntry } from '@services/file-helper';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
 
-const ROOT_CACHE_KEY = 'mmaModGlossary:';
+export const GLOSSARY_ENTRY_ADDED = 'addon_mod_glossary_entry_added';
+export const GLOSSARY_ENTRY_UPDATED = 'addon_mod_glossary_entry_updated';
+export const GLOSSARY_ENTRY_DELETED = 'addon_mod_glossary_entry_deleted';
 
 /**
  * Service that provides some features for glossaries.
@@ -41,19 +43,18 @@ export class AddonModGlossaryProvider {
     static readonly COMPONENT = 'mmaModGlossary';
     static readonly LIMIT_ENTRIES = 25;
     static readonly LIMIT_CATEGORIES = 10;
-    static readonly SHOW_ALL_CATEGORIES = 0;
-    static readonly SHOW_NOT_CATEGORISED = -1;
 
-    static readonly ADD_ENTRY_EVENT = 'addon_mod_glossary_add_entry';
+    private static readonly SHOW_ALL_CATEGORIES = 0;
+    private static readonly ROOT_CACHE_KEY = 'mmaModGlossary:';
 
     /**
      * Get the course glossary cache key.
      *
      * @param courseId Course Id.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCourseGlossariesCacheKey(courseId: number): string {
-        return ROOT_CACHE_KEY + 'courseGlossaries:' + courseId;
+        return `${AddonModGlossaryProvider.ROOT_CACHE_KEY}courseGlossaries:${courseId}`;
     }
 
     /**
@@ -61,7 +62,7 @@ export class AddonModGlossaryProvider {
      *
      * @param courseId Course Id.
      * @param options Other options.
-     * @return Resolved with the glossaries.
+     * @returns Resolved with the glossaries.
      */
     async getCourseGlossaries(courseId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModGlossaryGlossary[]> {
         const site = await CoreSites.getSite(options.siteId);
@@ -90,7 +91,6 @@ export class AddonModGlossaryProvider {
      *
      * @param courseId Course Id.
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
     async invalidateCourseGlossaries(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -104,44 +104,35 @@ export class AddonModGlossaryProvider {
      * Get the entries by author cache key.
      *
      * @param glossaryId Glossary Id.
-     * @param letter First letter of firstname or lastname, or either keywords: ALL or SPECIAL.
-     * @param field Search and order using: FIRSTNAME or LASTNAME
-     * @param sort The direction of the order: ASC or DESC
-     * @return Cache key.
+     * @returns Cache key.
      */
-    protected getEntriesByAuthorCacheKey(glossaryId: number, letter: string, field: string, sort: string): string {
-        return ROOT_CACHE_KEY + 'entriesByAuthor:' + glossaryId + ':' + letter + ':' + field + ':' + sort;
+    protected getEntriesByAuthorCacheKey(glossaryId: number): string {
+        return `${AddonModGlossaryProvider.ROOT_CACHE_KEY}entriesByAuthor:${glossaryId}:ALL:LASTNAME:ASC`;
     }
 
     /**
      * Get entries by author.
      *
      * @param glossaryId Glossary Id.
-     * @param letter First letter of firstname or lastname, or either keywords: ALL or SPECIAL.
-     * @param field Search and order using: FIRSTNAME or LASTNAME
-     * @param sort The direction of the order: ASC or DESC
      * @param options Other options.
-     * @return Resolved with the entries.
+     * @returns Resolved with the entries.
      */
     async getEntriesByAuthor(
         glossaryId: number,
-        letter: string,
-        field: string,
-        sort: string,
         options: AddonModGlossaryGetEntriesOptions = {},
     ): Promise<AddonModGlossaryGetEntriesWSResponse> {
         const site = await CoreSites.getSite(options.siteId);
 
         const params: AddonModGlossaryGetEntriesByAuthorWSParams = {
             id: glossaryId,
-            letter: letter,
-            field: field,
-            sort: sort,
+            letter: 'ALL',
+            field: 'LASTNAME',
+            sort: 'ASC',
             from: options.from || 0,
             limit: options.limit || AddonModGlossaryProvider.LIMIT_ENTRIES,
         };
         const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getEntriesByAuthorCacheKey(glossaryId, letter, field, sort),
+            cacheKey: this.getEntriesByAuthorCacheKey(glossaryId),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
             component: AddonModGlossaryProvider.COMPONENT,
             componentId: options.cmId,
@@ -155,22 +146,12 @@ export class AddonModGlossaryProvider {
      * Invalidate cache of entries by author.
      *
      * @param glossaryId Glossary Id.
-     * @param letter First letter of firstname or lastname, or either keywords: ALL or SPECIAL.
-     * @param field Search and order using: FIRSTNAME or LASTNAME
-     * @param sort The direction of the order: ASC or DESC
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
-    async invalidateEntriesByAuthor(
-        glossaryId: number,
-        letter: string,
-        field: string,
-        sort: string,
-        siteId?: string,
-    ): Promise<void> {
+    async invalidateEntriesByAuthor(glossaryId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
-        const key = this.getEntriesByAuthorCacheKey(glossaryId, letter, field, sort);
+        const key = this.getEntriesByAuthorCacheKey(glossaryId);
 
         await site.invalidateWsCacheForKey(key);
     }
@@ -179,26 +160,23 @@ export class AddonModGlossaryProvider {
      * Get entries by category.
      *
      * @param glossaryId Glossary Id.
-     * @param categoryId The category ID. Use constant SHOW_ALL_CATEGORIES for all categories, or
-     *                   constant SHOW_NOT_CATEGORISED for uncategorised entries.
      * @param options Other options.
-     * @return Resolved with the entries.
+     * @returns Resolved with the entries.
      */
     async getEntriesByCategory(
         glossaryId: number,
-        categoryId: number,
         options: AddonModGlossaryGetEntriesOptions = {},
     ): Promise<AddonModGlossaryGetEntriesByCategoryWSResponse> {
         const site = await CoreSites.getSite(options.siteId);
 
         const params: AddonModGlossaryGetEntriesByCategoryWSParams = {
             id: glossaryId,
-            categoryid: categoryId,
+            categoryid: AddonModGlossaryProvider.SHOW_ALL_CATEGORIES,
             from: options.from || 0,
             limit: options.limit || AddonModGlossaryProvider.LIMIT_ENTRIES,
         };
         const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getEntriesByCategoryCacheKey(glossaryId, categoryId),
+            cacheKey: this.getEntriesByCategoryCacheKey(glossaryId),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
             component: AddonModGlossaryProvider.COMPONENT,
             componentId: options.cmId,
@@ -212,15 +190,12 @@ export class AddonModGlossaryProvider {
      * Invalidate cache of entries by category.
      *
      * @param glossaryId Glossary Id.
-     * @param categoryId The category ID. Use constant SHOW_ALL_CATEGORIES for all categories, or
-     *                   constant SHOW_NOT_CATEGORISED for uncategorised entries.
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
-    async invalidateEntriesByCategory(glossaryId: number, categoryId: number, siteId?: string): Promise<void> {
+    async invalidateEntriesByCategory(glossaryId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
-        const key = this.getEntriesByCategoryCacheKey(glossaryId, categoryId);
+        const key = this.getEntriesByCategoryCacheKey(glossaryId);
 
         await site.invalidateWsCacheForKey(key);
     }
@@ -229,12 +204,12 @@ export class AddonModGlossaryProvider {
      * Get the entries by category cache key.
      *
      * @param glossaryId Glossary Id.
-     * @param categoryId The category ID. Use constant SHOW_ALL_CATEGORIES for all categories, or
-     *                   constant SHOW_NOT_CATEGORISED for uncategorised entries.
-     * @return Cache key.
+     * @returns Cache key.
      */
-    getEntriesByCategoryCacheKey(glossaryId: number, categoryId: number): string {
-        return ROOT_CACHE_KEY + 'entriesByCategory:' + glossaryId + ':' + categoryId;
+    getEntriesByCategoryCacheKey(glossaryId: number): string {
+        const prefix = `${AddonModGlossaryProvider.ROOT_CACHE_KEY}entriesByCategory`;
+
+        return `${prefix}:${glossaryId}:${AddonModGlossaryProvider.SHOW_ALL_CATEGORIES}`;
     }
 
     /**
@@ -242,11 +217,10 @@ export class AddonModGlossaryProvider {
      *
      * @param glossaryId Glossary Id.
      * @param order The way to order the records.
-     * @param sort The direction of the order.
-     * @return Cache key.
+     * @returns Cache key.
      */
-    getEntriesByDateCacheKey(glossaryId: number, order: string, sort: string): string {
-        return ROOT_CACHE_KEY + 'entriesByDate:' + glossaryId + ':' + order + ':' + sort;
+    getEntriesByDateCacheKey(glossaryId: number, order: string): string {
+        return `${AddonModGlossaryProvider.ROOT_CACHE_KEY}entriesByDate:${glossaryId}:${order}:DESC`;
     }
 
     /**
@@ -254,14 +228,12 @@ export class AddonModGlossaryProvider {
      *
      * @param glossaryId Glossary Id.
      * @param order The way to order the records.
-     * @param sort The direction of the order.
      * @param options Other options.
-     * @return Resolved with the entries.
+     * @returns Resolved with the entries.
      */
     async getEntriesByDate(
         glossaryId: number,
         order: string,
-        sort: string,
         options: AddonModGlossaryGetEntriesOptions = {},
     ): Promise<AddonModGlossaryGetEntriesWSResponse> {
         const site = await CoreSites.getSite(options.siteId);
@@ -269,12 +241,12 @@ export class AddonModGlossaryProvider {
         const params: AddonModGlossaryGetEntriesByDateWSParams = {
             id: glossaryId,
             order: order,
-            sort: sort,
+            sort: 'DESC',
             from: options.from || 0,
             limit: options.limit || AddonModGlossaryProvider.LIMIT_ENTRIES,
         };
         const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getEntriesByDateCacheKey(glossaryId, order, sort),
+            cacheKey: this.getEntriesByDateCacheKey(glossaryId, order),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
             component: AddonModGlossaryProvider.COMPONENT,
             componentId: options.cmId,
@@ -289,14 +261,12 @@ export class AddonModGlossaryProvider {
      *
      * @param glossaryId Glossary Id.
      * @param order The way to order the records.
-     * @param sort The direction of the order.
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
-    async invalidateEntriesByDate(glossaryId: number, order: string, sort: string, siteId?: string): Promise<void> {
+    async invalidateEntriesByDate(glossaryId: number, order: string, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
-        const key = this.getEntriesByDateCacheKey(glossaryId, order, sort);
+        const key = this.getEntriesByDateCacheKey(glossaryId, order);
 
         await site.invalidateWsCacheForKey(key);
     }
@@ -305,39 +275,36 @@ export class AddonModGlossaryProvider {
      * Get the entries by letter cache key.
      *
      * @param glossaryId Glossary Id.
-     * @param letter A letter, or a special keyword.
-     * @return Cache key.
+     * @returns Cache key.
      */
-    protected getEntriesByLetterCacheKey(glossaryId: number, letter: string): string {
-        return ROOT_CACHE_KEY + 'entriesByLetter:' + glossaryId + ':' + letter;
+    protected getEntriesByLetterCacheKey(glossaryId: number): string {
+        return `${AddonModGlossaryProvider.ROOT_CACHE_KEY}entriesByLetter:${glossaryId}:ALL`;
     }
 
     /**
      * Get entries by letter.
      *
      * @param glossaryId Glossary Id.
-     * @param letter A letter, or a special keyword.
      * @param options Other options.
-     * @return Resolved with the entries.
+     * @returns Resolved with the entries.
      */
     async getEntriesByLetter(
         glossaryId: number,
-        letter: string,
         options: AddonModGlossaryGetEntriesOptions = {},
     ): Promise<AddonModGlossaryGetEntriesWSResponse> {
-        options.from = options.from || 0;
-        options.limit = options.limit || AddonModGlossaryProvider.LIMIT_ENTRIES;
+        const from = options.from || 0;
+        const limit = options.limit || AddonModGlossaryProvider.LIMIT_ENTRIES;
 
         const site = await CoreSites.getSite(options.siteId);
 
         const params: AddonModGlossaryGetEntriesByLetterWSParams = {
             id: glossaryId,
-            letter: letter,
-            from: options.from,
-            limit: options.limit,
+            letter: 'ALL',
+            from,
+            limit,
         };
         const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getEntriesByLetterCacheKey(glossaryId, letter),
+            cacheKey: this.getEntriesByLetterCacheKey(glossaryId),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
             component: AddonModGlossaryProvider.COMPONENT,
             componentId: options.cmId,
@@ -350,9 +317,9 @@ export class AddonModGlossaryProvider {
             preSets,
         );
 
-        if (options.limit == AddonModGlossaryProvider.LIMIT_ENTRIES) {
+        if (limit === AddonModGlossaryProvider.LIMIT_ENTRIES) {
             // Store entries in background, don't block the user for this.
-            CoreUtils.ignoreErrors(this.storeEntries(glossaryId, result.entries, options.from, site.getId()));
+            CoreUtils.ignoreErrors(this.storeEntries(glossaryId, result.entries, from, site.getId()));
         }
 
         return result;
@@ -362,16 +329,14 @@ export class AddonModGlossaryProvider {
      * Invalidate cache of entries by letter.
      *
      * @param glossaryId Glossary Id.
-     * @param letter A letter, or a special keyword.
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
-    async invalidateEntriesByLetter(glossaryId: number, letter: string, siteId?: string): Promise<void> {
+    async invalidateEntriesByLetter(glossaryId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
-        const key = this.getEntriesByLetterCacheKey(glossaryId, letter);
+        const key = this.getEntriesByLetterCacheKey(glossaryId);
 
-        return site.invalidateWsCacheForKey(key);
+        await site.invalidateWsCacheForKey(key);
     }
 
     /**
@@ -380,18 +345,10 @@ export class AddonModGlossaryProvider {
      * @param glossaryId Glossary Id.
      * @param query The search query.
      * @param fullSearch Whether or not full search is required.
-     * @param order The way to order the results.
-     * @param sort The direction of the order.
-     * @return Cache key.
+     * @returns Cache key.
      */
-    protected getEntriesBySearchCacheKey(
-        glossaryId: number,
-        query: string,
-        fullSearch: boolean,
-        order: string,
-        sort: string,
-    ): string {
-        return ROOT_CACHE_KEY + 'entriesBySearch:' + glossaryId + ':' + fullSearch + ':' + order + ':' + sort + ':' + query;
+    protected getEntriesBySearchCacheKey(glossaryId: number, query: string, fullSearch: boolean): string {
+        return `${AddonModGlossaryProvider.ROOT_CACHE_KEY}entriesBySearch:${glossaryId}:${fullSearch}:CONCEPT:ASC:${query}`;
     }
 
     /**
@@ -400,21 +357,13 @@ export class AddonModGlossaryProvider {
      * @param glossaryId Glossary Id.
      * @param query The search query.
      * @param fullSearch Whether or not full search is required.
-     * @param order The way to order the results.
-     * @param sort The direction of the order.
-     * @param from Start returning records from here.
-     * @param limit Number of records to return.
-     * @param omitExpires True to always get the value from cache. If data isn't cached, it will call the WS.
-     * @param forceOffline True to always get the value from cache. If data isn't cached, it won't call the WS.
-     * @param siteId Site ID. If not defined, current site.
-     * @return Resolved with the entries.
+     * @param options Get entries options.
+     * @returns Resolved with the entries.
      */
     async getEntriesBySearch(
         glossaryId: number,
         query: string,
         fullSearch: boolean,
-        order: string,
-        sort: string,
         options: AddonModGlossaryGetEntriesOptions = {},
     ): Promise<AddonModGlossaryGetEntriesWSResponse> {
         const site = await CoreSites.getSite(options.siteId);
@@ -423,13 +372,13 @@ export class AddonModGlossaryProvider {
             id: glossaryId,
             query: query,
             fullsearch: fullSearch,
-            order: order,
-            sort: sort,
+            order: 'CONCEPT',
+            sort: 'ASC',
             from: options.from || 0,
             limit: options.limit || AddonModGlossaryProvider.LIMIT_ENTRIES,
         };
         const preSets: CoreSiteWSPreSets = {
-            cacheKey: this.getEntriesBySearchCacheKey(glossaryId, query, fullSearch, order, sort),
+            cacheKey: this.getEntriesBySearchCacheKey(glossaryId, query, fullSearch),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
             component: AddonModGlossaryProvider.COMPONENT,
             componentId: options.cmId,
@@ -445,22 +394,17 @@ export class AddonModGlossaryProvider {
      * @param glossaryId Glossary Id.
      * @param query The search query.
      * @param fullSearch Whether or not full search is required.
-     * @param order The way to order the results.
-     * @param sort The direction of the order.
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
     async invalidateEntriesBySearch(
         glossaryId: number,
         query: string,
         fullSearch: boolean,
-        order: string,
-        sort: string,
         siteId?: string,
     ): Promise<void> {
         const site = await CoreSites.getSite(siteId);
 
-        const key = this.getEntriesBySearchCacheKey(glossaryId, query, fullSearch, order, sort);
+        const key = this.getEntriesBySearchCacheKey(glossaryId, query, fullSearch);
 
         await site.invalidateWsCacheForKey(key);
     }
@@ -469,10 +413,10 @@ export class AddonModGlossaryProvider {
      * Get the glossary categories cache key.
      *
      * @param glossaryId Glossary Id.
-     * @return The cache key.
+     * @returns The cache key.
      */
     protected getCategoriesCacheKey(glossaryId: number): string {
-        return ROOT_CACHE_KEY + 'categories:' + glossaryId;
+        return AddonModGlossaryProvider.ROOT_CACHE_KEY + 'categories:' + glossaryId;
     }
 
     /**
@@ -480,7 +424,7 @@ export class AddonModGlossaryProvider {
      *
      * @param glossaryId Glossary Id.
      * @param options Other options.
-     * @return Promise resolved with the categories if supported or empty array if not.
+     * @returns Promise resolved with the categories if supported or empty array if not.
      */
     async getAllCategories(glossaryId: number, options: CoreCourseCommonModWSOptions = {}): Promise<AddonModGlossaryCategory[]> {
         const site = await CoreSites.getSite(options.siteId);
@@ -495,7 +439,7 @@ export class AddonModGlossaryProvider {
      * @param categories Already fetched categories where to append the fetch.
      * @param site Site object.
      * @param options Other options.
-     * @return Promise resolved with the categories.
+     * @returns Promise resolved with the categories.
      */
     protected async getCategories(
         glossaryId: number,
@@ -503,13 +447,13 @@ export class AddonModGlossaryProvider {
         site: CoreSite,
         options: AddonModGlossaryGetCategoriesOptions = {},
     ): Promise<AddonModGlossaryCategory[]> {
-        options.from = options.from || 0;
-        options.limit = options.limit || AddonModGlossaryProvider.LIMIT_CATEGORIES;
+        const from = options.from || 0;
+        const limit = options.limit || AddonModGlossaryProvider.LIMIT_CATEGORIES;
 
         const params: AddonModGlossaryGetCategoriesWSParams = {
             id: glossaryId,
-            from: options.from,
-            limit: options.limit,
+            from,
+            limit,
         };
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getCategoriesCacheKey(glossaryId),
@@ -522,11 +466,12 @@ export class AddonModGlossaryProvider {
         const response = await site.read<AddonModGlossaryGetCategoriesWSResponse>('mod_glossary_get_categories', params, preSets);
 
         categories = categories.concat(response.categories);
-        const canLoadMore = (options.from + options.limit) < response.count;
+        const canLoadMore = (from + limit) < response.count;
         if (canLoadMore) {
-            options.from += options.limit;
-
-            return this.getCategories(glossaryId, categories, site, options);
+            return this.getCategories(glossaryId, categories, site, {
+                ...options,
+                from: from + limit,
+            });
         }
 
         return categories;
@@ -537,7 +482,6 @@ export class AddonModGlossaryProvider {
      *
      * @param glossaryId Glossary Id.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when categories data has been invalidated,
      */
     async invalidateCategories(glossaryId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -549,10 +493,10 @@ export class AddonModGlossaryProvider {
      * Get an entry by ID cache key.
      *
      * @param entryId Entry Id.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getEntryCacheKey(entryId: number): string {
-        return ROOT_CACHE_KEY + 'getEntry:' + entryId;
+        return `${AddonModGlossaryProvider.ROOT_CACHE_KEY}getEntry:${entryId}`;
     }
 
     /**
@@ -560,7 +504,7 @@ export class AddonModGlossaryProvider {
      *
      * @param entryId Entry ID.
      * @param options Other options.
-     * @return Promise resolved with the entry.
+     * @returns Promise resolved with the entry.
      */
     async getEntry(entryId: number, options: CoreCourseCommonModWSOptions = {}): Promise<AddonModGlossaryGetEntryByIdResponse> {
         const site = await CoreSites.getSite(options.siteId);
@@ -606,7 +550,7 @@ export class AddonModGlossaryProvider {
      *
      * @param entryId Entry ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the glossary ID and the "from".
+     * @returns Promise resolved with the glossary ID and the "from".
      */
     async getStoredDataForEntry(entryId: number, siteId?: string): Promise<{glossaryId: number; from: number}> {
         const site = await CoreSites.getSite(siteId);
@@ -631,7 +575,7 @@ export class AddonModGlossaryProvider {
      * @param from Page to get.
      * @param loadNext Whether to load next pages if not found.
      * @param options Options.
-     * @return Promise resolved with the entry data.
+     * @returns Promise resolved with the entry data.
      */
     protected async getEntryFromList(
         glossaryId: number,
@@ -641,7 +585,7 @@ export class AddonModGlossaryProvider {
         options: CoreCourseCommonModWSOptions = {},
     ): Promise<AddonModGlossaryGetEntryByIdResponse> {
         // Get the entries from this "page" and check if the entry we're looking for is in it.
-        const result = await this.getEntriesByLetter(glossaryId, 'ALL', {
+        const result = await this.getEntriesByLetter(glossaryId, {
             from: from,
             readingStrategy: CoreSitesReadingStrategy.ONLY_CACHE,
             cmId: options.cmId,
@@ -663,18 +607,41 @@ export class AddonModGlossaryProvider {
 
         // No more pages and the entry wasn't found. Reject.
         throw new CoreError('Entry not found.');
-    };
+    }
+
+    /**
+     * Check whether the site can delete glossary entries.
+     *
+     * @param siteId Site id.
+     * @returns Whether the site can delete entries.
+     */
+    async canDeleteEntries(siteId?: string): Promise<boolean> {
+        const site = await CoreSites.getSite(siteId);
+
+        return site.wsAvailable('mod_glossary_delete_entry');
+    }
+
+    /**
+     * Check whether the site can update glossary entries.
+     *
+     * @param siteId Site id.
+     * @returns Whether the site can update entries.
+     */
+    async canUpdateEntries(siteId?: string): Promise<boolean> {
+        const site = await CoreSites.getSite(siteId);
+
+        return site.wsAvailable('mod_glossary_update_entry');
+    }
 
     /**
      * Performs the whole fetch of the entries using the proper function and arguments.
      *
      * @param fetchFunction Function to fetch.
-     * @param fetchArguments Arguments to call the fetching.
      * @param options Other options.
-     * @return Promise resolved with all entrries.
+     * @returns Promise resolved with all entrries.
      */
     fetchAllEntries(
-        fetchFunction: (options?: AddonModGlossaryGetEntriesOptions) => AddonModGlossaryGetEntriesWSResponse,
+        fetchFunction: (options?: AddonModGlossaryGetEntriesOptions) => Promise<AddonModGlossaryGetEntriesWSResponse>,
         options: CoreCourseCommonModWSOptions = {},
     ): Promise<AddonModGlossaryEntry[]> {
         options.siteId = options.siteId || CoreSites.getCurrentSiteId();
@@ -700,7 +667,6 @@ export class AddonModGlossaryProvider {
      *
      * @param entryId Entry Id.
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
     async invalidateEntry(entryId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -713,7 +679,6 @@ export class AddonModGlossaryProvider {
      *
      * @param entries Entry objects to invalidate.
      * @param siteId Site ID. If not defined, current site.
-     * @return Resolved when data is invalidated.
      */
     protected async invalidateEntries(entries: AddonModGlossaryEntry[], siteId?: string): Promise<void> {
         const keys: string[] = [];
@@ -732,7 +697,6 @@ export class AddonModGlossaryProvider {
      *
      * @param moduleId The module ID.
      * @param courseId Course ID.
-     * @return Promise resolved when data is invalidated.
      */
     async invalidateContent(moduleId: number, courseId: number): Promise<void> {
         const glossary = await this.getGlossary(courseId, moduleId);
@@ -752,7 +716,6 @@ export class AddonModGlossaryProvider {
      * @param glossary The glossary object.
      * @param onlyEntriesList If true, entries won't be invalidated.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when data is invalidated.
      */
     async invalidateGlossaryEntries(glossary: AddonModGlossaryGlossary, onlyEntriesList?: boolean, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -760,7 +723,7 @@ export class AddonModGlossaryProvider {
         const promises: Promise<void>[] = [];
 
         if (!onlyEntriesList) {
-            promises.push(this.fetchAllEntries(this.getEntriesByLetter.bind(this, glossary.id, 'ALL'), {
+            promises.push(this.fetchAllEntries((options) => this.getEntriesByLetter(glossary.id, options), {
                 cmId: glossary.coursemodule,
                 readingStrategy: CoreSitesReadingStrategy.PREFER_CACHE,
                 siteId,
@@ -770,21 +733,17 @@ export class AddonModGlossaryProvider {
         glossary.browsemodes.forEach((mode) => {
             switch (mode) {
                 case 'letter':
-                    promises.push(this.invalidateEntriesByLetter(glossary.id, 'ALL', siteId));
+                    promises.push(this.invalidateEntriesByLetter(glossary.id, siteId));
                     break;
                 case 'cat':
-                    promises.push(this.invalidateEntriesByCategory(
-                        glossary.id,
-                        AddonModGlossaryProvider.SHOW_ALL_CATEGORIES,
-                        siteId,
-                    ));
+                    promises.push(this.invalidateEntriesByCategory(glossary.id, siteId));
                     break;
                 case 'date':
-                    promises.push(this.invalidateEntriesByDate(glossary.id, 'CREATION', 'DESC', siteId));
-                    promises.push(this.invalidateEntriesByDate(glossary.id, 'UPDATE', 'DESC', siteId));
+                    promises.push(this.invalidateEntriesByDate(glossary.id, 'CREATION', siteId));
+                    promises.push(this.invalidateEntriesByDate(glossary.id, 'UPDATE', siteId));
                     break;
                 case 'author':
-                    promises.push(this.invalidateEntriesByAuthor(glossary.id, 'ALL', 'LASTNAME', 'ASC', siteId));
+                    promises.push(this.invalidateEntriesByAuthor(glossary.id, siteId));
                     break;
                 default:
             }
@@ -799,7 +758,7 @@ export class AddonModGlossaryProvider {
      * @param courseId Course Id.
      * @param cmId Course Module Id.
      * @param options Other options.
-     * @return Promise resolved with the glossary.
+     * @returns Promise resolved with the glossary.
      */
     async getGlossary(courseId: number, cmId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModGlossaryGlossary> {
         const glossaries = await this.getCourseGlossaries(courseId, options);
@@ -819,7 +778,7 @@ export class AddonModGlossaryProvider {
      * @param courseId Course Id.
      * @param glossaryId Glossary Id.
      * @param options Other options.
-     * @return Promise resolved with the glossary.
+     * @returns Promise resolved with the glossary.
      */
     async getGlossaryById(
         courseId: number,
@@ -847,7 +806,7 @@ export class AddonModGlossaryProvider {
      * @param entryOptions Options for the entry.
      * @param attachments Attachments ID if sending online, result of CoreFileUploaderProvider#storeFilesToUpload otherwise.
      * @param otherOptions Other options.
-     * @return Promise resolved with entry ID if entry was created in server, false if stored in device.
+     * @returns Promise resolved with entry ID if entry was created in server, false if stored in device.
      */
     async addEntry(
         glossaryId: number,
@@ -862,13 +821,10 @@ export class AddonModGlossaryProvider {
 
         // Convenience function to store a new entry to be synchronized later.
         const storeOffline = async (): Promise<false> => {
-            const discardTime = otherOptions.discardEntry?.timecreated;
-
             if (otherOptions.checkDuplicates) {
                 // Check if the entry is duplicated in online or offline mode.
                 const conceptUsed = await this.isConceptUsed(glossaryId, concept, {
                     cmId: otherOptions.cmId,
-                    timeCreated: discardTime,
                     siteId: otherOptions.siteId,
                 });
 
@@ -882,40 +838,38 @@ export class AddonModGlossaryProvider {
                 throw new CoreError('Error adding entry.');
             }
 
-            await AddonModGlossaryOffline.addNewEntry(
+            await AddonModGlossaryOffline.addOfflineEntry(
                 glossaryId,
                 concept,
                 definition,
                 courseId,
+                otherOptions.timeCreated ?? Date.now(),
                 entryOptions,
                 attachments,
-                otherOptions.timeCreated,
                 otherOptions.siteId,
                 undefined,
-                otherOptions.discardEntry,
             );
 
             return false;
         };
 
-        if (!CoreApp.isOnline() && otherOptions.allowOffline) {
+        if (!CoreNetwork.isOnline() && otherOptions.allowOffline) {
             // App is offline, store the action.
             return storeOffline();
         }
 
-        // If we are editing an offline entry, discard previous first.
-        if (otherOptions.discardEntry) {
-            await AddonModGlossaryOffline.deleteNewEntry(
-                glossaryId,
-                otherOptions.discardEntry.concept,
-                otherOptions.discardEntry.timecreated,
-                otherOptions.siteId,
-            );
-        }
-
         try {
             // Try to add it in online.
-            return this.addEntryOnline(glossaryId, concept, definition, entryOptions, <number> attachments, otherOptions.siteId);
+            const entryId = await this.addEntryOnline(
+                glossaryId,
+                concept,
+                definition,
+                entryOptions,
+                <number> attachments,
+                otherOptions.siteId,
+            );
+
+            return entryId;
         } catch (error) {
             if (otherOptions.allowOffline && !CoreUtils.isWebServiceError(error)) {
                 // Couldn't connect to server, store in offline.
@@ -936,7 +890,7 @@ export class AddonModGlossaryProvider {
      * @param options Options for the entry.
      * @param attachId Attachments ID (if any attachment).
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the entry ID if created, rejected otherwise.
+     * @returns Promise resolved with the entry ID if created, rejected otherwise.
      */
     async addEntryOnline(
         glossaryId: number,
@@ -957,7 +911,7 @@ export class AddonModGlossaryProvider {
         };
 
         if (attachId) {
-            params.options!.push({
+            params.options?.push({
                 name: 'attachmentsid',
                 value: String(attachId),
             });
@@ -965,7 +919,69 @@ export class AddonModGlossaryProvider {
 
         const response = await site.write<AddonModGlossaryAddEntryWSResponse>('mod_glossary_add_entry', params);
 
+        CoreEvents.trigger(GLOSSARY_ENTRY_ADDED, { glossaryId, entryId: response.entryid }, siteId);
+
         return response.entryid;
+    }
+
+    /**
+     * Update an existing entry on a glossary.
+     *
+     * @param glossaryId Glossary ID.
+     * @param entryId Entry ID.
+     * @param concept Glossary entry concept.
+     * @param definition Glossary entry concept definition.
+     * @param options Options for the entry.
+     * @param attachId Attachments ID (if any attachment).
+     * @param siteId Site ID. If not defined, current site.
+     */
+    async updateEntry(
+        glossaryId: number,
+        entryId: number,
+        concept: string,
+        definition: string,
+        options?: Record<string, AddonModGlossaryEntryOption>,
+        attachId?: number,
+        siteId?: string,
+    ): Promise<void> {
+        const site = await CoreSites.getSite(siteId);
+
+        const params: AddonModGlossaryUpdateEntryWSParams = {
+            entryid: entryId,
+            concept: concept,
+            definition: definition,
+            definitionformat: 1,
+            options: CoreUtils.objectToArrayOfObjects(options || {}, 'name', 'value'),
+        };
+
+        if (attachId) {
+            params.options?.push({
+                name: 'attachmentsid',
+                value: String(attachId),
+            });
+        }
+
+        const response = await site.write<AddonModGlossaryUpdateEntryWSResponse>('mod_glossary_update_entry', params);
+
+        if (!response.result) {
+            throw new CoreError(response.warnings?.[0].message ?? 'Error updating entry');
+        }
+
+        CoreEvents.trigger(GLOSSARY_ENTRY_UPDATED, { glossaryId, entryId }, siteId);
+    }
+
+    /**
+     * Delete entry.
+     *
+     * @param glossaryId Glossary id.
+     * @param entryId Entry id.
+     */
+    async deleteEntry(glossaryId: number, entryId: number): Promise<void> {
+        const site = CoreSites.getRequiredCurrentSite();
+
+        await site.write('mod_glossary_delete_entry', { entryid: entryId });
+
+        CoreEvents.trigger(GLOSSARY_ENTRY_DELETED, { glossaryId, entryId });
     }
 
     /**
@@ -974,7 +990,7 @@ export class AddonModGlossaryProvider {
      * @param glossaryId Glossary ID.
      * @param concept Concept to check.
      * @param options Other options.
-     * @return Promise resolved with true if used, resolved with false if not used or error.
+     * @returns Promise resolved with true if used, resolved with false if not used or error.
      */
     async isConceptUsed(glossaryId: number, concept: string, options: AddonModGlossaryIsConceptUsedOptions = {}): Promise<boolean> {
         try {
@@ -987,7 +1003,7 @@ export class AddonModGlossaryProvider {
 
             // If we get here, there's no offline entry with this name, check online.
             // Get entries from the cache.
-            const entries = await this.fetchAllEntries(this.getEntriesByLetter.bind(glossaryId, 'ALL'), {
+            const entries = await this.fetchAllEntries((options) => this.getEntriesByLetter(glossaryId, options), {
                 cmId: options.cmId,
                 readingStrategy: CoreSitesReadingStrategy.PREFER_CACHE,
                 siteId: options.siteId,
@@ -1006,24 +1022,19 @@ export class AddonModGlossaryProvider {
      *
      * @param glossaryId Glossary ID.
      * @param mode The mode in which the glossary was viewed.
-     * @param name Name of the glossary.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
      */
-    logView(glossaryId: number, mode: string, name?: string, siteId?: string): Promise<void> {
+    async logView(glossaryId: number, mode: string, siteId?: string): Promise<void> {
         const params: AddonModGlossaryViewGlossaryWSParams = {
             id: glossaryId,
             mode: mode,
         };
 
-        return CoreCourseLogHelper.logSingle(
+        await CoreCourseLogHelper.log(
             'mod_glossary_view_glossary',
             params,
             AddonModGlossaryProvider.COMPONENT,
             glossaryId,
-            name,
-            'glossary',
-            { mode },
             siteId,
         );
     }
@@ -1033,23 +1044,18 @@ export class AddonModGlossaryProvider {
      *
      * @param entryId Entry ID.
      * @param glossaryId Glossary ID.
-     * @param name Name of the glossary.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
      */
-    logEntryView(entryId: number, glossaryId: number, name?: string, siteId?: string): Promise<void> {
+    async logEntryView(entryId: number, glossaryId: number, siteId?: string): Promise<void> {
         const params: AddonModGlossaryViewEntryWSParams = {
             id: entryId,
         };
 
-        return CoreCourseLogHelper.logSingle(
+        await CoreCourseLogHelper.log(
             'mod_glossary_view_entry',
             params,
             AddonModGlossaryProvider.COMPONENT,
             glossaryId,
-            name,
-            'glossary',
-            { entryid: entryId },
             siteId,
         );
     }
@@ -1061,7 +1067,6 @@ export class AddonModGlossaryProvider {
      * @param entries Entries.
      * @param from The "page" the entries belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
      */
     protected async storeEntries(
         glossaryId: number,
@@ -1079,7 +1084,6 @@ export class AddonModGlossaryProvider {
      * @param entryId Entry ID.
      * @param from The "page" the entry belongs to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
      */
     protected async storeEntryId(glossaryId: number, entryId: number, from: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -1105,18 +1109,38 @@ declare module '@singletons/events' {
      * @see https://www.typescriptlang.org/docs/handbook/declaration-merging.html#module-augmentation
      */
     export interface CoreEventsData {
-        [AddonModGlossaryProvider.ADD_ENTRY_EVENT]: AddonModGlossaryAddEntryEventData;
-        [AddonModGlossarySyncProvider.AUTO_SYNCED]: AddonModGlossaryAutoSyncData;
+        [GLOSSARY_ENTRY_ADDED]: AddonModGlossaryEntryAddedEventData;
+        [GLOSSARY_ENTRY_UPDATED]: AddonModGlossaryEntryUpdatedEventData;
+        [GLOSSARY_ENTRY_DELETED]: AddonModGlossaryEntryDeletedEventData;
     }
 
 }
 
 /**
- * Data passed to ADD_ENTRY_EVENT.
+ * GLOSSARY_ENTRY_ADDED event payload.
  */
-export type AddonModGlossaryAddEntryEventData = {
+export type AddonModGlossaryEntryAddedEventData = {
     glossaryId: number;
     entryId?: number;
+    timecreated?: number;
+};
+
+/**
+ * GLOSSARY_ENTRY_UPDATED event payload.
+ */
+export type AddonModGlossaryEntryUpdatedEventData = {
+    glossaryId: number;
+    entryId?: number;
+    timecreated?: number;
+};
+
+/**
+ * GLOSSARY_ENTRY_DELETED event payload.
+ */
+export type AddonModGlossaryEntryDeletedEventData = {
+    glossaryId: number;
+    entryId?: number;
+    timecreated?: number;
 };
 
 /**
@@ -1368,6 +1392,35 @@ export type AddonModGlossaryAddEntryWSResponse = {
 };
 
 /**
+ * Params of mod_glossary_update_entry WS.
+ */
+export type AddonModGlossaryUpdateEntryWSParams = {
+    entryid: number; // Glossary entry id to update.
+    concept: string; // Glossary concept.
+    definition: string; // Glossary concept definition.
+    definitionformat: number; // Definition format (1 = HTML, 0 = MOODLE, 2 = PLAIN or 4 = MARKDOWN).
+    options?: { // Optional settings.
+        name: string; // The allowed keys (value format) are:
+        // inlineattachmentsid (int); the draft file area id for inline attachments
+        // attachmentsid (int); the draft file area id for attachments
+        // categories (comma separated int); comma separated category ids
+        // aliases (comma separated str); comma separated aliases
+        // usedynalink (bool); whether the entry should be automatically linked.
+        // casesensitive (bool); whether the entry is case sensitive.
+        // fullmatch (bool); whether to match whole words only.
+        value: string | number; // The value of the option (validated inside the function).
+    }[];
+};
+
+/**
+ * Data returned by mod_glossary_update_entry WS.
+ */
+export type AddonModGlossaryUpdateEntryWSResponse = {
+    result: boolean; // The update result.
+    warnings?: CoreWSExternalWarning[];
+};
+
+/**
  * Params of mod_glossary_view_glossary WS.
  */
 export type AddonModGlossaryViewGlossaryWSParams = {
@@ -1387,35 +1440,10 @@ export type AddonModGlossaryViewEntryWSParams = {
  */
 export type AddonModGlossaryAddEntryOptions = {
     timeCreated?: number; // The time the entry was created. If not defined, current time.
-    discardEntry?: AddonModGlossaryDiscardedEntry; // The entry provided will be discarded if found.
     allowOffline?: boolean; // True if it can be stored in offline, false otherwise.
     checkDuplicates?: boolean; // Check for duplicates before storing offline. Only used if allowOffline is true.
     cmId?: number; // Module ID.
     siteId?: string; // Site ID. If not defined, current site.
-};
-
-/**
- * Entry to discard.
- */
-export type AddonModGlossaryDiscardedEntry = {
-    concept: string;
-    timecreated: number;
-};
-
-/**
- * Entry to be added.
- */
-export type AddonModGlossaryNewEntry = {
-    concept: string;
-    definition: string;
-    timecreated: number;
-};
-
-/**
- * Entry to be added, including attachments.
- */
-export type AddonModGlossaryNewEntryWithFiles = AddonModGlossaryNewEntry & {
-    files: CoreFileEntry[];
 };
 
 /**

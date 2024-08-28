@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
 import { CoreSwipeSlidesItemsManager } from '@classes/items-management/swipe-slides-items-manager';
@@ -24,8 +24,7 @@ import { CoreCourse } from '@features/course/services/course';
 import { CoreCourseModuleData } from '@features/course/services/course-helper';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
 import { CoreTag, CoreTagItem } from '@features/tag/services/tag';
-import { IonRefresher } from '@ionic/angular';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreNavigator } from '@services/navigator';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreTextUtils } from '@services/utils/text';
@@ -40,6 +39,8 @@ import {
     AddonModBookProvider,
     AddonModBookTocChapter,
 } from '../../services/book';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreUrlUtils } from '@services/utils/url';
 
 /**
  * Page that displays a book contents.
@@ -51,7 +52,7 @@ import {
 })
 export class AddonModBookContentsPage implements OnInit, OnDestroy {
 
-    @ViewChild(CoreSwipeSlidesComponent) slides?: CoreSwipeSlidesComponent;
+    @ViewChild(CoreSwipeSlidesComponent) swipeSlidesComponent?: CoreSwipeSlidesComponent;
 
     title = '';
     cmId!: number;
@@ -62,8 +63,10 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
     warning = '';
     displayNavBar = true;
     navigationItems: CoreNavigationBarItem<AddonModBookTocChapter>[] = [];
-    slidesOpts: CoreSwipeSlidesOptions = {
+    swiperOpts: CoreSwipeSlidesOptions = {
         autoHeight: true,
+        observer: true,
+        observeParents: true,
         scrollOnChange: 'top',
     };
 
@@ -119,7 +122,7 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
      * Download book contents and load the current chapter.
      *
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchContent(refresh = false): Promise<void> {
         try {
@@ -158,8 +161,9 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
      * If the download call fails the promise won't be rejected, but the error will be included in the returned object.
      * If module.contents cannot be loaded then the Promise will be rejected.
      *
+     * @param module Module to download.
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async downloadResourceIfNeeded(
         module: CoreCourseModuleData,
@@ -174,7 +178,7 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
         // Get module status to determine if it needs to be downloaded.
         const status = await CoreCourseModulePrefetchDelegate.getModuleStatus(module, this.courseId, undefined, refresh);
 
-        if (status !== CoreConstants.DOWNLOADED) {
+        if (status !== DownloadStatus.DOWNLOADED) {
             // Download content. This function also loads module contents if needed.
             try {
                 await CoreCourseModulePrefetchDelegate.downloadModule(module, this.courseId);
@@ -190,7 +194,7 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
 
         if (!module.contents?.length || (refresh && !contentsAlreadyLoaded)) {
             // Try to load the contents.
-            const ignoreCache = refresh && CoreApp.isOnline();
+            const ignoreCache = refresh && CoreNetwork.isOnline();
 
             try {
                 await CoreCourse.loadModuleContents(module, undefined, undefined, false, ignoreCache);
@@ -212,23 +216,22 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
      * Change the current chapter.
      *
      * @param chapterId Chapter to load.
-     * @return Promise resolved when done.
      */
     changeChapter(chapterId: number): void {
         if (!chapterId) {
             return;
         }
 
-        this.slides?.slideToItem({ id: chapterId });
+        this.swipeSlidesComponent?.slideToItem({ id: chapterId });
     }
 
     /**
      * Refresh the data.
      *
      * @param refresher Refresher.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async doRefresh(refresher?: IonRefresher): Promise<void> {
+    async doRefresh(refresher?: HTMLIonRefresherElement): Promise<void> {
         if (this.manager) {
             await CoreUtils.ignoreErrors(Promise.all([
                 this.manager.getSource().invalidateContent(),
@@ -268,7 +271,7 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
      * Update data related to chapter being viewed.
      *
      * @param chapterId Chapter viewed.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async onChapterViewed(chapterId: number): Promise<void> {
         if (this.displayNavBar) {
@@ -284,7 +287,15 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
         }
 
         // Chapter loaded, log view.
-        await CoreUtils.ignoreErrors(AddonModBook.logView(this.module.instance, chapterId, this.module.name));
+        await CoreUtils.ignoreErrors(AddonModBook.logView(this.module.instance, chapterId));
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM,
+            ws: 'mod_book_view_book',
+            name: this.module.name,
+            data: { id: this.module.instance, category: 'book', chapterid: chapterId },
+            url: CoreUrlUtils.addParamsToUrl(`/mod/book/view.php?id=${this.module.id}`, { chapterid: chapterId }),
+        });
 
         const currentChapterIndex = this.chapters.findIndex((chapter) => chapter.id == chapterId);
         const isLastChapter = currentChapterIndex < 0 || this.chapters[currentChapterIndex + 1] === undefined;
@@ -299,7 +310,7 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
      * Converts chapters to navigation items.
      *
      * @param chapterId Current chapter Id.
-     * @return Navigation items.
+     * @returns Navigation items.
      */
     protected getNavigationItems(chapterId: number): CoreNavigationBarItem<AddonModBookTocChapter>[] {
         return this.chapters.map((chapter) => ({
@@ -314,8 +325,10 @@ export class AddonModBookContentsPage implements OnInit, OnDestroy {
      * @inheritdoc
      */
     ngOnDestroy(): void {
-        this.managerUnsubscribe && this.managerUnsubscribe();
         this.manager?.destroy();
+        this.managerUnsubscribe?.();
+
+        delete this.manager;
     }
 
 }
@@ -358,7 +371,7 @@ class AddonModBookSlidesItemsManagerSource extends CoreSwipeSlidesItemsManagerSo
     /**
      * Load book data from WS.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async loadBookData(): Promise<{ module: CoreCourseModuleData; book: AddonModBookBookWSData }> {
         this.module = await CoreCourse.getModule(this.CM_ID, this.COURSE_ID);
@@ -421,7 +434,7 @@ class AddonModBookSlidesItemsManagerSource extends CoreSwipeSlidesItemsManagerSo
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     invalidateContent(): Promise<void> {
         return AddonModBook.invalidateContent(this.CM_ID, this.COURSE_ID);

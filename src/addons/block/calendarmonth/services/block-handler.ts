@@ -20,6 +20,7 @@ import { CoreCourseBlock } from '@features/course/services/course';
 import { Params } from '@angular/router';
 import { makeSingleton } from '@singletons';
 import { AddonCalendarMainMenuHandlerService } from '@addons/calendar/services/handlers/mainmenu';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Block handler.
@@ -36,10 +37,10 @@ export class AddonBlockCalendarMonthHandlerService extends CoreBlockBaseHandler 
      * @param block The block to render.
      * @param contextLevel The context where the block will be used.
      * @param instanceId The instance ID associated with the context level.
-     * @return Data or promise resolved with the data.
+     * @returns Data or promise resolved with the data.
      */
-    getDisplayData(block: CoreCourseBlock, contextLevel: string, instanceId: number): CoreBlockHandlerData {
-        const linkParams: Params = contextLevel == 'course' ? { courseId: instanceId } : {};
+    getDisplayData(block: CoreCourseBlock, contextLevel: ContextLevel, instanceId: number): CoreBlockHandlerData {
+        const linkParams: Params = contextLevel === ContextLevel.COURSE ? { courseId: instanceId } : {};
 
         return {
             title: 'addon.block_calendarmonth.pluginname',

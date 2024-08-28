@@ -31,7 +31,7 @@ export class AddonMessageOutputAirnotifierHandlerService implements AddonMessage
     /**
      * Whether or not the module is enabled for the site.
      *
-     * @return True if enabled, false otherwise.
+     * @returns True if enabled, false otherwise.
      */
     async isEnabled(): Promise<boolean> {
         return true;
@@ -41,14 +41,14 @@ export class AddonMessageOutputAirnotifierHandlerService implements AddonMessage
      * Returns the data needed to render the handler.
      *
      * @param processor The processor object.
-     * @return Data.
+     * @returns Data.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getDisplayData(processor: Record<string, unknown>): AddonMessageOutputHandlerData {
         return {
             priority: 600,
             label: 'addon.messageoutput_airnotifier.processorsettingsdesc',
-            icon: 'fas-cog',
+            icon: 'fas-gear',
             page: AddonMessageOutputAirnotifierHandlerService.PAGE_NAME,
         };
     }

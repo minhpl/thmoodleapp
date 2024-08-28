@@ -38,6 +38,7 @@ import {
 } from '../../services/workshop';
 import { AddonModWorkshopHelper, AddonModWorkshopSubmissionAssessmentWithFormData } from '../../services/workshop-helper';
 import { AddonModWorkshopOffline } from '../../services/workshop-offline';
+import { ADDON_MOD_WORKSHOP_COMPONENT } from '@addons/mod/workshop/constants';
 
 /**
  * Component that displays workshop assessment strategy form.
@@ -72,10 +73,10 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
     assessmentStrategyLoaded = false;
     notSupported = false;
     feedbackText = '';
-    feedbackControl = new FormControl();
+    feedbackControl = new FormControl<string | null>(null);
     overallFeedkback = false;
     overallFeedkbackRequired = false;
-    component = AddonModWorkshopProvider.COMPONENT;
+    component = ADDON_MOD_WORKSHOP_COMPONENT;
     componentId?: number;
     weights: number[] = [];
     weight?: number;
@@ -95,7 +96,7 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
     };
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         if (!this.assessmentId || !this.strategy) {
@@ -110,7 +111,7 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
         this.data.moduleId = this.workshop.coursemodule;
         this.data.courseId = this.workshop.course;
 
-        this.componentClass = AddonWorkshopAssessmentStrategyDelegate.getComponentForPlugin(this.strategy);
+        this.componentClass = await AddonWorkshopAssessmentStrategyDelegate.getComponentForPlugin(this.strategy);
         if (this.componentClass) {
             this.overallFeedkback = this.workshop.overallfeedbackmode != AddonModWorkshopOverallFeedbackMode.DISABLED;
             this.overallFeedkbackRequired =
@@ -119,7 +120,7 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
 
             // Load Weights selector.
             if (this.edit && this.access.canallocate) {
-                this.weights;
+                this.weights = [];
                 for (let i = 16; i >= 0; i--) {
                     this.weights[i] = i;
                 }
@@ -128,15 +129,14 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
             // Check if rich text editor is enabled.
             if (this.edit) {
                 // Block the workshop.
-                CoreSync.blockOperation(AddonModWorkshopProvider.COMPONENT, this.workshop.id);
+                CoreSync.blockOperation(ADDON_MOD_WORKSHOP_COMPONENT, this.workshop.id);
             }
 
             try {
                 await this.load();
                 this.obsInvalidated = CoreEvents.on(
                     AddonModWorkshopProvider.ASSESSMENT_INVALIDATED,
-                    this.load.bind(this),
-
+                    () => this.load(),
                     CoreSites.getCurrentSiteId(),
                 );
             } catch (error) {
@@ -155,13 +155,17 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
     /**
      * Convenience function to load the assessment data.
      *
-     * @return Promised resvoled when data is loaded.
+     * @returns Promised resvoled when data is loaded.
      */
     protected async load(): Promise<void> {
         this.data.assessment = await AddonModWorkshopHelper.getReviewerAssessmentById(this.workshop.id, this.assessmentId, {
             userId: this.userId,
             cmId: this.workshop.coursemodule,
         });
+
+        if (!this.data.assessment.form) {
+            return;
+        }
 
         if (this.edit) {
             try {
@@ -177,7 +181,7 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
                 }
 
                 // Override assessment plugins values.
-                this.data.assessment.form!.current = AddonModWorkshop.parseFields(
+                this.data.assessment.form.current = AddonModWorkshop.parseFields(
                     CoreUtils.objectToArrayOfObjects(offlineData, 'name', 'value'),
                 );
 
@@ -222,14 +226,14 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
         try {
             this.data.selectedValues = await AddonWorkshopAssessmentStrategyDelegate.getOriginalValues(
                 this.strategy,
-                this.data.assessment.form!,
+                this.data.assessment.form,
                 this.workshop.id,
             );
         } finally {
             this.originalData.selectedValues = CoreUtils.clone(this.data.selectedValues);
             if (this.edit) {
                 CoreFileSession.setFiles(
-                    AddonModWorkshopProvider.COMPONENT,
+                    ADDON_MOD_WORKSHOP_COMPONENT,
                     this.workshop.id + '_' + this.assessmentId,
                     this.data.assessment.feedbackattachmentfiles,
                 );
@@ -243,10 +247,10 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
     /**
      * Check if data has changed.
      *
-     * @return True if data has changed.
+     * @returns True if data has changed.
      */
     hasDataChanged(): boolean {
-        if (!this.assessmentStrategyLoaded) {
+        if (!this.assessmentStrategyLoaded || !this.workshop.strategy || !this.edit) {
             return false;
         }
 
@@ -262,7 +266,7 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
 
         // Compare feedback files.
         const files = CoreFileSession.getFiles(
-            AddonModWorkshopProvider.COMPONENT,
+            ADDON_MOD_WORKSHOP_COMPONENT,
             this.workshop.id + '_' + this.assessmentId,
         ) || [];
         if (CoreFileUploader.areFileListDifferent(files, this.originalData.files)) {
@@ -270,7 +274,7 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
         }
 
         return AddonWorkshopAssessmentStrategyDelegate.hasDataChanged(
-            this.workshop.strategy!,
+            this.workshop.strategy,
             this.originalData.selectedValues,
             this.data.selectedValues,
         );
@@ -279,11 +283,15 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
     /**
      * Save the assessment.
      *
-     * @return Promise resolved when done, rejected if assessment could not be saved.
+     * @returns Promise resolved when done, rejected if assessment could not be saved.
      */
     async saveAssessment(): Promise<void> {
+        if (!this.data.assessment?.form) {
+            return;
+        }
+
         const files = CoreFileSession.getFiles(
-            AddonModWorkshopProvider.COMPONENT,
+            ADDON_MOD_WORKSHOP_COMPONENT,
             this.workshop.id + '_' + this.assessmentId,
         ) || [];
 
@@ -329,7 +337,7 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
                     this.workshop,
                     this.data.selectedValues,
                     text,
-                    this.data.assessment!.form!,
+                    this.data.assessment.form,
                     attachmentsId,
                 );
             } catch (errors) {
@@ -347,8 +355,6 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
                     this.workshop.course,
                     assessmentData,
                 );
-
-                gradeUpdated = false;
             } else {
 
                 // Try to send it to server.
@@ -398,8 +404,8 @@ export class AddonModWorkshopAssessmentStrategyComponent implements OnInit, OnDe
      *
      * @param text The new text.
      */
-    onFeedbackChange(text: string): void {
-        this.feedbackText = text;
+    onFeedbackChange(text?: string | null): void {
+        this.feedbackText = text ?? '';
     }
 
     /**

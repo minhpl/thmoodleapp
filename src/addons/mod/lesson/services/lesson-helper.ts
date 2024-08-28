@@ -27,6 +27,7 @@ import {
     AddonModLessonProvider,
 } from './lesson';
 import { CoreTime } from '@singletons/time';
+import { CoreUtils } from '@services/utils/utils';
 
 /**
  * Helper service that provides some features for quiz.
@@ -42,7 +43,7 @@ export class AddonModLessonHelperProvider {
      * Given the HTML of next activity link, format it to extract the href and the text.
      *
      * @param activityLink HTML of the activity link.
-     * @return Formatted data.
+     * @returns Formatted data.
      */
     formatActivityLink(activityLink: string): AddonModLessonActivityLink {
         const element = CoreDomUtils.convertToElement(activityLink);
@@ -68,7 +69,7 @@ export class AddonModLessonHelperProvider {
      * Given the HTML of an answer from a content page, extract the data to render the answer.
      *
      * @param html Answer's HTML.
-     * @return Data to render the answer.
+     * @returns Data to render the answer.
      */
     getContentPageAnswerDataFromHtml(html: string): {buttonText: string; content: string} {
         const data = {
@@ -95,7 +96,7 @@ export class AddonModLessonHelperProvider {
      * Get the buttons to change pages.
      *
      * @param html Page's HTML.
-     * @return List of buttons.
+     * @returns List of buttons.
      */
     getPageButtonsFromHtml(html: string): AddonModLessonPageButton[] {
         const buttons: AddonModLessonPageButton[] = [];
@@ -147,7 +148,7 @@ export class AddonModLessonHelperProvider {
      * Given a page data, get the page contents.
      *
      * @param data Page data.
-     * @return Page contents.
+     * @returns Page contents.
      */
     getPageContentsFromPageData(data: AddonModLessonGetPageDataWSResponse): string {
         // Search the page contents inside the whole page HTML. Use data.pagecontent because it's filtered.
@@ -174,7 +175,7 @@ export class AddonModLessonHelperProvider {
      *
      * @param questionForm The form group where to add the controls.
      * @param pageData Page data.
-     * @return Question data.
+     * @returns Question data.
      */
     getQuestionFromPageData(questionForm: FormGroup, pageData: AddonModLessonGetPageDataWSResponse): AddonModLessonQuestion {
         const element = CoreDomUtils.convertToElement(pageData.pagecontent || '');
@@ -200,17 +201,14 @@ export class AddonModLessonHelperProvider {
             return question;
         }
 
-        let type = 'text';
-
         switch (pageData.page?.qtype) {
             case AddonModLessonProvider.LESSON_PAGE_TRUEFALSE:
             case AddonModLessonProvider.LESSON_PAGE_MULTICHOICE:
                 return this.getMultiChoiceQuestionData(questionForm, question, fieldContainer);
 
             case AddonModLessonProvider.LESSON_PAGE_NUMERICAL:
-                type = 'number';
             case AddonModLessonProvider.LESSON_PAGE_SHORTANSWER:
-                return this.getInputQuestionData(questionForm, question, fieldContainer, type);
+                return this.getInputQuestionData(questionForm, question, fieldContainer, pageData.page.qtype);
 
             case AddonModLessonProvider.LESSON_PAGE_ESSAY: {
                 return this.getEssayQuestionData(questionForm, question, fieldContainer);
@@ -230,7 +228,7 @@ export class AddonModLessonHelperProvider {
      * @param questionForm The form group where to add the controls.
      * @param question Basic question data.
      * @param fieldContainer HTMLElement containing the data.
-     * @return Question data.
+     * @returns Question data.
      */
     protected getMultiChoiceQuestionData(
         questionForm: FormGroup,
@@ -271,9 +269,14 @@ export class AddonModLessonHelperProvider {
 
             if (option.checked || multiChoiceQuestion.multi) {
                 // Add the control.
-                const value = multiChoiceQuestion.multi ?
-                    { value: option.checked, disabled: option.disabled } : option.value;
-                questionForm.addControl(option.name, this.formBuilder.control(value));
+                if (multiChoiceQuestion.multi) {
+                    questionForm.addControl(
+                        option.name,
+                        this.formBuilder.control({ value: option.checked, disabled: option.disabled }),
+                    );
+                } else {
+                    questionForm.addControl(option.name, this.formBuilder.control(option.value));
+                }
                 controlAdded = true;
             }
 
@@ -301,21 +304,21 @@ export class AddonModLessonHelperProvider {
      * @param questionForm The form group where to add the controls.
      * @param question Basic question data.
      * @param fieldContainer HTMLElement containing the data.
-     * @param type Type of the input.
-     * @return Question data.
+     * @param questionType Type of the question.
+     * @returns Question data.
      */
     protected getInputQuestionData(
         questionForm: FormGroup,
         question: AddonModLessonQuestion,
         fieldContainer: HTMLElement,
-        type: string,
+        questionType: number,
     ): AddonModLessonInputQuestion {
 
         const inputQuestion = <AddonModLessonInputQuestion> question;
         inputQuestion.template = 'shortanswer';
 
         // Get the input.
-        const input = <HTMLInputElement> fieldContainer.querySelector('input[type="text"], input[type="number"]');
+        const input = fieldContainer.querySelector<HTMLInputElement>('input[type="text"], input[type="number"]');
         if (!input) {
             return inputQuestion;
         }
@@ -324,11 +327,14 @@ export class AddonModLessonHelperProvider {
             id: input.id,
             name: input.name,
             maxlength: input.maxLength,
-            type,
+            type: 'text', // Use text for numerical questions too to allow different decimal separators.
         };
 
         // Init the control.
-        questionForm.addControl(input.name, this.formBuilder.control({ value: input.value, disabled: input.readOnly }));
+        questionForm.addControl(input.name, this.formBuilder.control({
+            value: questionType === AddonModLessonProvider.LESSON_PAGE_NUMERICAL ? CoreUtils.formatFloat(input.value) : input.value,
+            disabled: input.readOnly,
+        }));
 
         return inputQuestion;
     }
@@ -339,7 +345,7 @@ export class AddonModLessonHelperProvider {
      * @param questionForm The form group where to add the controls.
      * @param question Basic question data.
      * @param fieldContainer HTMLElement containing the data.
-     * @return Question data.
+     * @returns Question data.
      */
     protected getEssayQuestionData(
         questionForm: FormGroup,
@@ -368,7 +374,7 @@ export class AddonModLessonHelperProvider {
             };
 
             // Init the control.
-            essayQuestion.control = this.formBuilder.control('');
+            essayQuestion.control = this.formBuilder.control('', { nonNullable: true });
             questionForm.addControl(essayQuestion.textarea.name, essayQuestion.control);
         }
 
@@ -381,7 +387,7 @@ export class AddonModLessonHelperProvider {
      * @param questionForm The form group where to add the controls.
      * @param question Basic question data.
      * @param fieldContainer HTMLElement containing the data.
-     * @return Question data.
+     * @returns Question data.
      */
     protected getMatchingQuestionData(
         questionForm: FormGroup,
@@ -454,31 +460,34 @@ export class AddonModLessonHelperProvider {
      * Given the HTML of an answer from a question page, extract the data to render the answer.
      *
      * @param html Answer's HTML.
-     * @return Object with the data to render the answer. If the answer doesn't require any parsing, return a string with the HTML.
+     * @returns Object with the data to render the answer. If the answer doesn't require any parsing, return a string with the HTML.
      */
     getQuestionPageAnswerDataFromHtml(html: string): AddonModLessonAnswerData {
         const element = CoreDomUtils.convertToElement(html);
 
         // Check if it has a checkbox.
-        let input = <HTMLInputElement> element.querySelector('input[type="checkbox"][name*="answer"]');
+        let input = element.querySelector<HTMLInputElement>('input[type="checkbox"][name*="answer"]');
         if (input) {
             // Truefalse or multichoice.
+            const successBadge = element.querySelector<HTMLElement>('.badge.bg-success, .badge.badge-success');
             const data: AddonModLessonCheckboxAnswerData = {
                 isCheckbox: true,
                 checked: !!input.checked,
                 name: input.name,
                 highlight: !!element.querySelector('.highlight'),
                 content: '',
+                successBadge: successBadge?.innerText,
             };
 
             input.remove();
+            successBadge?.remove();
             data.content = element.innerHTML.trim();
 
             return data;
         }
 
         // Check if it has an input text or number.
-        input = <HTMLInputElement> element.querySelector('input[type="number"],input[type="text"]');
+        input = element.querySelector<HTMLInputElement>('input[type="number"],input[type="text"]');
         if (input) {
             // Short answer or numeric.
             return {
@@ -514,7 +523,7 @@ export class AddonModLessonHelperProvider {
      *
      * @param retake Retake object.
      * @param includeDuration Whether to include the duration of the retake.
-     * @return Retake label.
+     * @returns Retake label.
      */
     getRetakeLabel(retake: AddonModLessonAttemptsOverviewsAttemptWSData, includeDuration?: boolean): string {
         const data = {
@@ -550,7 +559,7 @@ export class AddonModLessonHelperProvider {
      *
      * @param question Question to prepare.
      * @param data Data to prepare.
-     * @return Data to send.
+     * @returns Data to send.
      */
     prepareQuestionData(question: AddonModLessonQuestion, data: CoreFormFields): CoreFormFields {
         if (question.template == 'essay') {
@@ -576,7 +585,7 @@ export class AddonModLessonHelperProvider {
      * Given the feedback of a process page in HTML, remove the question text.
      *
      * @param html Feedback's HTML.
-     * @return Feedback without the question text.
+     * @returns Feedback without the question text.
      */
     removeQuestionFromFeedback(html: string): string {
         const element = CoreDomUtils.convertToElement(html);
@@ -631,7 +640,7 @@ export type AddonModLessonInputQuestion = AddonModLessonQuestionBasicData & {
 export type AddonModLessonEssayQuestion = AddonModLessonQuestionBasicData & {
     useranswer?: string; // User answer, for reviewing.
     textarea?: AddonModLessonTextareaData; // Data for the textarea.
-    control?: FormControl; // Form control.
+    control?: FormControl<string>; // Form control.
 };
 
 /**
@@ -699,6 +708,7 @@ export type AddonModLessonCheckboxAnswerData = {
     name: string;
     highlight: boolean;
     content: string;
+    successBadge?: string;
 };
 
 /**

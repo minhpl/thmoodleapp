@@ -14,7 +14,7 @@
 
 import { Injectable } from '@angular/core';
 import { CoreSites, CoreSitesCommonWSOptions } from '@services/sites';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreWSExternalWarning, CoreWSExternalFile } from '@services/ws';
 import { makeSingleton, Translate } from '@singletons';
 import { CoreConstants } from '@/core/constants';
@@ -23,8 +23,8 @@ import { CoreCourse } from '@features/course/services/course';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreError } from '@classes/errors/error';
-
-const ROOT_CACHE_KEY = 'mmaModUrl:';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { ADDON_MOD_URL_COMPONENT } from '../constants';
 
 /**
  * Service that provides some features for urls.
@@ -32,13 +32,14 @@ const ROOT_CACHE_KEY = 'mmaModUrl:';
 @Injectable({ providedIn: 'root' })
 export class AddonModUrlProvider {
 
-    static readonly COMPONENT = 'mmaModUrl';
+    protected static readonly ROOT_CACHE_KEY = 'mmaModUrl:';
+    static readonly COMPONENT = ADDON_MOD_URL_COMPONENT;
 
     /**
      * Get the final display type for a certain URL. Based on Moodle's url_get_final_display_type.
      *
      * @param url URL data.
-     * @return Final display type.
+     * @returns Final display type.
      */
     getFinalDisplayType(url?: AddonModUrlUrl): number {
         if (!url) {
@@ -90,10 +91,10 @@ export class AddonModUrlProvider {
      * Get cache key for url data WS calls.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getUrlCacheKey(courseId: number): string {
-        return ROOT_CACHE_KEY + 'url:' + courseId;
+        return AddonModUrlProvider.ROOT_CACHE_KEY + 'url:' + courseId;
     }
 
     /**
@@ -103,7 +104,7 @@ export class AddonModUrlProvider {
      * @param key Name of the property to check.
      * @param value Value to search.
      * @param options Other options.
-     * @return Promise resolved when the url is retrieved.
+     * @returns Promise resolved when the url is retrieved.
      */
     protected async getUrlDataByKey(
         courseId: number,
@@ -120,7 +121,7 @@ export class AddonModUrlProvider {
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getUrlCacheKey(courseId),
             updateFrequency: CoreSite.FREQUENCY_RARELY,
-            component: AddonModUrlProvider.COMPONENT,
+            component: ADDON_MOD_URL_COMPONENT,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy),
         };
 
@@ -140,7 +141,7 @@ export class AddonModUrlProvider {
      * @param courseId Course ID.
      * @param cmId Course module ID.
      * @param options Other options.
-     * @return Promise resolved when the url is retrieved.
+     * @returns Promise resolved when the url is retrieved.
      */
     getUrl(courseId: number, cmId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModUrlUrl> {
         return this.getUrlDataByKey(courseId, 'coursemodule', cmId, options);
@@ -150,20 +151,20 @@ export class AddonModUrlProvider {
      * Guess the icon for a certain URL. Based on Moodle's url_guess_icon.
      *
      * @param url URL to check.
-     * @return Icon, empty if it should use the default icon.
+     * @returns Icon, empty if it should use the default icon.
      */
     guessIcon(url: string): string {
         url = url || '';
 
         const matches = url.match(/\//g);
-        const extension = CoreMimetypeUtils.getFileExtension(url);
+        const extension = CoreMimetypeUtils.guessExtensionFromUrl(url);
 
         if (!matches || matches.length < 3 || url.slice(-1) === '/' || extension == 'php') {
             // Use default icon.
             return '';
         }
 
-        const icon = CoreMimetypeUtils.getFileIcon(url);
+        const icon = CoreMimetypeUtils.getExtensionIcon(extension ?? '');
 
         // We do not want to return those icon types, the module icon is more appropriate.
         if (icon === CoreMimetypeUtils.getFileIconForType('unknown') ||
@@ -180,7 +181,7 @@ export class AddonModUrlProvider {
      * @param moduleId The module ID.
      * @param courseId Course ID of the module.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     invalidateContent(moduleId: number, courseId: number, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -196,9 +197,9 @@ export class AddonModUrlProvider {
     /**
      * Invalidates url data.
      *
-     * @param courseid Course ID.
+     * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateUrlData(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -210,23 +211,19 @@ export class AddonModUrlProvider {
      * Report the url as being viewed.
      *
      * @param id Module ID.
-     * @param name Name of the assign.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
-    logView(id: number, name?: string, siteId?: string): Promise<void> {
+    logView(id: number, siteId?: string): Promise<void> {
         const params: AddonModUrlViewUrlWSParams = {
             urlid: id,
         };
 
-        return CoreCourseLogHelper.logSingle(
+        return CoreCourseLogHelper.log(
             'mod_url_view_url',
             params,
-            AddonModUrlProvider.COMPONENT,
+            ADDON_MOD_URL_COMPONENT,
             id,
-            name,
-            'url',
-            {},
             siteId,
         );
     }

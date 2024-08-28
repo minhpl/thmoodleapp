@@ -17,7 +17,7 @@ import { ScrollDetail } from '@ionic/core';
 import { IonContent } from '@ionic/angular';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreMath } from '@singletons/math';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 import { CoreFormatTextDirective } from './format-text';
 import { CoreEventObserver } from '@singletons/events';
 import { CoreLoadingComponent } from '@components/loading/loading';
@@ -38,6 +38,7 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
 
     @Input() appearOnBottom = false;
 
+    protected id = '0';
     protected element: HTMLElement;
     protected initialHeight = 48;
     protected finalHeight = 0;
@@ -53,6 +54,7 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
     protected viewportPromise?: CoreCancellablePromise<void>;
     protected loadingHeight = false;
     protected pageDidEnterListener?: EventListener;
+    protected keyUpListener?: EventListener;
     protected page?: HTMLElement;
 
     constructor(el: ElementRef, protected ionContent: IonContent) {
@@ -63,6 +65,8 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
      * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
+        this.id = String(CoreUtils.getUniqueId('CoreCollapsibleFooterDirective'));
+
         // Only if not present or explicitly falsy it will be false.
         this.appearOnBottom = !CoreUtils.isFalseOrZero(this.appearOnBottom);
         this.slotPromise = CoreDom.slotOnContent(this.element);
@@ -72,6 +76,7 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
         await this.waitFormatTextsRendered();
 
         this.content = this.element.closest('ion-content');
+        this.content?.setAttribute('data-collapsible-footer-id', this.id);
 
         await this.calculateHeight();
 
@@ -79,7 +84,7 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
             this.calculateHeight();
         });
 
-        this.listenScrollEvents();
+        this.listenEvents();
     }
 
     /**
@@ -116,9 +121,9 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
     }
 
     /**
-     * Setup scroll event listener.
+     * Setup event listeners.
      */
-    protected async listenScrollEvents(): Promise<void> {
+    protected async listenEvents(): Promise<void> {
         if (!this.content || this.content?.classList.contains('has-collapsible-footer')) {
             return;
         }
@@ -181,13 +186,24 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
                 this.calculateHeight();
             },
         );
+
+        // Handle scroll when navigating using tab key and the selected element is behind the footer.
+        this.content.addEventListener('keyup', this.keyUpListener = (ev: KeyboardEvent) => {
+            if (ev.key !== 'Tab' || !document.activeElement) {
+                return;
+            }
+
+            if (document.activeElement.getBoundingClientRect().bottom > this.element.getBoundingClientRect().top) {
+                document.activeElement.scrollIntoView({ block: 'center' });
+            }
+        });
     }
 
     /**
      * Wait until all <core-format-text> children inside the element are done rendering.
      */
     protected async waitFormatTextsRendered(): Promise<void> {
-        await CoreComponentsRegistry.waitComponentsReady(this.element, 'core-format-text', CoreFormatTextDirective);
+        await CoreDirectivesRegistry.waitDirectivesReady(this.element, 'core-format-text', CoreFormatTextDirective);
     }
 
     /**
@@ -227,14 +243,14 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
     /**
      * Wait until all <core-loading> children inside the page.
      *
-     * @return Promise resolved when loadings are done.
+     * @returns Promise resolved when loadings are done.
      */
     protected async waitLoadingsDone(): Promise<void> {
         const scrollElement = await this.ionContent.getScrollElement();
 
         await Promise.all([
-            await CoreComponentsRegistry.waitComponentsReady(scrollElement, 'core-loading', CoreLoadingComponent),
-            await CoreComponentsRegistry.waitComponentsReady(this.element, 'core-loading', CoreLoadingComponent),
+            await CoreDirectivesRegistry.waitDirectivesReady(scrollElement, 'core-loading', CoreLoadingComponent),
+            await CoreDirectivesRegistry.waitDirectivesReady(this.element, 'core-loading', CoreLoadingComponent),
         ]);
     }
 
@@ -242,14 +258,24 @@ export class CoreCollapsibleFooterDirective implements OnInit, OnDestroy {
      * @inheritdoc
      */
     async ngOnDestroy(): Promise<void> {
-        this.content?.style.setProperty('--padding-bottom', this.initialPaddingBottom);
+        if (this.content) {
+            // Only reset the variables and classes if the collapsible footer hasn't changed (avoid race conditions).
+            if (this.content.getAttribute('data-collapsible-footer-id') === this.id) {
+                this.content.style.setProperty('--padding-bottom', this.initialPaddingBottom);
+                this.content.classList.remove('has-collapsible-footer');
+            }
 
-        if (this.content && this.contentScrollListener) {
-            this.content.removeEventListener('ionScroll', this.contentScrollListener);
+            if (this.contentScrollListener) {
+                this.content.removeEventListener('ionScroll', this.contentScrollListener);
+            }
+            if (this.endContentScrollListener) {
+                this.content.removeEventListener('ionScrollEnd', this.endContentScrollListener);
+            }
+            if (this.keyUpListener) {
+                this.content.removeEventListener('keyup', this.keyUpListener);
+            }
         }
-        if (this.content && this.endContentScrollListener) {
-            this.content.removeEventListener('ionScrollEnd', this.endContentScrollListener);
-        }
+
         if (this.page && this.pageDidEnterListener) {
             this.page.removeEventListener('ionViewDidEnter', this.pageDidEnterListener);
         }

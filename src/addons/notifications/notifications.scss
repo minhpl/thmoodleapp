@@ -1,46 +1,55 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
-    --extra-icon-size: 16px;
-    --icon-size: 24px;
+    --icon-size: 32px;
+    --extra-icon-size: 12px;
 
-    ::ng-deep core-user-avatar {
-        .core-avatar-extra-img,
-        core-mod-icon {
+    ion-item ::ng-deep core-user-avatar {
+        --core-avatar-size: var(--icon-size);
+
+        .core-avatar-extra-img {
             margin: 0 !important;
             position: absolute;
             right: -4px;
             bottom: -4px;
-            padding: 0.2rem;
+            --module-icon-padding: 0.2rem;
         }
 
         .core-avatar-extra-img {
             background: var(--background-color);
-            border-radius: var(--medium-radius);
+            border-radius: var(--mdl-shape-borderRadius-sm);
             img {
                 max-width: var(--extra-icon-size);
                 max-height: var(--extra-icon-size);
+                width: var(--extra-icon-size);
+                height: var(--extra-icon-size);
                 display: block;
             }
-        }
-
-        core-mod-icon  {
-            --size: var(--extra-icon-size);
         }
     }
 
     div.core-notification-icon {
+        max-width: var(--icon-size);
+        max-height:  var(--icon-size);
         img {
             width: var(--icon-size);
-            height: var(--icon-size);
+            height:  var(--icon-size);
+            padding: 4px;
         }
-        padding: 0.7rem;
+        ion-icon {
+            font-size: var(--icon-size);
+        }
+        padding: 0px;
         background: var(--background-color);
-        border-radius: var(--small-radius);
+        border-radius: var(--core-avatar-radius);
+        @include margin(6px, 8px, 6px, 0px);
     }
 
-    .core-notification-icon {
-        --module-icon-size: var(--icon-size);
+    .core-notification-img {
         @include margin(6px, 8px, 6px, 0px);
+        width: var(--icon-size);
+        height: var(--icon-size);
+        object-fit: cover;
+        border-radius: var(--core-avatar-radius);
     }
 }

@@ -1,0 +1,10 @@
+ion-input {
+    &.input-disabled.md, &.input-disabled.ios {
+        opacity: var(--mdl-input-disabled-opacity);
+    }
+}
+
+input[disabled],
+input[readonly] {
+    opacity: var(--mdl-input-disabled-opacity);
+}

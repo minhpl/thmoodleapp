@@ -19,6 +19,7 @@ import { ModalController } from '@singletons';
 import { CoreEvents } from '@singletons/events';
 import { AddonCalendarEventType, AddonCalendarProvider } from '../../services/calendar';
 import { AddonCalendarFilter, AddonCalendarEventIcons } from '../../services/calendar-helper';
+import { ALL_COURSES_ID } from '@features/courses/services/courses-helper';
 
 /**
  * Component to display the events filter that includes events types and a list of courses.
@@ -30,6 +31,7 @@ import { AddonCalendarFilter, AddonCalendarEventIcons } from '../../services/cal
 })
 export class AddonCalendarFilterComponent implements OnInit {
 
+    @Input() courses: CoreEnrolledCourseData[] = [];
     @Input() filter: AddonCalendarFilter = {
         filtered: false,
         courseId: undefined,
@@ -42,10 +44,9 @@ export class AddonCalendarFilterComponent implements OnInit {
     };
 
     courseId = -1;
-
-    @Input() courses: Partial<CoreEnrolledCourseData>[] = [];
     typeIcons: AddonCalendarEventIcons[] = [];
     types: string[] = [];
+    sortedCourses: CoreEnrolledCourseData[] = [];
 
     constructor() {
         CoreUtils.enumKeys(AddonCalendarEventType).forEach((name) => {
@@ -60,7 +61,18 @@ export class AddonCalendarFilterComponent implements OnInit {
      * @inheritdoc
      */
     ngOnInit(): void {
-        this.courseId = this.filter.courseId || -1;
+        this.courseId = this.filter.courseId || ALL_COURSES_ID;
+        this.sortedCourses = Array.from(this.courses).sort((a, b) => {
+            if (a.id === ALL_COURSES_ID) {
+                return -1;
+            }
+
+            if (b.id === ALL_COURSES_ID) {
+                return 1;
+            }
+
+            return (a.shortname?.toLowerCase() ?? '').localeCompare(b.shortname?.toLowerCase() ?? '');
+        });
     }
 
     /**

@@ -15,7 +15,7 @@
 import { Injectable } from '@angular/core';
 import { CoreSites } from '@services/sites';
 import { CoreWSExternalWarning } from '@services/ws';
-import { CoreSite } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { makeSingleton } from '@singletons';
 import { CoreError } from '@classes/errors/error';
 
@@ -34,7 +34,7 @@ export class AddonBadgesProvider {
      * check, we should not be calling WS from here.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with true if enabled, false otherwise.
+     * @returns Promise resolved with true if enabled, false otherwise.
      */
     async isPluginEnabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -47,7 +47,7 @@ export class AddonBadgesProvider {
      *
      * @param courseId ID of the course to get the badges from.
      * @param userId ID of the user to get the badges from.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getBadgesCacheKey(courseId: number, userId: number): string {
         return ROOT_CACHE_KEY + 'badges:' + courseId + ':' + userId;
@@ -59,7 +59,7 @@ export class AddonBadgesProvider {
      * @param courseId ID of the course to get the badges from.
      * @param userId ID of the user to get the badges from.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise to be resolved when the badges are retrieved.
+     * @returns Promise to be resolved when the badges are retrieved.
      */
     async getUserBadges(courseId: number, userId: number, siteId?: string): Promise<AddonBadgesUserBadge[]> {
 
@@ -98,7 +98,7 @@ export class AddonBadgesProvider {
      * @param courseId Course ID.
      * @param userId ID of the user to get the badges from.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when data is invalidated.
+     * @returns Promise resolved when data is invalidated.
      */
     async invalidateUserBadges(courseId: number, userId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -194,7 +194,7 @@ export type AddonBadgesUserBadge = {
         targetframework?: string; // Target framework.
         targetcode?: string; // Target code.
     }[];
-    competencies?: { // @deprecatedonmoodle from 3.7. @since 3.6. In 3.7 it was renamed to alignment.
+    competencies?: { // @deprecatedonmoodle since 3.7. @since 3.6. In 3.7 it was renamed to alignment.
         id?: number; // Alignment id.
         badgeid?: number; // Badge id.
         targetname?: string; // Target name.

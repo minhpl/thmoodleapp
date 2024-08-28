@@ -1,4 +1,4 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
     @for $i from 0 to length($core-course-image-background) {
@@ -20,7 +20,7 @@
     --button-size: 44px;
     --button-padding: 10px;
     --button-radius: 50%;
-    --button-background: rgba(255,255,255,0.5);
+    --button-background: rgb(255 255 255 / 50%);
 
     @include media-breakpoint-down(md) {
         --avatar-size: 48px;
@@ -29,8 +29,8 @@
 }
 
 
-:host-context(body.dark) {
-    --button-background: rgba(0, 0, 0, 0.3);
+:host-context(html.dark) {
+    --button-background: rgb(0 0 0 / 30%);
 }
 
 // Common styles.
@@ -87,9 +87,7 @@ ion-card {
 .core-course-shortname {
     font-size: var(--shortname-size);
     color: var(--dark);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
+    @include ellipsis();
 }
 
 ion-chip {
@@ -108,6 +106,7 @@ ion-chip {
 ion-card.core-course-list-item {
     max-width: var(--list-item-max-width);
 
+    /** Deprecated icon */
     ion-icon.course-icon {
         padding: 12px;
         font-size: calc(var(--avatar-size) - 24px);
@@ -136,13 +135,27 @@ ion-card.core-course-list-item {
     .core-course-maininfo {
         @include margin-horizontal(null, 32px);
     }
+
+    @if ($core-course-hide-progress-on-list-items) {
+        .core-course-progress {
+            display: none;
+        }
+    }
 }
 
+// Fill geopaterns
+.core-course-thumb img[src$=".svg"] {
+    min-width: 100%;
+}
 
 // Card layout.
 ion-card.core-course-list-card {
-    display: flex;
-    flex-direction: column;
+    &::part(native) {
+        display: flex;
+        flex-direction: column;
+        align-items: stretch;
+        height: 100%;
+    }
 
     height: calc(100% - var(--card-vertical-margin) - var(--card-vertical-margin));
     margin-top: var(--card-vertical-margin);
@@ -212,18 +225,13 @@ ion-card.core-course-list-card {
 
             // Clamp one line with ellipsis on tablet view, and 2 in mobile.
             .item-heading {
-                white-space: nowrap;
-                text-overflow: ellipsis;
-                overflow: hidden;
+                @include ellipsis();
             }
 
             @include media-breakpoint-down(md) {
                 .item-heading {
                     // Addition lines for 2 line or multiline ellipsis
-                    display: -webkit-box !important;
-                    -webkit-line-clamp: 2;
-                    -webkit-box-orient: vertical;
-                    white-space: normal;
+                    @include ellipsis(2);
                 }
             }
 

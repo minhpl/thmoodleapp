@@ -1,5 +1,6 @@
-<ion-slides *ngIf="loaded" (ionSlideWillChange)="slideWillChange()" (ionSlideDidChange)="slideDidChange()" [options]="options">
-    <ion-slide *ngFor="let item of items">
-        <ng-container *ngIf="template" [ngTemplateOutlet]="template" [ngTemplateOutletContext]="{item: item}"></ng-container>
-    </ion-slide>
-</ion-slides>
+<swiper-container #swiperRef *ngIf="loaded" [attr.aria-busy]="activeSlideIndex ? 'true' : null">
+    <swiper-slide *ngFor="let item of items; index as index" [attr.aria-hidden]="!isActive(index)"
+        [attr.tabindex]="!isActive(index) ? -1 : null">
+        <ng-container *ngIf="template" [ngTemplateOutlet]="template" [ngTemplateOutletContext]="{item: item, active: isActive(index)}" />
+    </swiper-slide>
+</swiper-container>

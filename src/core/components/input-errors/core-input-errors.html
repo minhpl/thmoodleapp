@@ -1,16 +1,22 @@
-<div class="core-input-error-container" role="alert" *ngIf="(control && control.dirty && !control.valid) || errorText">
-    <ng-container *ngIf="control && control.dirty && !control.valid">
-        <ng-container *ngFor="let error of errorKeys">
-            <div *ngIf="control.hasError(error)" class="core-input-error">
-                <span *ngIf="errorMessages && errorMessages[error]">{{errorMessages[error]}}</span>
-                <span *ngIf="(!errorMessages || !errorMessages[error]) && error == 'max' && control.errors?.max">
+<ng-container *ngIf="control && control.dirty && !control.valid">
+    <ng-container *ngFor="let error of errorKeys">
+        <div *ngIf="control.hasError(error)" class="core-input-error">
+            <ng-container *ngIf="error !== 'pattern'">
+                <span *ngIf="errorMessages && errorMessages[error]">
+                    <ion-icon *ngIf="error === 'required'" name="fas-circle-exclamation" aria-hidden="true" />
+                    {{ errorMessages[error] | translate }}
+                </span>
+                <span *ngIf="(!errorMessages || !errorMessages[error]) && error === 'max' && control.errors?.max">
                     {{ 'core.login.invalidvaluemax' | translate:{$a: control.errors!.max.max} }}
                 </span>
-                <span *ngIf="(!errorMessages || !errorMessages[error]) && error == 'min' && control.errors?.min">
+                <span *ngIf="(!errorMessages || !errorMessages[error]) && error === 'min' && control.errors?.min">
                     {{ 'core.login.invalidvaluemin' | translate:{$a: control.errors!.min.min} }}
                 </span>
-            </div>
-        </ng-container>
+            </ng-container>
+            <ng-container *ngIf="error === 'pattern' && getPatternErrorMessage() as errorMessage">
+                <span>{{ errorMessage | translate }}</span>
+            </ng-container>
+        </div>
     </ng-container>
-    <div *ngIf="errorText" class="core-input-error" aria-live="assertive">{{ errorText }}</div>
-</div>
+</ng-container>
+<div *ngIf="errorText" class="core-input-error" aria-live="assertive">{{ errorText }}</div>

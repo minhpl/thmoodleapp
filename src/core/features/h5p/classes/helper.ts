@@ -12,16 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 
 import { CoreFile, CoreFileProvider } from '@services/file';
 import { CoreSites } from '@services/sites';
 import { CoreMimetypeUtils } from '@services/utils/mimetype';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreH5P } from '../services/h5p';
-import { CoreH5PCore, CoreH5PDisplayOptions } from './core';
+import { CoreH5PCore, CoreH5PDisplayOptions, CoreH5PLocalization } from './core';
 import { CoreError } from '@classes/errors/error';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 
 /**
  * Equivalent to Moodle's H5P helper class.
@@ -48,7 +48,7 @@ export class CoreH5PHelper {
      * Convert the number representation of display options into an object.
      *
      * @param displayOptions Number representing display options.
-     * @return Object with display options.
+     * @returns Object with display options.
      */
     static decodeDisplayOptions(displayOptions: number): CoreH5PDisplayOptions {
         const displayOptionsObject = CoreH5P.h5pCore.getDisplayOptionsAsObject(displayOptions);
@@ -70,7 +70,7 @@ export class CoreH5PHelper {
     /**
      * Get the core H5P assets, including all core H5P JavaScript and CSS.
      *
-     * @return Array core H5P assets.
+     * @returns Array core H5P assets.
      */
     static async getCoreAssets(
         siteId?: string,
@@ -109,7 +109,7 @@ export class CoreH5PHelper {
      * Get the settings needed by the H5P library.
      *
      * @param siteId The site ID. If not defined, current site.
-     * @return Promise resolved with the settings.
+     * @returns Promise resolved with the settings.
      */
     static async getCoreSettings(siteId?: string): Promise<CoreH5PCoreSettings> {
 
@@ -122,29 +122,30 @@ export class CoreH5PHelper {
             throw new CoreError('Site info could not be fetched.');
         }
 
+        // H5P doesn't currently support xAPI State. It implements a mechanism in contentUserDataAjax() in h5p.js to update user
+        // data. However, in our case, we're overriding this method to call the xAPI State web services.
         const basePath = CoreFile.getBasePathInstant();
         const ajaxPaths = {
-            xAPIResult: '',
             contentUserData: '',
         };
 
         return {
             baseUrl: CoreFile.getWWWPath(),
             url: CoreFile.convertFileSrc(
-                CoreText.concatenatePaths(
+                CorePath.concatenatePaths(
                     basePath,
                     CoreH5P.h5pCore.h5pFS.getExternalH5PFolderPath(site.getId()),
                 ),
             ),
             urlLibraries: CoreFile.convertFileSrc(
-                CoreText.concatenatePaths(
+                CorePath.concatenatePaths(
                     basePath,
                     CoreH5P.h5pCore.h5pFS.getLibrariesFolderPath(site.getId()),
                 ),
             ),
             postUserStatistics: false,
             ajax: ajaxPaths,
-            saveFreq: false,
+            saveFreq: false, // saveFreq will be overridden in params.js.
             siteUrl: site.getURL(),
             l10n: {
                 H5P: CoreH5P.h5pCore.getLocalization(), // eslint-disable-line @typescript-eslint/naming-convention
@@ -155,7 +156,7 @@ export class CoreH5PHelper {
             crossorigin: null,
             libraryConfig: null,
             pluginCacheBuster: '',
-            libraryUrl: CoreText.concatenatePaths(CoreH5P.h5pCore.h5pFS.getCoreH5PPath(), 'js'),
+            libraryUrl: CorePath.concatenatePaths(CoreH5P.h5pCore.h5pFS.getCoreH5PPath(), 'js'),
         };
     }
 
@@ -167,7 +168,7 @@ export class CoreH5PHelper {
      * @param file The file entry of the downloaded file.
      * @param siteId Site ID. If not defined, current site.
      * @param onProgress Function to call on progress.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     static async saveH5P(fileUrl: string, file: FileEntry, siteId?: string, onProgress?: CoreH5PSaveOnProgress): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -187,7 +188,7 @@ export class CoreH5PHelper {
      * @param file The file entry of the downloaded file.
      * @param siteId Site ID. If not defined, current site.
      * @param onProgress Function to call on progress.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected static async performSave(
         fileUrl: string,
@@ -197,10 +198,10 @@ export class CoreH5PHelper {
     ): Promise<void> {
 
         const folderName = CoreMimetypeUtils.removeExtension(file.name);
-        const destFolder = CoreText.concatenatePaths(CoreFileProvider.TMPFOLDER, 'h5p/' + folderName);
+        const destFolder = CorePath.concatenatePaths(CoreFileProvider.TMPFOLDER, 'h5p/' + folderName);
 
         // Unzip the file.
-        await CoreFile.unzipFile(file.toURL(), destFolder, onProgress);
+        await CoreFile.unzipFile(CoreFile.getFileEntryURL(file), destFolder, onProgress);
 
         try {
             // Notify that the unzip is starting.
@@ -223,7 +224,7 @@ export class CoreH5PHelper {
             // Remove tmp folder.
             try {
                 await CoreFile.removeDir(destFolder);
-            } catch (error) {
+            } catch {
                 // Ignore errors, it will be deleted eventually.
             }
         }
@@ -240,13 +241,13 @@ export type CoreH5PCoreSettings = {
     urlLibraries: string;
     postUserStatistics: boolean;
     ajax: {
-        xAPIResult: string;
+        xAPIResult?: string;
         contentUserData: string;
     };
     saveFreq: boolean;
     siteUrl: string;
     l10n: {
-        H5P: {[name: string]: string}; // eslint-disable-line @typescript-eslint/naming-convention
+        H5P: CoreH5PLocalization; // eslint-disable-line @typescript-eslint/naming-convention
     };
     user: {
         name: string;

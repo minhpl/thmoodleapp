@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 import { NgModule } from '@angular/core';
 
 import { AddonQbehaviourAdaptiveModule } from './adaptive/adaptive.module';
@@ -38,4 +39,4 @@ import { AddonQbehaviourManualGradedModule } from './manualgraded/manualgraded.m
         AddonQbehaviourManualGradedModule,
     ],
 })
-export class AddonQbehaviourModule { }
+export class AddonQbehaviourModule {}

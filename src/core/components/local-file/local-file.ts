@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Component, Input, Output, OnInit, EventEmitter, ViewChild, ElementRef } from '@angular/core';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 
 import { CoreIonLoadingElement } from '@classes/ion-loading';
 import { CoreFile } from '@services/file';
@@ -25,8 +25,8 @@ import { CoreTextUtils } from '@services/utils/text';
 import { CoreTimeUtils } from '@services/utils/time';
 import { CoreUtils, CoreUtilsOpenFileOptions, OpenFileAction } from '@services/utils/utils';
 import { CoreForms } from '@singletons/form';
-import { CoreApp } from '@services/app';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Component to handle a local file. Only files inside the app folder can be managed.
@@ -64,7 +64,7 @@ export class CoreLocalFileComponent implements OnInit {
     protected defaultIsOpenWithPicker = false;
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         this.manage = CoreUtils.isTrueOrOne(this.manage);
@@ -83,9 +83,9 @@ export class CoreLocalFileComponent implements OnInit {
 
         this.timemodified = CoreTimeUtils.userDate(metadata.modificationTime.getTime(), 'core.strftimedatetimeshort');
 
-        this.isIOS = CoreApp.isIOS();
+        this.isIOS = CorePlatform.isIOS();
         this.defaultIsOpenWithPicker = CoreFileHelper.defaultIsOpenWithPicker();
-        this.openButtonIcon = this.defaultIsOpenWithPicker ? 'fas-file' : 'fas-share-square';
+        this.openButtonIcon = this.defaultIsOpenWithPicker ? 'fas-file' : 'fas-share-from-square';
         this.openButtonLabel = this.defaultIsOpenWithPicker ? 'core.openfile' : 'core.openwith';
     }
 
@@ -98,7 +98,7 @@ export class CoreLocalFileComponent implements OnInit {
         this.fileExtension = CoreMimetypeUtils.getFileExtension(file.name);
 
         // Let's calculate the relative path for the file.
-        this.relativePath = CoreFile.removeBasePath(file.toURL());
+        this.relativePath = CoreFile.removeBasePath(CoreFile.getFileEntryURL(file));
         if (!this.relativePath) {
             // Didn't find basePath, use fullPath but if the user tries to manage the file it'll probably fail.
             this.relativePath = file.fullPath;
@@ -119,7 +119,7 @@ export class CoreLocalFileComponent implements OnInit {
         e.preventDefault();
         e.stopPropagation();
 
-        if (!isOpenButton && CoreUtils.isTrueOrOne(this.overrideClick) && this.onClick.observers.length) {
+        if (!isOpenButton && CoreUtils.isTrueOrOne(this.overrideClick) && this.onClick.observed) {
             this.onClick.emit();
 
             return;
@@ -127,7 +127,7 @@ export class CoreLocalFileComponent implements OnInit {
 
         if (!CoreFileHelper.isOpenableInApp(this.file)) {
             try {
-                await CoreFileHelper.showConfirmOpenUnsupportedFile();
+                await CoreFileHelper.showConfirmOpenUnsupportedFile(false, this.file);
             } catch (error) {
                 return; // Cancelled, stop.
             }
@@ -139,7 +139,7 @@ export class CoreLocalFileComponent implements OnInit {
             options.iOSOpenFileAction = this.defaultIsOpenWithPicker ? OpenFileAction.OPEN : OpenFileAction.OPEN_WITH;
         }
 
-        CoreUtils.openFile(this.file.toURL(), options);
+        CoreUtils.openFile(CoreFile.getFileEntryURL(this.file), options);
     }
 
     /**
@@ -183,7 +183,7 @@ export class CoreLocalFileComponent implements OnInit {
 
         const modal = await CoreDomUtils.showModalLoading();
         const fileAndDir = CoreFile.getFileAndDirectoryFromPath(this.relativePath);
-        const newPath = CoreText.concatenatePaths(fileAndDir.directory, newName);
+        const newPath = CorePath.concatenatePaths(fileAndDir.directory, newName);
 
         try {
             // Check if there's a file with this name.

@@ -16,12 +16,12 @@ import { CoreFile } from '@services/file';
 import { CoreSites } from '@services/sites';
 import { CoreUrlUtils } from '@services/utils/url';
 import { CoreUtils } from '@services/utils/utils';
-import { CoreXAPI } from '@features/xapi/services/xapi';
 import { CoreH5P } from '../services/h5p';
 import { CoreH5PCore, CoreH5PDisplayOptions, CoreH5PContentData, CoreH5PDependenciesFiles } from './core';
 import { CoreH5PCoreSettings, CoreH5PHelper } from './helper';
 import { CoreH5PStorage } from './storage';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
+import { CoreXAPIIRI } from '@features/xapi/classes/iri';
 
 /**
  * Equivalent to Moodle's H5P player class.
@@ -40,7 +40,7 @@ export class CoreH5PPlayer {
      * @param fileUrl File URL.
      * @param displayOptions Display options.
      * @param component Component to send xAPI events to.
-     * @return URL.
+     * @returns URL.
      */
     calculateOnlinePlayerUrl(siteUrl: string, fileUrl: string, displayOptions?: CoreH5PDisplayOptions, component?: string): string {
         fileUrl = CoreH5P.treatH5PUrl(fileUrl, siteUrl);
@@ -51,7 +51,7 @@ export class CoreH5PPlayer {
             params.component = component;
         }
 
-        return CoreUrlUtils.addParamsToUrl(CoreText.concatenatePaths(siteUrl, '/h5p/embed.php'), params);
+        return CoreUrlUtils.addParamsToUrl(CorePath.concatenatePaths(siteUrl, '/h5p/embed.php'), params);
     }
 
     /**
@@ -63,7 +63,7 @@ export class CoreH5PPlayer {
      * @param content Content data.
      * @param embedType Embed type. The app will always use 'iframe'.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the URL of the index file.
+     * @returns Promise resolved with the URL of the index file.
      */
     async createContentIndex(
         id: number,
@@ -78,7 +78,7 @@ export class CoreH5PPlayer {
         const contentId = this.getContentId(id);
         const basePath = CoreFile.getBasePathInstant();
         const contentUrl = CoreFile.convertFileSrc(
-            CoreText.concatenatePaths(
+            CorePath.concatenatePaths(
                 basePath,
                 this.h5pCore.h5pFS.getContentFolderPath(content.folderName, site.getId()),
             ),
@@ -98,7 +98,7 @@ export class CoreH5PPlayer {
             metadata: content.metadata,
             contentUserData: [
                 {
-                    state: '{}',
+                    state: '{}', // state will be overridden in params.js to use the latest state when the package is played.
                 },
             ],
         };
@@ -122,7 +122,7 @@ export class CoreH5PPlayer {
                 JSON.stringify(result.settings).replace(/\//g, '\\/') + '</script>';
 
         // Add our own script to handle the params.
-        html += '<script type="text/javascript" src="' + CoreText.concatenatePaths(
+        html += '<script type="text/javascript" src="' + CorePath.concatenatePaths(
             this.h5pCore.h5pFS.getCoreH5PPath(),
             'moodle/js/params.js',
         ) + '"></script>';
@@ -132,7 +132,7 @@ export class CoreH5PPlayer {
         // Include the required JS at the beginning of the body, like Moodle web does.
         // Load the embed.js to allow communication with the parent window.
         html += '<script type="text/javascript" src="' +
-                CoreText.concatenatePaths(this.h5pCore.h5pFS.getCoreH5PPath(), 'moodle/js/embed.js') + '"></script>';
+                CorePath.concatenatePaths(this.h5pCore.h5pFS.getCoreH5PPath(), 'moodle/js/embed.js') + '"></script>';
 
         result.jsRequires.forEach((jsUrl) => {
             html += '<script type="text/javascript" src="' + jsUrl + '"></script>';
@@ -145,13 +145,13 @@ export class CoreH5PPlayer {
 
         const fileEntry = await CoreFile.writeFile(indexPath, html);
 
-        return fileEntry.toURL();
+        return CoreFile.getFileEntryURL(fileEntry);
     }
 
     /**
      * Delete all content indexes of all sites from filesystem.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async deleteAllContentIndexes(): Promise<void> {
         const siteIds = await CoreSites.getSitesIds();
@@ -163,19 +163,19 @@ export class CoreH5PPlayer {
      * Delete all content indexes for a certain site from filesystem.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async deleteAllContentIndexesForSite(siteId?: string): Promise<void> {
-        siteId = siteId || CoreSites.getCurrentSiteId();
+        const siteIdentifier = siteId || CoreSites.getCurrentSiteId();
 
-        if (!siteId) {
+        if (!siteIdentifier) {
             return;
         }
 
-        const records = await this.h5pCore.h5pFramework.getAllContentData(siteId);
+        const records = await this.h5pCore.h5pFramework.getAllContentData(siteIdentifier);
 
         await Promise.all(records.map(async (record) => {
-            await CoreUtils.ignoreErrors(this.h5pCore.h5pFS.deleteContentIndex(record.foldername, siteId!));
+            await CoreUtils.ignoreErrors(this.h5pCore.h5pFS.deleteContentIndex(record.foldername, siteIdentifier));
         }));
     }
 
@@ -184,7 +184,7 @@ export class CoreH5PPlayer {
      *
      * @param fileUrl File URL.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async deleteContentByUrl(fileUrl: string, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -205,7 +205,7 @@ export class CoreH5PPlayer {
      * @param content Content data.
      * @param embedType Embed type.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the assets.
+     * @returns Promise resolved with the assets.
      */
     protected async getAssets(
         id: number,
@@ -250,7 +250,7 @@ export class CoreH5PPlayer {
      * Get the identifier for the H5P content. This identifier is different than the ID stored in the DB.
      *
      * @param id Package ID.
-     * @return Content identifier.
+     * @returns Content identifier.
      */
     protected getContentId(id: number): string {
         return 'cid-' + id;
@@ -264,7 +264,7 @@ export class CoreH5PPlayer {
      * @param component Component to send xAPI events to.
      * @param contextId Context ID where the H5P is. Required for tracking.
      * @param siteId The site ID. If not defined, current site.
-     * @return Promise resolved with the file URL if exists, rejected otherwise.
+     * @returns Promise resolved with the file URL if exists, rejected otherwise.
      */
     async getContentIndexFileUrl(
         fileUrl: string,
@@ -272,6 +272,7 @@ export class CoreH5PPlayer {
         component?: string,
         contextId?: number,
         siteId?: string,
+        otherOptions: CoreH5PGetContentUrlOptions = {},
     ): Promise<string> {
         siteId = siteId || CoreSites.getCurrentSiteId();
 
@@ -282,13 +283,24 @@ export class CoreH5PPlayer {
 
         displayOptions = this.h5pCore.fixDisplayOptions(displayOptions || {}, data.id);
 
-        const params: Record<string, string> = {
+        const params: Record<string, string | number> = {
             displayOptions: JSON.stringify(displayOptions),
             component: component || '',
         };
 
         if (contextId) {
-            params.trackingUrl = await CoreXAPI.getUrl(contextId, 'activity', siteId);
+            params.trackingUrl = await CoreXAPIIRI.generate(contextId, 'activity', siteId);
+        }
+        if (otherOptions.saveFreq !== undefined) {
+            params.saveFreq = otherOptions.saveFreq;
+        }
+        if (otherOptions.state !== undefined) {
+            params.state = otherOptions.state;
+        }
+
+        const customCssUrl = await CoreUtils.ignoreErrors(CoreH5P.getCustomCssSrc(siteId));
+        if (customCssUrl) {
+            params.customCssUrl = customCssUrl;
         }
 
         return CoreUrlUtils.addParamsToUrl(path, params);
@@ -300,7 +312,7 @@ export class CoreH5PPlayer {
      * @param id Content id.
      * @param folderName Name of the folder of the content.
      * @param siteId The site ID. If not defined, current site.
-     * @return Promise resolved with the files.
+     * @returns Promise resolved with the files.
      */
     protected async getDependencyFiles(id: number, folderName: string, siteId?: string): Promise<CoreH5PDependenciesFiles> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -319,7 +331,7 @@ export class CoreH5PPlayer {
      * Get display options from a URL params.
      *
      * @param params URL params.
-     * @return Display options as object.
+     * @returns Display options as object.
      */
     getDisplayOptionsFromUrlParams(params?: {[name: string]: string}): CoreH5PDisplayOptions {
         const displayOptions: CoreH5PDisplayOptions = {};
@@ -346,7 +358,7 @@ export class CoreH5PPlayer {
      * @param siteUrl The site URL.
      * @param h5pUrl The URL of the .h5p file.
      * @param embedEnabled Whether the option to embed the H5P content is enabled.
-     * @return The HTML code to reuse this H5P content in a different place.
+     * @returns The HTML code to reuse this H5P content in a different place.
      */
     protected getEmbedCode(siteUrl: string, h5pUrl: string, embedEnabled?: boolean): string {
         if (!embedEnabled) {
@@ -361,16 +373,16 @@ export class CoreH5PPlayer {
      *
      * @param siteUrl The site URL.
      * @param h5pUrl The URL of the .h5p file.
-     * @return The embed URL.
+     * @returns The embed URL.
      */
     protected getEmbedUrl(siteUrl: string, h5pUrl: string): string {
-        return CoreText.concatenatePaths(siteUrl, '/h5p/embed.php') + '?url=' + h5pUrl;
+        return CorePath.concatenatePaths(siteUrl, '/h5p/embed.php') + '?url=' + h5pUrl;
     }
 
     /**
      * Resizing script for settings.
      *
-     * @return The HTML code with the resize script.
+     * @returns The HTML code with the resize script.
      */
     protected getResizeCode(): string {
         return '<script src="' + this.getResizerScriptUrl() + '"></script>';
@@ -379,17 +391,17 @@ export class CoreH5PPlayer {
     /**
      * Get the URL to the resizer script.
      *
-     * @return URL.
+     * @returns URL.
      */
     getResizerScriptUrl(): string {
-        return CoreText.concatenatePaths(this.h5pCore.h5pFS.getCoreH5PPath(), 'js/h5p-resizer.js');
+        return CorePath.concatenatePaths(this.h5pCore.h5pFS.getCoreH5PPath(), 'js/h5p-resizer.js');
     }
 
     /**
      * Get online player URL params from display options.
      *
      * @param options Display options.
-     * @return Object with URL params.
+     * @returns Object with URL params.
      */
     getUrlParamsFromDisplayOptions(options?: CoreH5PDisplayOptions): {[name: string]: string} {
         const params: {[name: string]: string} = {};
@@ -419,4 +431,9 @@ type AssetsSettings = CoreH5PCoreSettings & {
     moodleLibraryPaths: {
         [libString: string]: string;
     };
+};
+
+export type CoreH5PGetContentUrlOptions = {
+    saveFreq?: number; // State save frequency (if enabled).
+    state?: string; // Current state.
 };

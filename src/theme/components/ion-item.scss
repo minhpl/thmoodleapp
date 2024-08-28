@@ -1,0 +1,258 @@
+ion-item.item {
+    --detail-icon-color: var(--ion-item-detail-icon-color);
+    --detail-icon-font-size: var(--ion-item-detail-icon-font-size);
+    --detail-icon-opacity: var(--ion-item-detail-icon-opacity);
+
+    ion-input.in-item,
+    &.item-label > ion-label.label-stacked {
+        font-size: var(--mdl-typography-fontSize-lg);
+    }
+
+    > ion-icon[slot] {
+        color: var(--ion-item-icon-color);
+    }
+
+    &.item-lines-default,
+    &.item-has-interactive-control {
+        /** Remove lines by default and interactive control (toggles, radios, checkbox and selects) */
+        --inner-border-width: 0px;
+        --border-width: 0px;
+    }
+
+    &.ion-valid,
+    &.ion-invalid {
+        &.item-lines-default:not(.item-has-interactive-control) {
+            --inner-border-width: 0 0 1px 0;
+        }
+
+        &.ion-touched {
+            &.ion-invalid {
+                --ion-item-border-color: var(--highlight-color-invalid);
+                --highlight-background: var(--ion-item-border-color);
+                --border-color: var(--ion-item-border-color);
+            }
+            &.ion-valid {
+                --ion-item-border-color: var(--highlight-color-valid);
+                --highlight-background: var(--ion-item-border-color);
+                --border-color: var(--ion-item-border-color);
+            }
+        }
+    }
+
+    // Hide details on items to align badges.
+    &.hide-detail {
+        --detail-icon-opacity: 0;
+    }
+
+    &.item-has-interactive-control:focus-within {
+        @include core-focus-outline();
+    }
+
+    &.item-has-interactive-control.item-interactive-disabled {
+        pointer-events: none;
+    }
+}
+
+// Fake item.
+// The usage of this fake item is discouraged, use ion-item instead. It will be removed soon.
+div.fake-ion-item {
+    position: relative;
+    align-items: center;
+    justify-content: space-between;
+    outline: none;
+    color: var(--ion-text-color);
+    background: var(--ion-item-background);
+    text-align: initial;
+    text-decoration: none;
+    box-sizing: border-box;
+    white-space: normal;
+    overflow: inherit;
+
+    @include padding(null, var(--mdl-spacing-4), null, var(--mdl-spacing-4));
+    margin-top: var(--mdl-spacing-2);
+    margin-bottom: var(--mdl-spacing-2);
+
+    h1 {
+        @include margin(0px, 0px, 2px);
+        font: var(--mdl-typography-heading4-font);
+    }
+
+    h2 {
+        @include margin(2px, 0px);
+        font: var(--mdl-typography-heading5-font);
+    }
+
+    h3,
+    h4,
+    h5,
+    h6 {
+        @include margin(2px, 0px);
+        font: var(--mdl-typography-heading6-font);
+    }
+
+    p {
+        @include margin(0px, 0px, 2px);
+        font: var(--mdl-typography-body-font-md);
+        line-height: 20px;
+    }
+
+    core-format-text,
+    core-format-text > *:not(pre) {
+        white-space: normal;
+        overflow: inherit;
+    }
+}
+
+ion-item.item,
+ion-item-divider.item {
+    > ion-label p {
+        --color: var(--subdued-text-color);
+    }
+}
+
+// Item Headings.
+// Some styles taken from ion-label
+ion-item.item > ion-label,
+ion-item-divider.item > ion-label,
+ion-item .in-item {
+    font-size: var(--text-size);
+
+    p {
+        color: var(--color);
+        @include margin(2px, 0);
+    }
+
+    .item-heading {
+        @include margin(2px, 0);
+
+        font-size: 1rem;
+        font-weight: normal;
+
+        text-overflow: inherit;
+        overflow: inherit;
+        white-space: inherit;
+        --color: initial;
+        color: var(--color);
+
+        &.item-heading-secondary {
+            @include margin(2px, 0);
+
+            font-size: var(--text-size);
+            font-weight: normal;
+            line-height: normal;
+
+            --color: var(--subdued-text-color);
+        }
+    }
+}
+
+// Correctly inherit ion-text-wrap onto labels.
+.item > ion-label,
+.item > ion-checkbox::part(label),
+ion-checkbox::part(label),
+.item ion-toggle::part(label),
+ion-toggle::part(label),
+.item > ion-input > label,
+ion-input > label {
+    core-format-text,
+    core-format-text > *:not(pre) {
+        @include ellipsis();
+    }
+}
+
+.item.ion-text-wrap > ion-label,
+ion-item > .in-item,
+.item.ion-text-wrap > ion-checkbox::part(label),
+ion-checkbox.ion-text-wrap::part(label),
+ion-toggle.ion-text-wrap::part(label),
+.item.ion-text-wrap > ion-toggle::part(label),
+.item.ion-text-wrap > ion-input > label,
+ion-input.ion-text-wrap > label {
+    white-space: normal;
+    overflow: inherit;
+
+    core-format-text,
+    core-format-text > *:not(pre) {
+        white-space: normal;
+        overflow: inherit;
+    }
+}
+
+ion-item .core-input-errors-wrapper {
+    width: 100%;
+}
+
+ion-item.item.item-file {
+    ion-thumbnail {
+        --size: 32px;
+        width: var(--size);
+        height: var(--size);
+    }
+
+    p.item-heading {
+        font-size: var(--text-size);
+    }
+
+    p {
+        font-size: var(--mdl-typography-fontSize-sm);
+    }
+
+    ion-label {
+        margin-top: 8px;
+        margin-bottom: 8px;
+    }
+
+    ion-button {
+        --a11y-sizing-minTargetSize: 40px;
+    }
+
+    &.item-directory ion-icon {
+        @include margin-horizontal(0px, var(--mdl-spacing-4));
+    }
+
+    [slot=end] {
+        @include margin-horizontal(var(--mdl-spacing-4), null);
+    }
+
+    // Disabled items.
+    &.item-disabled,
+    &.item-interactive-disabled:not(.item-multiple-inputs) ion-label {
+        opacity: var(--mdl-item-disabled-opacity) !important;
+    }
+
+    // No highlight on RTE.
+    &.item-rte {
+        --full-highlight-height: 0px !important;
+    }
+
+    &.item-multiple-inputs.only-links  a {
+        cursor: pointer;
+    }
+
+}
+
+.item-dimmed {
+    opacity: 0.7;
+    --background: var(--light);
+    ion-item {
+        --background: var(--light);
+    }
+}
+
+// Coloured items.
+@each $color-name, $unused in $colors {
+
+    ion-item.item.core-#{$color-name}-item,
+    .item.core-#{$color-name}-item {
+        --color-base: var(--ion-color-#{$color-name});
+        --color-shade: var(--ion-color-#{$color-name}-shade);
+
+        --border-width: 0 0 3px 0;
+        --border-color: var(--color-base);
+        --inner-border-width: 0px;
+
+        > ion-icon[slot] {
+            color: var(--color-base);
+        }
+    }
+}

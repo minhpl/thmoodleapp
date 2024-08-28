@@ -18,7 +18,7 @@ import { CoreSites } from '@services/sites';
 import { CoreWSExternalWarning, CoreWSExternalFile, CoreWSFile } from '@services/ws';
 import { CoreUrlUtils } from '@services/utils/url';
 import { CoreQueueRunner } from '@classes/queue-runner';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 
 import { CoreH5PCore } from '../classes/core';
 import { CoreH5PFramework } from '../classes/framework';
@@ -28,7 +28,11 @@ import { CoreH5PValidator } from '../classes/validator';
 
 import { makeSingleton } from '@singletons';
 import { CoreError } from '@classes/errors/error';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { CoreFilepool } from '@services/filepool';
+import { DownloadStatus } from '@/core/constants';
+import { CoreUtils } from '@services/utils/utils';
 
 /**
  * Service to provide H5P functionalities.
@@ -43,7 +47,8 @@ export class CoreH5PProvider {
     h5pValidator: CoreH5PValidator;
     queueRunner: CoreQueueRunner;
 
-    protected readonly ROOT_CACHE_KEY = 'CoreH5P:';
+    protected static readonly ROOT_CACHE_KEY = 'CoreH5P:';
+    protected static readonly CUSTOM_CSS_COMPONENT = 'CoreH5PCustomCSS';
 
     constructor() {
         this.queueRunner = new CoreQueueRunner(1);
@@ -59,7 +64,7 @@ export class CoreH5PProvider {
      * Returns whether or not WS to get trusted H5P file is available.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with true if ws is available, false otherwise.
+     * @returns Promise resolved with true if ws is available, false otherwise.
      * @since 3.8
      */
     async canGetTrustedH5PFile(siteId?: string): Promise<boolean> {
@@ -72,7 +77,7 @@ export class CoreH5PProvider {
      * Returns whether or not WS to get trusted H5P file is available in a certain site.
      *
      * @param site Site. If not defined, current site.
-     * @return Promise resolved with true if ws is available, false otherwise.
+     * @returns Promise resolved with true if ws is available, false otherwise.
      * @since 3.8
      */
     canGetTrustedH5PFileInSite(site?: CoreSite): boolean {
@@ -82,13 +87,43 @@ export class CoreH5PProvider {
     }
 
     /**
+     * Get the src URL to load custom CSS styles for H5P.
+     *
+     * @param siteId Site ID. If not defined, current site.
+     * @returns Src URL, undefined if no custom CSS.
+     */
+    async getCustomCssSrc(siteId?: string): Promise<string | undefined> {
+        const site = await CoreSites.getSite(siteId);
+
+        const customCssUrl = await site.getStoredConfig('h5pcustomcssurl');
+        if (!customCssUrl) {
+            return;
+        }
+
+        const state = await CoreFilepool.getFileStateByUrl(site.getId(), customCssUrl);
+        if (state === DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED) {
+            // File not downloaded, URL has changed or first time. Delete previously downloaded file.
+            await CoreUtils.ignoreErrors(
+                CoreFilepool.removeFilesByComponent(site.getId(), CoreH5PProvider.CUSTOM_CSS_COMPONENT, 1),
+            );
+        }
+
+        if (state !== DownloadStatus.DOWNLOADED) {
+            // Download CSS styles first.
+            await CoreFilepool.downloadUrl(site.getId(), customCssUrl, false, CoreH5PProvider.CUSTOM_CSS_COMPONENT, 1);
+        }
+
+        return await CoreFilepool.getInternalSrcByUrl(site.getId(), customCssUrl);
+    }
+
+    /**
      * Get a trusted H5P file.
      *
      * @param url The file URL.
      * @param options Options.
      * @param ignoreCache Whether to ignore cache.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the file data.
+     * @returns Promise resolved with the file data.
      */
     async getTrustedH5PFile(
         url: string,
@@ -135,7 +170,7 @@ export class CoreH5PProvider {
      * Get cache key for trusted H5P file WS calls.
      *
      * @param url The file URL.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getTrustedH5PFileCacheKey(url: string): string {
         return this.getTrustedH5PFilePrefixCacheKey() + url;
@@ -144,17 +179,17 @@ export class CoreH5PProvider {
     /**
      * Get prefixed cache key for trusted H5P file WS calls.
      *
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getTrustedH5PFilePrefixCacheKey(): string {
-        return this.ROOT_CACHE_KEY + 'trustedH5PFile:';
+        return CoreH5PProvider.ROOT_CACHE_KEY + 'trustedH5PFile:';
     }
 
     /**
      * Invalidates all trusted H5P file WS calls.
      *
      * @param siteId Site ID (empty for current site).
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateAllGetTrustedH5PFile(siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -167,7 +202,7 @@ export class CoreH5PProvider {
      *
      * @param url The URL of the file.
      * @param siteId Site ID (empty for current site).
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateGetTrustedH5PFile(url: string, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -179,7 +214,7 @@ export class CoreH5PProvider {
      * Check whether H5P offline is disabled.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: whether is disabled.
+     * @returns Promise resolved with boolean: whether is disabled.
      */
     async isOfflineDisabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -191,7 +226,7 @@ export class CoreH5PProvider {
      * Check whether H5P offline is disabled.
      *
      * @param site Site instance. If not defined, current site.
-     * @return Whether is disabled.
+     * @returns Whether is disabled.
      */
     isOfflineDisabledInSite(site?: CoreSite): boolean {
         site = site || CoreSites.getCurrentSite();
@@ -204,10 +239,10 @@ export class CoreH5PProvider {
      *
      * @param url H5P file URL.
      * @param siteUrl Site URL.
-     * @return Treated url.
+     * @returns Treated url.
      */
     treatH5PUrl(url: string, siteUrl: string): string {
-        if (url.indexOf(CoreText.concatenatePaths(siteUrl, '/webservice/pluginfile.php')) === 0) {
+        if (url.indexOf(CorePath.concatenatePaths(siteUrl, '/webservice/pluginfile.php')) === 0) {
             url = url.replace('/webservice/pluginfile', '/pluginfile');
         }
 

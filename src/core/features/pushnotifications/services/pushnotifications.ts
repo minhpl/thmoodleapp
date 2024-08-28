@@ -13,8 +13,8 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { ILocalNotification } from '@ionic-native/local-notifications';
-import { NotificationEventResponse, PushOptions, RegistrationEventResponse } from '@ionic-native/push/ngx';
+import { ILocalNotification } from '@awesome-cordova-plugins/local-notifications';
+import { NotificationEventResponse, PushOptions, RegistrationEventResponse } from '@awesome-cordova-plugins/push/ngx';
 
 import { CoreApp } from '@services/app';
 import { CoreSites } from '@services/sites';
@@ -24,8 +24,8 @@ import { CoreUtils } from '@services/utils/utils';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreConfig } from '@services/config';
 import { CoreConstants } from '@/core/constants';
-import { CoreSite, CoreSiteInfo } from '@classes/site';
-import { makeSingleton, Badge, Push, Device, Translate, Platform, ApplicationInit, NgZone } from '@singletons';
+import { CoreSite } from '@classes/sites/site';
+import { makeSingleton, Badge, Device, Translate, ApplicationInit, NgZone } from '@singletons';
 import { CoreLogger } from '@singletons/logger';
 import { CoreEvents } from '@singletons/events';
 import {
@@ -36,6 +36,10 @@ import {
     CorePushNotificationsPendingUnregisterDBRecord,
     CorePushNotificationsRegisteredDeviceDBRecord,
     CorePushNotificationsBadgeDBRecord,
+    REGISTERED_DEVICES_TABLE_PRIMARY_KEYS,
+    CorePushNotificationsRegisteredDeviceDBPrimaryKeys,
+    CorePushNotificationsBadgeDBPrimaryKeys,
+    BADGE_TABLE_PRIMARY_KEYS,
 } from './database/pushnotifications';
 import { CoreError } from '@classes/errors/error';
 import { CoreWSExternalWarning } from '@services/ws';
@@ -46,6 +50,10 @@ import { CoreDatabaseTable } from '@classes/database/database-table';
 import { CoreDatabaseCachingStrategy, CoreDatabaseTableProxy } from '@classes/database/database-table-proxy';
 import { CoreObject } from '@singletons/object';
 import { lazyMap, LazyMap } from '@/core/utils/lazy-map';
+import { CorePlatform } from '@services/platform';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreSiteInfo } from '@classes/sites/unauthenticated-site';
+import { Push } from '@features/native/plugins';
 
 /**
  * Service to handle push notifications.
@@ -57,23 +65,38 @@ export class CorePushNotificationsProvider {
 
     protected logger: CoreLogger;
     protected pushID?: string;
-    protected badgesTable = asyncInstance<CoreDatabaseTable<CorePushNotificationsBadgeDBRecord, 'siteid' | 'addon'>>();
+    protected badgesTable =
+        asyncInstance<CoreDatabaseTable<CorePushNotificationsBadgeDBRecord, CorePushNotificationsBadgeDBPrimaryKeys>>();
+
     protected pendingUnregistersTable =
         asyncInstance<CoreDatabaseTable<CorePushNotificationsPendingUnregisterDBRecord, 'siteid'>>();
 
     protected registeredDevicesTables:
-        LazyMap<AsyncInstance<CoreDatabaseTable<CorePushNotificationsRegisteredDeviceDBRecord, 'appid' | 'uuid'>>>;
+        LazyMap<
+            AsyncInstance<
+                CoreDatabaseTable<
+                    CorePushNotificationsRegisteredDeviceDBRecord,
+                    CorePushNotificationsRegisteredDeviceDBPrimaryKeys,
+                    never
+                >
+            >
+        >;
 
     constructor() {
         this.logger = CoreLogger.getInstance('CorePushNotificationsProvider');
         this.registeredDevicesTables = lazyMap(
             siteId => asyncInstance(
-                () => CoreSites.getSiteTable<CorePushNotificationsRegisteredDeviceDBRecord, 'appid' | 'uuid'>(
+                () => CoreSites.getSiteTable<
+                    CorePushNotificationsRegisteredDeviceDBRecord,
+                    CorePushNotificationsRegisteredDeviceDBPrimaryKeys,
+                    never
+                >(
                     REGISTERED_DEVICES_TABLE_NAME,
                     {
                         siteId,
                         config: { cachingStrategy: CoreDatabaseCachingStrategy.None },
-                        primaryKeyColumns: ['appid', 'uuid'],
+                        primaryKeyColumns: [...REGISTERED_DEVICES_TABLE_PRIMARY_KEYS],
+                        rowIdColumn: null,
                         onDestroy: () => delete this.registeredDevicesTables[siteId],
                     },
                 ),
@@ -84,7 +107,7 @@ export class CorePushNotificationsProvider {
     /**
      * Initialize the service.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async initialize(): Promise<void> {
         await Promise.all([
@@ -102,10 +125,14 @@ export class CorePushNotificationsProvider {
 
         // Register device on Moodle site when login.
         CoreEvents.on(CoreEvents.LOGIN, async () => {
+            if (!this.canRegisterOnMoodle()) {
+                return;
+            }
+
             try {
                 await this.registerDeviceOnMoodle();
             } catch (error) {
-                this.logger.warn('Can\'t register device', error);
+                this.logger.error('Can\'t register device', error);
             }
         });
 
@@ -128,8 +155,11 @@ export class CorePushNotificationsProvider {
         CoreLocalNotifications.registerClick<CorePushNotificationsNotificationBasicData>(
             CorePushNotificationsProvider.COMPONENT,
             (notification) => {
-                // Log notification open event.
-                this.logEvent('moodle_notification_open', notification, true);
+                CoreAnalytics.logEvent({
+                    eventName: 'moodle_notification_open',
+                    type: CoreAnalyticsEventType.PUSH_NOTIFICATION,
+                    data: notification,
+                });
 
                 this.notificationClicked(notification);
             },
@@ -140,8 +170,11 @@ export class CorePushNotificationsProvider {
             'clear',
             CorePushNotificationsProvider.COMPONENT,
             (notification) => {
-                // Log notification dismissed event.
-                this.logEvent('moodle_notification_dismiss', notification, true);
+                CoreAnalytics.logEvent({
+                    eventName: 'moodle_notification_dismiss',
+                    type: CoreAnalyticsEventType.PUSH_NOTIFICATION,
+                    data: notification,
+                });
             },
         );
     }
@@ -149,10 +182,10 @@ export class CorePushNotificationsProvider {
     /**
      * Initialize the default channel for Android.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async initializeDefaultChannel(): Promise<void> {
-        await Platform.ready();
+        await CorePlatform.ready();
 
         // Create the default channel.
         this.createDefaultChannel();
@@ -166,21 +199,21 @@ export class CorePushNotificationsProvider {
     /**
      * Initialize database.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async initializeDatabase(): Promise<void> {
         try {
             await CoreApp.createTablesFromSchema(APP_SCHEMA);
-        } catch (e) {
+        } catch {
             // Ignore errors.
         }
 
         const database = CoreApp.getDB();
-        const badgesTable = new CoreDatabaseTableProxy<CorePushNotificationsBadgeDBRecord, 'siteid' | 'addon'>(
+        const badgesTable = new CoreDatabaseTableProxy<CorePushNotificationsBadgeDBRecord, CorePushNotificationsBadgeDBPrimaryKeys>(
             { cachingStrategy: CoreDatabaseCachingStrategy.Eager },
             database,
             BADGE_TABLE_NAME,
-            ['siteid', 'addon'],
+            [...BADGE_TABLE_PRIMARY_KEYS],
         );
         const pendingUnregistersTable = new CoreDatabaseTableProxy<CorePushNotificationsPendingUnregisterDBRecord, 'siteid'>(
             { cachingStrategy: CoreDatabaseCachingStrategy.Eager },
@@ -201,17 +234,17 @@ export class CorePushNotificationsProvider {
     /**
      * Check whether the device can be registered in Moodle to receive push notifications.
      *
-     * @return Whether the device can be registered in Moodle.
+     * @returns Whether the device can be registered in Moodle.
      */
     canRegisterOnMoodle(): boolean {
-        return !!this.pushID && CoreApp.isMobile();
+        return !!this.pushID && CorePlatform.isMobile();
     }
 
     /**
      * Delete all badge records for a given site.
      *
      * @param siteId Site ID.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async cleanSiteCounters(siteId: string): Promise<void> {
         try {
@@ -224,10 +257,10 @@ export class CorePushNotificationsProvider {
     /**
      * Create the default push channel. It is used to change the name.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async createDefaultChannel(): Promise<void> {
-        if (!CoreApp.isAndroid()) {
+        if (!CorePlatform.isAndroid()) {
             return;
         }
 
@@ -243,33 +276,20 @@ export class CorePushNotificationsProvider {
     }
 
     /**
-     * Enable or disable Firebase analytics.
+     * Enable or disable analytics.
      *
      * @param enable Whether to enable or disable.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
+     * @deprecated since 4.3. Use CoreAnalytics.enableAnalytics instead.
      */
     async enableAnalytics(enable: boolean): Promise<void> {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const win = <any> window; // This feature is only present in our fork of the plugin.
-
-        if (!CoreConstants.CONFIG.enableanalytics || !win.PushNotification?.enableAnalytics) {
-            return;
-        }
-
-        const deferred = CoreUtils.promiseDefer<void>();
-
-        win.PushNotification.enableAnalytics(deferred.resolve, (error) => {
-            this.logger.error('Error enabling or disabling Firebase analytics', enable, error);
-            deferred.resolve();
-        }, !!enable);
-
-        await deferred.promise;
+        return CoreAnalytics.enableAnalytics(enable);
     }
 
     /**
      * Returns options for push notifications based on device.
      *
-     * @return Promise with the push options resolved when done.
+     * @returns Promise with the push options resolved when done.
      */
     protected async getOptions(): Promise<PushOptions> {
         let soundEnabled = true;
@@ -298,18 +318,18 @@ export class CorePushNotificationsProvider {
     /**
      * Get the pushID for this device.
      *
-     * @return Push ID.
+     * @returns Push ID.
      */
     getPushId(): string | undefined {
         return this.pushID;
     }
 
     /**
-     * Get data to register the device in Moodle.
+     * Get required data to register the device in Moodle.
      *
-     * @return Data.
+     * @returns Data.
      */
-    protected getRegisterData(): CoreUserAddUserDeviceWSParams {
+    protected getRequiredRegisterData(): CoreUserAddUserDeviceWSParams {
         if (!this.pushID) {
             throw new CoreError('Cannot get register data because pushID is not set.');
         }
@@ -329,112 +349,95 @@ export class CorePushNotificationsProvider {
      * Get Sitebadge counter from the database.
      *
      * @param siteId Site ID.
-     * @return Promise resolved with the stored badge counter for the site.
+     * @returns Promise resolved with the stored badge counter for the site.
      */
     getSiteCounter(siteId: string): Promise<number> {
         return this.getAddonBadge(siteId);
     }
 
     /**
-     * Log a firebase event.
+     * Log an analytics event.
      *
-     * @param name Name of the event.
+     * @param eventName Name of the event.
      * @param data Data of the event.
-     * @param filter Whether to filter the data. This is useful when logging a full notification.
-     * @return Promise resolved when done. This promise is never rejected.
+     * @returns Promise resolved when done. This promise is never rejected.
+     * @deprecated since 4.3. Use CoreAnalytics.logEvent instead.
      */
-    async logEvent(name: string, data: Record<string, unknown>, filter?: boolean): Promise<void> {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const win = <any> window; // This feature is only present in our fork of the plugin.
-
-        if (!CoreConstants.CONFIG.enableanalytics || !win.PushNotification?.logEvent) {
-            return;
+    async logEvent(eventName: string, data: Record<string, string | number | boolean | undefined>): Promise<void> {
+        if (eventName !== 'view_item' && eventName !== 'view_item_list') {
+            return CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.PUSH_NOTIFICATION,
+                eventName,
+                data,
+            });
         }
 
-        // Check if the analytics is enabled by the user.
-        const enabled = await CoreConfig.get<boolean>(CoreConstants.SETTINGS_ANALYTICS_ENABLED, true);
-        if (!enabled) {
-            return;
-        }
+        const name = data.name ? String(data.name) : '';
+        delete data.name;
 
-        const deferred = CoreUtils.promiseDefer<void>();
-
-        win.PushNotification.logEvent(deferred.resolve, (error) => {
-            this.logger.error('Error logging firebase event', name, error);
-            deferred.resolve();
-        }, name, data, !!filter);
-
-        await deferred.promise;
+        return CoreAnalytics.logEvent({
+            type: eventName === 'view_item' ? CoreAnalyticsEventType.VIEW_ITEM : CoreAnalyticsEventType.VIEW_ITEM_LIST,
+            ws: <string> data.moodleaction ?? '',
+            name,
+            data,
+        });
     }
 
     /**
-     * Log a firebase view_item event.
+     * Log an analytics VIEW_ITEM_LIST event.
      *
      * @param itemId The item ID.
      * @param itemName The item name.
      * @param itemCategory The item category.
      * @param wsName Name of the WS.
      * @param data Other data to pass to the event.
-     * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done. This promise is never rejected.
+     * @returns Promise resolved when done. This promise is never rejected.
+     * @deprecated since 4.3. Use CoreAnalytics.logEvent instead.
      */
     logViewEvent(
         itemId: number | string | undefined,
         itemName: string | undefined,
         itemCategory: string | undefined,
         wsName: string,
-        data?: Record<string, unknown>,
-        siteId?: string,
+        data?: Record<string, string | number | boolean | undefined>,
     ): Promise<void> {
         data = data || {};
-
-        // Add "moodle" to the name of all extra params.
-        data = CoreUtils.prefixKeys(data, 'moodle');
+        data.id = itemId;
+        data.name = itemName;
+        data.category = itemCategory;
         data.moodleaction = wsName;
-        data.moodlesiteid = siteId || CoreSites.getCurrentSiteId();
 
-        if (itemId) {
-            data.item_id = itemId;
-        }
-        if (itemName) {
-            data.item_name = itemName;
-        }
-        if (itemCategory) {
-            data.item_category = itemCategory;
-        }
-
-        return this.logEvent('view_item', data, false);
+        // eslint-disable-next-line deprecation/deprecation
+        return this.logEvent('view_item', data);
     }
 
     /**
-     * Log a firebase view_item_list event.
+     * Log an analytics view item list event.
      *
      * @param itemCategory The item category.
      * @param wsName Name of the WS.
      * @param data Other data to pass to the event.
-     * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done. This promise is never rejected.
+     * @returns Promise resolved when done. This promise is never rejected.
+     * @deprecated since 4.3. Use CoreAnalytics.logEvent instead.
      */
-    logViewListEvent(itemCategory: string, wsName: string, data?: Record<string, unknown>, siteId?: string): Promise<void> {
+    logViewListEvent(
+        itemCategory: string,
+        wsName: string,
+        data?: Record<string, string | number | boolean | undefined>,
+    ): Promise<void> {
         data = data || {};
-
-        // Add "moodle" to the name of all extra params.
-        data = CoreUtils.prefixKeys(data, 'moodle');
         data.moodleaction = wsName;
-        data.moodlesiteid = siteId || CoreSites.getCurrentSiteId();
+        data.category = itemCategory;
 
-        if (itemCategory) {
-            data.item_category = itemCategory;
-        }
-
-        return this.logEvent('view_item_list', data, false);
+        // eslint-disable-next-line deprecation/deprecation
+        return this.logEvent('view_item_list', data);
     }
 
     /**
      * Function called when a push notification is clicked. Redirect the user to the right state.
      *
-     * @param notification Notification.
-     * @return Promise resolved when done.
+     * @param data Notification data.
+     * @returns Promise resolved when done.
      */
     async notificationClicked(data: CorePushNotificationsNotificationBasicData): Promise<void> {
         await ApplicationInit.donePromise;
@@ -448,6 +451,7 @@ export class CorePushNotificationsProvider {
      * if we are in background this code is executed when we open the app clicking in the notification bar.
      *
      * @param notification Notification received.
+     * @returns Promise resolved when done.
      */
     async onMessageReceived(notification: NotificationEventResponse): Promise<void> {
         const rawData: CorePushNotificationsNotificationBasicRawData = notification ? notification.additionalData : {};
@@ -457,7 +461,7 @@ export class CorePushNotificationsProvider {
             title: notification.title,
             message: notification.message,
             customdata: typeof rawData.customdata == 'string' ?
-                CoreTextUtils.parseJSON<Record<string, unknown>>(rawData.customdata, {}) : rawData.customdata,
+                CoreTextUtils.parseJSON<Record<string, string|number>>(rawData.customdata, {}) : rawData.customdata,
         });
 
         let site: CoreSite | undefined;
@@ -475,11 +479,6 @@ export class CorePushNotificationsProvider {
             return this.notificationClicked(data);
         }
 
-        // If the app is in foreground when the notification is received, it's not shown. Let's show it ourselves.
-        if (!CoreLocalNotifications.isAvailable()) {
-            return this.notifyReceived(notification, data);
-        }
-
         const localNotif: ILocalNotification = {
             id: Number(data.notId) || 1,
             data: data,
@@ -487,7 +486,7 @@ export class CorePushNotificationsProvider {
             text: notification.message,
             channel: 'PushPluginChannel',
         };
-        const isAndroid = CoreApp.isAndroid();
+        const isAndroid = CorePlatform.isAndroid();
         const extraFeatures = CoreUtils.isTrueOrOne(data.extrafeatures);
 
         if (extraFeatures && isAndroid && CoreUtils.isFalseOrZero(data.notif)) {
@@ -527,7 +526,7 @@ export class CorePushNotificationsProvider {
      *
      * @param notification Notification.
      * @param data Notification data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async notifyReceived(
         notification: NotificationEventResponse,
@@ -542,10 +541,10 @@ export class CorePushNotificationsProvider {
      * Unregisters a device from a certain Moodle site.
      *
      * @param site Site to unregister from.
-     * @return Promise resolved when device is unregistered.
+     * @returns Promise resolved when device is unregistered.
      */
     async unregisterDeviceOnMoodle(site: CoreSite): Promise<void> {
-        if (!site || !CoreApp.isMobile()) {
+        if (!site || !CorePlatform.isMobile()) {
             throw new CoreError('Cannot unregister device');
         }
 
@@ -587,7 +586,7 @@ export class CorePushNotificationsProvider {
 
         await CoreUtils.ignoreErrors(Promise.all([
             // Remove the device from the local DB.
-            this.registeredDevicesTables[site.getId()].delete(this.getRegisterData()),
+            this.registeredDevicesTables[site.getId()].delete(this.getRequiredRegisterData()),
             // Remove pending unregisters for this site.
             this.pendingUnregistersTable.deleteByPrimaryKey({ siteid: site.getId() }),
         ]));
@@ -600,7 +599,7 @@ export class CorePushNotificationsProvider {
      * @param addon Registered addon name to set the badge number.
      * @param value The number to be stored.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise resolved with the stored badge counter for the addon on the site.
+     * @returns Promise resolved with the stored badge counter for the addon on the site.
      */
     async updateAddonCounter(addon: string, value: number, siteId?: string): Promise<number> {
         if (!CorePushNotificationsDelegate.isCounterHandlerRegistered(addon)) {
@@ -618,7 +617,7 @@ export class CorePushNotificationsProvider {
     /**
      * Update total badge counter of the app.
      *
-     * @return Promise resolved with the stored badge counter for the site.
+     * @returns Promise resolved with the stored badge counter for the site.
      */
     async updateAppCounter(): Promise<number> {
         const sitesIds = await CoreSites.getSitesIds();
@@ -627,13 +626,10 @@ export class CorePushNotificationsProvider {
 
         const total = counters.reduce((previous, counter) => previous + counter, 0);
 
-        if (!CoreApp.isMobile()) {
-            // Browser doesn't have an app badge, stop.
-            return total;
+        if (CorePlatform.isMobile()) {
+            // Set the app badge on mobile.
+            await Badge.set(total);
         }
-
-        // Set the app badge.
-        await Badge.set(total);
 
         return total;
     }
@@ -643,7 +639,7 @@ export class CorePushNotificationsProvider {
      * It will return the updated site counter.
      *
      * @param siteId Site ID.
-     * @return Promise resolved with the stored badge counter for the site.
+     * @returns Promise resolved with the stored badge counter for the site.
      */
     async updateSiteCounter(siteId: string): Promise<number> {
         const addons = CorePushNotificationsDelegate.getCounterHandlers();
@@ -663,7 +659,7 @@ export class CorePushNotificationsProvider {
     /**
      * Register a device in Apple APNS or Google GCM.
      *
-     * @return Promise resolved when the device is registered.
+     * @returns Promise resolved when the device is registered.
      */
     async registerDevice(): Promise<void> {
         try {
@@ -689,12 +685,12 @@ export class CorePushNotificationsProvider {
                 // Execute the callback in the Angular zone, so change detection doesn't stop working.
                 NgZone.run(() => {
                     this.pushID = data.registrationId;
-                    if (!CoreSites.isLoggedIn()) {
+                    if (!CoreSites.isLoggedIn() || !this.canRegisterOnMoodle()) {
                         return;
                     }
 
                     this.registerDeviceOnMoodle().catch((error) => {
-                        this.logger.warn('Can\'t register device', error);
+                        this.logger.error('Can\'t register device', error);
                     });
                 });
             });
@@ -717,7 +713,7 @@ export class CorePushNotificationsProvider {
      *
      * @param siteId Site ID. If not defined, current site.
      * @param forceUnregister Whether to force unregister and register.
-     * @return Promise resolved when device is registered.
+     * @returns Promise resolved when device is registered.
      */
     async registerDeviceOnMoodle(siteId?: string, forceUnregister?: boolean): Promise<void> {
         this.logger.debug('Register device on Moodle.');
@@ -730,33 +726,47 @@ export class CorePushNotificationsProvider {
 
         try {
 
-            const data = this.getRegisterData();
-            let result = {
-                unregister: true,
-                register: true,
-            };
+            const data = this.getRequiredRegisterData();
+            data.publickey = await this.getPublicKeyForSite(site);
 
-            if (!forceUnregister) {
-                // Check if the device is already registered.
-                result = await this.shouldRegister(data, site);
-            }
+            const neededActions = await this.getRegisterDeviceActions(data, site, forceUnregister);
 
-            if (result.unregister) {
+            if (neededActions.unregister) {
                 // Unregister the device first.
                 await CoreUtils.ignoreErrors(this.unregisterDeviceOnMoodle(site));
             }
 
-            if (result.register) {
+            if (neededActions.register) {
                 // Now register the device.
-                await site.write('core_user_add_user_device', CoreUtils.clone(data));
+                const addDeviceResponse =
+                    await site.write<CoreUserAddUserDeviceWSResponse>('core_user_add_user_device', CoreUtils.clone(data));
+
+                const deviceAlreadyRegistered =
+                    addDeviceResponse[0] && addDeviceResponse[0].find(warning => warning.warningcode === 'existingkeyforthisuser');
+                if (deviceAlreadyRegistered && data.publickey) {
+                    // Device already registered, make sure the public key is up to date.
+                    await this.updatePublicKeyOnMoodle(site, data);
+                }
 
                 CoreEvents.trigger(CoreEvents.DEVICE_REGISTERED_IN_MOODLE, {}, site.getId());
 
                 // Insert the device in the local DB.
-                try {
-                    await this.registeredDevicesTables[site.getId()].insert(data);
-                } catch (err) {
-                    // Ignore errors.
+                await CoreUtils.ignoreErrors(this.registeredDevicesTables[site.getId()].insert(data));
+            } else if (neededActions.updatePublicKey) {
+                // Device already registered, make sure the public key is up to date.
+                const response = await this.updatePublicKeyOnMoodle(site, data);
+
+                if (response?.warnings?.find(warning => warning.warningcode === 'devicedoesnotexist')) {
+                    // The device doesn't exist in the server. Remove the device from the local DB and try again.
+                    await this.registeredDevicesTables[site.getId()].delete({
+                        appid: data.appid,
+                        uuid: data.uuid,
+                        name: data.name,
+                        model: data.model,
+                        platform: data.platform,
+                    });
+
+                    await this.registerDeviceOnMoodle(siteId, false);
                 }
             }
         } finally {
@@ -766,11 +776,66 @@ export class CorePushNotificationsProvider {
     }
 
     /**
+     * Get the public key to register in a site.
+     *
+     * @param site Site to register
+     * @returns Public key, undefined if the site or the device doesn't support encryption.
+     */
+    protected async getPublicKeyForSite(site: CoreSite): Promise<string | undefined> {
+        if (!site.wsAvailable('core_user_update_user_device_public_key')) {
+            return;
+        }
+
+        return await this.getPublicKey();
+    }
+
+    /**
+     * Get the device public key.
+     *
+     * @returns Public key, undefined if the device doesn't support encryption.
+     */
+    async getPublicKey(): Promise<string | undefined> {
+        if (!CorePlatform.isMobile()) {
+            return;
+        }
+
+        const publicKey = await Push.getPublicKey();
+
+        return publicKey ?? undefined;
+    }
+
+    /**
+     * Update a public key on a Moodle site.
+     *
+     * @param site Site.
+     * @param data Device data.
+     * @returns WS response, undefined if no public key.
+     */
+    protected async updatePublicKeyOnMoodle(
+        site: CoreSite,
+        data: CoreUserAddUserDeviceWSParams,
+    ): Promise<CoreUserUpdateUserDevicePublicKeyWSResponse | undefined> {
+        if (!data.publickey) {
+            return;
+        }
+
+        this.logger.debug('Update public key on Moodle.');
+
+        const params: CoreUserUpdateUserDevicePublicKeyWSParams = {
+            uuid: data.uuid,
+            appid: data.appid,
+            publickey: data.publickey,
+        };
+
+        return await site.write<CoreUserUpdateUserDevicePublicKeyWSResponse>('core_user_update_user_device_public_key', params);
+    }
+
+    /**
      * Get the addon/site badge counter from the database.
      *
      * @param siteId Site ID.
      * @param addon Registered addon name. If not defined it will store the site total.
-     * @return Promise resolved with the stored badge counter for the addon or site or 0 if none.
+     * @returns Promise resolved with the stored badge counter for the addon or site or 0 if none.
      */
     protected async getAddonBadge(siteId?: string, addon: string = 'site'): Promise<number> {
         try {
@@ -786,7 +851,7 @@ export class CorePushNotificationsProvider {
      * Retry pending unregisters.
      *
      * @param siteId If defined, retry only for that site if needed. Otherwise, retry all pending unregisters.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async retryUnregisters(siteId?: string): Promise<void> {
         const results = await this.pendingUnregistersTable.getMany(CoreObject.withoutEmpty({ siteid: siteId }));
@@ -797,7 +862,7 @@ export class CorePushNotificationsProvider {
                 result.siteid,
                 result.siteurl,
                 result.token,
-                CoreTextUtils.parseJSON<CoreSiteInfo | null>(result.info, null) || undefined,
+                { info: CoreTextUtils.parseJSON<CoreSiteInfo | null>(result.info, null) || undefined },
             );
 
             await this.unregisterDeviceOnMoodle(tmpSite);
@@ -810,7 +875,7 @@ export class CorePushNotificationsProvider {
      * @param value The number to be stored.
      * @param siteId Site ID. If not defined, use current site.
      * @param addon Registered addon name. If not defined it will store the site total.
-     * @return Promise resolved with the stored badge counter for the addon or site.
+     * @returns Promise resolved with the stored badge counter for the addon or site.
      */
     protected async saveAddonBadge(value: number, siteId?: string, addon: string = 'site'): Promise<number> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -825,16 +890,26 @@ export class CorePushNotificationsProvider {
     }
 
     /**
-     * Check if device should be registered (and unregistered first).
+     * Get the needed actions to perform to register a device.
      *
      * @param data Data of the device.
      * @param site Site to use.
-     * @return Promise resolved with booleans: whether to register/unregister.
+     * @param forceUnregister Whether to force unregister and register.
+     * @returns Whether each action needs to be performed or not.
      */
-    protected async shouldRegister(
+    protected async getRegisterDeviceActions(
         data: CoreUserAddUserDeviceWSParams,
         site: CoreSite,
-    ): Promise<{register: boolean; unregister: boolean}> {
+        forceUnregister?: boolean,
+    ): Promise<RegisterDeviceActions> {
+        if (forceUnregister) {
+            // No need to check if device is stored, always unregister and register the device.
+            return {
+                unregister: true,
+                register: true,
+                updatePublicKey: false,
+            };
+        }
 
         // Check if the device is already registered.
         const records = await CoreUtils.ignoreErrors(
@@ -849,35 +924,24 @@ export class CorePushNotificationsProvider {
 
         let isStored = false;
         let versionOrPushChanged = false;
+        let updatePublicKey = false;
 
         (records || []).forEach((record) => {
             if (record.version == data.version && record.pushid == data.pushid) {
                 // The device is already stored.
                 isStored = true;
+                updatePublicKey = !!data.publickey && record.publickey !== data.publickey;
             } else {
                 // The version or pushid has changed.
                 versionOrPushChanged = true;
             }
         });
 
-        if (isStored) {
-            // The device has already been registered, no need to register it again.
-            return {
-                register: false,
-                unregister: false,
-            };
-        } else if (versionOrPushChanged) {
-            // This data can be updated by calling register WS, no need to call unregister.
-            return {
-                register: true,
-                unregister: false,
-            };
-        } else {
-            return {
-                register: true,
-                unregister: true,
-            };
-        }
+        return {
+            register: !isStored, // No need to register if device is already stored.
+            unregister: !isStored && !versionOrPushChanged, // No need to unregister first if only version or push changed.
+            updatePublicKey,
+        };
     }
 
 }
@@ -914,7 +978,7 @@ export type CorePushNotificationsNotificationBasicRawData = {
 export type CorePushNotificationsNotificationBasicData = Omit<CorePushNotificationsNotificationBasicRawData, 'customdata'> & {
     title?: string; // Notification title.
     message?: string; // Notification message.
-    customdata?: Record<string, unknown>; // Parsed custom data.
+    customdata?: Record<string, string|number>; // Parsed custom data.
 };
 
 /**
@@ -943,9 +1007,33 @@ export type CoreUserAddUserDeviceWSParams = {
     version: string; // The device version '6.1.2' or '4.2.2' etc.
     pushid: string; // The device PUSH token/key/identifier/registration id.
     uuid: string; // The device UUID.
+    publickey?: string; // @since 4.2. The app generated public key.
 };
 
 /**
  * Data returned by core_user_add_user_device WS.
  */
 export type CoreUserAddUserDeviceWSResponse = CoreWSExternalWarning[][];
+
+/**
+ * Params of core_user_update_user_device_public_key WS.
+ */
+export type CoreUserUpdateUserDevicePublicKeyWSParams = {
+    uuid: string;
+    appid: string;
+    publickey: string;
+};
+
+/**
+ * Data returned by core_user_update_user_device_public_key WS.
+ */
+export type CoreUserUpdateUserDevicePublicKeyWSResponse = {
+    status: boolean;
+    warnings?: CoreWSExternalWarning[];
+};
+
+type RegisterDeviceActions = {
+    register: boolean; // Whether device needs to be registered in LMS.
+    unregister: boolean; // Whether device needs to be unregistered before register in LMS to make sure data is up to date.
+    updatePublicKey: boolean; // Whether only public key needs to be updated.
+};

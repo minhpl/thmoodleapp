@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { Clipboard } from '@ionic-native/clipboard/ngx';
+import { Clipboard } from '@awesome-cordova-plugins/clipboard/ngx';
 
 /**
  * Emulates the Cordova Clipboard plugin in browser.
@@ -37,7 +37,7 @@ export class ClipboardMock extends Clipboard {
      * Copy some text to the clipboard.
      *
      * @param text The text to copy.
-     * @return Promise resolved when copied.
+     * @returns Promise resolved when copied.
      */
     copy(text: string): Promise<void> {
         return new Promise((resolve, reject): void => {
@@ -46,6 +46,7 @@ export class ClipboardMock extends Clipboard {
             this.copyTextarea.select();
 
             try {
+                // eslint-disable-next-line deprecation/deprecation
                 if (document.execCommand('copy')) {
                     resolve();
                 } else {
@@ -62,7 +63,7 @@ export class ClipboardMock extends Clipboard {
     /*
      * Get the text stored in the clipboard.
      *
-     * @return Promise resolved with the text.
+     * @returns Promise resolved with the text.
      */
     paste(): Promise<string> {
         return new Promise((resolve, reject): void => {
@@ -71,6 +72,7 @@ export class ClipboardMock extends Clipboard {
             this.copyTextarea.select();
 
             try {
+                // eslint-disable-next-line deprecation/deprecation
                 if (document.execCommand('paste')) {
                     resolve(this.copyTextarea.innerHTML);
                 } else {

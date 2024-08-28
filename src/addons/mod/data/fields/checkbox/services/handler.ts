@@ -11,6 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 import {
     AddonModDataEntryField,
     AddonModDataField,
@@ -22,6 +23,7 @@ import { Injectable, Type } from '@angular/core';
 import { CoreFormFields } from '@singletons/form';
 import { makeSingleton, Translate } from '@singletons';
 import { AddonModDataFieldCheckboxComponent } from '../component/checkbox';
+import type { AddonModDataFieldPluginBaseComponent } from '@addons/mod/data/classes/base-field-plugin-component';
 
 /**
  * Handler for checkbox data field plugin.
@@ -35,7 +37,7 @@ export class AddonModDataFieldCheckboxHandlerService implements AddonModDataFiel
     /**
      * @inheritdoc
      */
-    getComponent(): Type<unknown> {
+    getComponent(): Type<AddonModDataFieldPluginBaseComponent> {
         return AddonModDataFieldCheckboxComponent;
     }
 
@@ -103,7 +105,7 @@ export class AddonModDataFieldCheckboxHandlerService implements AddonModDataFiel
      *
      * @param field Defines the field to be rendered.
      * @param inputData Data entered in the edit form.
-     * @return String with the notification or false.
+     * @returns String with the notification or false.
      */
     getFieldsNotifications(field: AddonModDataField, inputData: AddonModDataSubfieldData[]): string | undefined {
         if (field.required && (!inputData || !inputData.length || !inputData[0].value)) {

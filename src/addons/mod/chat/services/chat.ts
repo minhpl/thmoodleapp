@@ -14,15 +14,15 @@
 
 import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreCourseCommonModWSOptions } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreUser } from '@features/user/services/user';
 import { CoreSites, CoreSitesCommonWSOptions, CoreSitesReadingStrategy } from '@services/sites';
 import { CoreWSExternalFile, CoreWSExternalWarning } from '@services/ws';
 import { makeSingleton, Translate } from '@singletons';
-
-const ROOT_CACHE_KEY = 'AddonModChat:';
+import { ADDON_MOD_CHAT_COMPONENT } from '../constants';
 
 /**
  * Service that provides some features for chats.
@@ -30,8 +30,7 @@ const ROOT_CACHE_KEY = 'AddonModChat:';
 @Injectable({ providedIn: 'root' })
 export class AddonModChatProvider {
 
-    static readonly COMPONENT = 'mmaModChat';
-    static readonly POLL_INTERVAL = 4000;
+    protected static readonly ROOT_CACHE_KEY = 'AddonModChat:';
 
     /**
      * Get a chat.
@@ -39,7 +38,7 @@ export class AddonModChatProvider {
      * @param courseId Course ID.
      * @param cmId Course module ID.
      * @param options Other options.
-     * @return Promise resolved when the chat is retrieved.
+     * @returns Promise resolved when the chat is retrieved.
      */
     async getChat(courseId: number, cmId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModChatChat> {
         const site = await CoreSites.getSite(options.siteId);
@@ -50,7 +49,7 @@ export class AddonModChatProvider {
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getChatsCacheKey(courseId),
             updateFrequency: CoreSite.FREQUENCY_RARELY,
-            component: AddonModChatProvider.COMPONENT,
+            component: ADDON_MOD_CHAT_COMPONENT,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
 
@@ -69,7 +68,7 @@ export class AddonModChatProvider {
      *
      * @param chatId Chat instance ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS is executed.
+     * @returns Promise resolved when the WS is executed.
      */
     async loginUser(chatId: number, siteId?: string): Promise<string> {
         const site = await CoreSites.getSite(siteId);
@@ -87,24 +86,46 @@ export class AddonModChatProvider {
      * Report a chat as being viewed.
      *
      * @param id Chat instance ID.
-     * @param name Name of the chat.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
-    async logView(id: number, name?: string, siteId?: string): Promise<void> {
+    async logView(id: number, siteId?: string): Promise<void> {
         const params: AddonModChatViewChatWSParams = {
             chatid: id,
         };
 
-        await CoreCourseLogHelper.logSingle(
+        await CoreCourseLogHelper.log(
             'mod_chat_view_chat',
             params,
-            AddonModChatProvider.COMPONENT,
+            ADDON_MOD_CHAT_COMPONENT,
             id,
-            name,
-            'chat',
-            {},
             siteId,
+        );
+    }
+
+    /**
+     * Report chat session views.
+     *
+     * @param id Chat instance ID.
+     * @param period Session period if viewing an individual session.
+     * @param period.start Period start.
+     * @param period.end Period end.
+     */
+    async logViewSessions(id: number, period?: { start: number; end: number }): Promise<void> {
+        const params: AddonModChatViewSessionsWSParams = {
+            cmid: id,
+        };
+
+        if (period) {
+            params.start = period.start;
+            params.end = period.end;
+        }
+
+        await CoreCourseLogHelper.log(
+            'mod_chat_view_sessions',
+            params,
+            ADDON_MOD_CHAT_COMPONENT,
+            id,
         );
     }
 
@@ -115,7 +136,7 @@ export class AddonModChatProvider {
      * @param message Message text.
      * @param beepUserId Beep user ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS is executed.
+     * @returns Promise resolved when the WS is executed.
      */
     async sendMessage(sessionId: string, message: string, beepUserId: number, siteId?: string): Promise<number> {
         const site = await CoreSites.getSite(siteId);
@@ -137,7 +158,7 @@ export class AddonModChatProvider {
      * @param sessionId Chat sessiond ID.
      * @param lastTime Last time when messages were retrieved.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS is executed.
+     * @returns Promise resolved when the WS is executed.
      */
     async getLatestMessages(
         sessionId: string,
@@ -162,7 +183,7 @@ export class AddonModChatProvider {
      * @param messages Messages to get the user data for.
      * @param courseId ID of the course the messages belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise always resolved with the formatted messages.
+     * @returns Promise always resolved with the formatted messages.
      */
     async getMessagesUserData(messages: AddonModChatWSMessage[], courseId: number, siteId?: string): Promise<AddonModChatMessage[]>;
     async getMessagesUserData(
@@ -197,7 +218,7 @@ export class AddonModChatProvider {
      *
      * @param sessionId Chat sessiond ID.
      * @param options Other options.
-     * @return Promise resolved when the WS is executed.
+     * @returns Promise resolved when the WS is executed.
      */
     async getChatUsers(sessionId: string, options: CoreCourseCommonModWSOptions = {}): Promise<AddonModChatGetChatUsersWSResponse> {
         // By default, always try to get the latest data.
@@ -209,7 +230,7 @@ export class AddonModChatProvider {
             chatsid: sessionId,
         };
         const preSets: CoreSiteWSPreSets = {
-            component: AddonModChatProvider.COMPONENT,
+            component: ADDON_MOD_CHAT_COMPONENT,
             componentId: options.cmId,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
@@ -224,7 +245,7 @@ export class AddonModChatProvider {
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param showAll Whether to include incomplete sessions or not.
      * @param options Other options.
-     * @return Promise resolved with the list of sessions.
+     * @returns Promise resolved with the list of sessions.
      */
     async getSessions(
         chatId: number,
@@ -242,7 +263,7 @@ export class AddonModChatProvider {
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getSessionsCacheKey(chatId, groupId, showAll),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
-            component: AddonModChatProvider.COMPONENT,
+            component: ADDON_MOD_CHAT_COMPONENT,
             componentId: options.cmId,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
@@ -260,7 +281,7 @@ export class AddonModChatProvider {
      * @param sessionEnd Session end time.
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param options Other options.
-     * @return Promise resolved with the list of messages.
+     * @returns Promise resolved with the list of messages.
      */
     async getSessionMessages(
         chatId: number,
@@ -280,7 +301,7 @@ export class AddonModChatProvider {
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getSessionMessagesCacheKey(chatId, sessionStart, groupId),
             updateFrequency: CoreSite.FREQUENCY_RARELY,
-            component: AddonModChatProvider.COMPONENT,
+            component: ADDON_MOD_CHAT_COMPONENT,
             componentId: options.cmId,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
@@ -299,7 +320,7 @@ export class AddonModChatProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateChats(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -314,7 +335,7 @@ export class AddonModChatProvider {
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param showAll Whether to include incomplete sessions or not.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateSessions(chatId: number, groupId: number = 0, showAll: boolean = false, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -327,7 +348,7 @@ export class AddonModChatProvider {
      *
      * @param chatId Chat ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateAllSessions(chatId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -342,7 +363,7 @@ export class AddonModChatProvider {
      * @param sessionStart Session start time.
      * @param groupId Group ID, 0 means that the function will determine the user group.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateSessionMessages(chatId: number, sessionStart: number, groupId: number = 0, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -355,7 +376,7 @@ export class AddonModChatProvider {
      *
      * @param chatId Chat ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateAllSessionMessages(chatId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -367,10 +388,10 @@ export class AddonModChatProvider {
      * Get cache key for chats WS call.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getChatsCacheKey(courseId: number): string {
-        return ROOT_CACHE_KEY + 'chats:' + courseId;
+        return AddonModChatProvider.ROOT_CACHE_KEY + 'chats:' + courseId;
     }
 
     /**
@@ -379,7 +400,7 @@ export class AddonModChatProvider {
      * @param chatId Chat ID.
      * @param groupId Goup ID, 0 means that the function will determine the user group.
      * @param showAll Whether to include incomplete sessions or not.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getSessionsCacheKey(chatId: number, groupId: number, showAll: boolean): string {
         return this.getSessionsCacheKeyPrefix(chatId) + groupId + ':' + (showAll ? 1 : 0);
@@ -389,10 +410,10 @@ export class AddonModChatProvider {
      * Get cache key prefix for sessions WS call.
      *
      * @param chatId Chat ID.
-     * @return Cache key prefix.
+     * @returns Cache key prefix.
      */
     protected getSessionsCacheKeyPrefix(chatId: number): string {
-        return ROOT_CACHE_KEY + 'sessions:' + chatId + ':';
+        return AddonModChatProvider.ROOT_CACHE_KEY + 'sessions:' + chatId + ':';
     }
 
     /**
@@ -401,7 +422,7 @@ export class AddonModChatProvider {
      * @param chatId Chat ID.
      * @param sessionStart Session start time.
      * @param groupId Group ID, 0 means that the function will determine the user group.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getSessionMessagesCacheKey(chatId: number, sessionStart: number, groupId: number): string {
         return this.getSessionMessagesCacheKeyPrefix(chatId) + sessionStart + ':' + groupId;
@@ -411,10 +432,10 @@ export class AddonModChatProvider {
      * Get cache key prefix for session messages WS call.
      *
      * @param chatId Chat ID.
-     * @return Cache key prefix.
+     * @returns Cache key prefix.
      */
     protected getSessionMessagesCacheKeyPrefix(chatId: number): string {
-        return ROOT_CACHE_KEY + 'sessionsMessages:' + chatId + ':';
+        return AddonModChatProvider.ROOT_CACHE_KEY + 'sessionsMessages:' + chatId + ':';
     }
 
 }
@@ -480,6 +501,15 @@ export type AddonModChatLoginUserWSResponse = {
  */
 export type AddonModChatViewChatWSParams = {
     chatid: number; // Chat instance id.
+};
+
+/**
+ * Params of mod_chat_view_sessions WS.
+ */
+export type AddonModChatViewSessionsWSParams = {
+    cmid: number; // Course module id.
+    start?: number; // Session start time.
+    end?: number; // Session end time.
 };
 
 /**

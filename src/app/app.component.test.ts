@@ -13,37 +13,16 @@
 // limitations under the License.
 
 import { AppComponent } from '@/app/app.component';
-import { CoreEvents } from '@singletons/events';
-import { CoreLang, CoreLangProvider } from '@services/lang';
 
-import { mockSingleton, renderComponent } from '@/testing/utils';
-import { CoreNavigator, CoreNavigatorService } from '@services/navigator';
+import { renderComponent } from '@/testing/utils';
 
 describe('AppComponent', () => {
-
-    let langProvider: CoreLangProvider;
-    let navigator: CoreNavigatorService;
-
-    beforeEach(() => {
-        navigator = mockSingleton(CoreNavigator, ['navigate']);
-        langProvider = mockSingleton(CoreLang, ['clearCustomStrings']);
-    });
 
     it('should render', async () => {
         const fixture = await renderComponent(AppComponent);
 
         expect(fixture.debugElement.componentInstance).toBeTruthy();
         expect(fixture.nativeElement.querySelector('ion-router-outlet')).toBeTruthy();
-    });
-
-    it('cleans up on logout', async () => {
-        const fixture = await renderComponent(AppComponent);
-
-        fixture.componentInstance.ngOnInit();
-        CoreEvents.trigger(CoreEvents.LOGOUT);
-
-        expect(langProvider.clearCustomStrings).toHaveBeenCalled();
-        expect(navigator.navigate).toHaveBeenCalledWith('/login/sites', { reset: true });
     });
 
 });

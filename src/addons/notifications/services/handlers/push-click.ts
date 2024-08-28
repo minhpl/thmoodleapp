@@ -39,9 +39,9 @@ export class AddonNotificationsPushClickHandlerService implements CorePushNotifi
      * Check if a notification click is handled by this handler.
      *
      * @param notification The notification to check.
-     * @return Whether the notification click is handled by this handler
+     * @returns Whether the notification click is handled by this handler
      */
-    async handles(notification: AddonNotificationsNotificationData): Promise<boolean> {
+    async handles(notification: AddonNotificationsPushNotification): Promise<boolean> {
         if (!notification.moodlecomponent) {
             // The notification doesn't come from Moodle. Handle it.
             return true;
@@ -61,9 +61,9 @@ export class AddonNotificationsPushClickHandlerService implements CorePushNotifi
      * Mark the notification as read.
      *
      * @param notification Notification to mark.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    protected async markAsRead(notification: AddonNotificationsNotificationData): Promise<void> {
+    protected async markAsRead(notification: AddonNotificationsPushNotification): Promise<void> {
         await CoreUtils.ignoreErrors(AddonNotificationsHelper.markNotificationAsRead(notification));
     }
 
@@ -71,9 +71,9 @@ export class AddonNotificationsPushClickHandlerService implements CorePushNotifi
      * Handle the notification click.
      *
      * @param notification The notification to check.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async handleClick(notification: AddonNotificationsNotificationData): Promise<void> {
+    async handleClick(notification: AddonNotificationsPushNotification): Promise<void> {
 
         if (notification.customdata?.extendedtext) {
             // Display the text in a modal.
@@ -137,8 +137,9 @@ export class AddonNotificationsPushClickHandlerService implements CorePushNotifi
 
 export const AddonNotificationsPushClickHandler = makeSingleton(AddonNotificationsPushClickHandlerService);
 
-export type AddonNotificationsNotificationData = CorePushNotificationsNotificationBasicData & {
+export type AddonNotificationsPushNotification = CorePushNotificationsNotificationBasicData & {
     contexturl?: string; // URL related to the notification.
     savedmessageid?: number; // Notification ID (optional).
     id?: number; // Notification ID (optional).
+    date?: string | number; // Notification date (timestamp). E.g. "1669204700".
 };

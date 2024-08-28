@@ -21,11 +21,12 @@ import { CoreDatabaseCachingStrategy, CoreDatabaseTableProxy } from '@classes/da
 import { CoreApp } from '@services/app';
 import { CoreUtils } from '@services/utils/utils';
 import { AngularFrameworkDelegate, makeSingleton } from '@singletons';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 import { CoreDom } from '@singletons/dom';
 import { CoreSubscriptions } from '@singletons/subscriptions';
 import { CoreUserToursUserTourComponent } from '../components/user-tour/user-tour';
 import { APP_SCHEMA, CoreUserToursDBEntry, USER_TOURS_TABLE_NAME } from './database/user-tours';
+import { CorePromisedValue } from '@classes/promised-value';
 
 /**
  * Service to manage User Tours.
@@ -35,6 +36,7 @@ export class CoreUserToursService {
 
     protected table = asyncInstance<CoreDatabaseTable<CoreUserToursDBEntry>>();
     protected tours: { component: CoreUserToursUserTourComponent; visible: boolean }[] = [];
+    protected toursListeners: Partial<Record<string, CorePromisedValue<void>[]>> = {};
 
     /**
      * Initialize database.
@@ -47,7 +49,6 @@ export class CoreUserToursService {
                 { cachingStrategy: CoreDatabaseCachingStrategy.Eager },
                 CoreApp.getDB(),
                 USER_TOURS_TABLE_NAME,
-                ['id'],
             );
 
             await table.initialize();
@@ -114,13 +115,21 @@ export class CoreUserToursService {
 
         await CoreUtils.wait(delay ?? 200);
 
+        options.after && await this.waitForUserTour(options.after, options.afterTimeout);
+
         const container = document.querySelector('ion-app') ?? document.body;
+        const viewContainer = container.querySelector('ion-router-outlet, ion-nav, #ion-view-container-root');
         const element = await AngularFrameworkDelegate.attachViewToDom(
             container,
             CoreUserToursUserTourComponent,
             { ...componentOptions, container },
         );
-        const tour = CoreComponentsRegistry.require(element, CoreUserToursUserTourComponent);
+        const tour = CoreDirectivesRegistry.require(element, CoreUserToursUserTourComponent);
+
+        viewContainer?.setAttribute('aria-hidden', 'true');
+        viewContainer?.setAttribute('tabindex', '-1');
+
+        this.toursListeners[options.id]?.forEach(listener => listener.resolve());
 
         return this.startTour(tour, options.watch ?? (options as CoreUserToursFocusedOptions).focus);
     }
@@ -132,6 +141,17 @@ export class CoreUserToursService {
      */
     async dismiss(acknowledge: boolean = true): Promise<void> {
         await this.getForegroundTour()?.dismiss(acknowledge);
+
+        if (this.hasVisibleTour()) {
+            return;
+        }
+
+        const container = document.querySelector('ion-app') ?? document.body;
+        const viewContainer = container.querySelector('ion-router-outlet, ion-nav, #ion-view-container-root');
+
+        viewContainer?.removeAttribute('aria-hidden');
+        viewContainer?.removeAttribute('tabindex');
+
     }
 
     /**
@@ -235,16 +255,25 @@ export class CoreUserToursService {
     /**
      * Returns the first visible tour in the stack.
      *
-     * @return foreground tour if found or undefined.
+     * @returns foreground tour if found or undefined.
      */
     protected getForegroundTour(): CoreUserToursUserTourComponent | undefined {
         return this.tours.find(({ visible }) => visible)?.component;
     }
 
     /**
+     * Check whether any tour is visible.
+     *
+     * @returns Whether any tour is visible.
+     */
+    protected hasVisibleTour(): boolean {
+        return this.tours.some(({ visible }) => visible);
+    }
+
+    /**
      * Returns the tour index in the stack.
      *
-     * @return Tour index if found or -1 otherwise.
+     * @returns Tour index if found or -1 otherwise.
      */
     protected getTourIndex(tour: CoreUserToursUserTourComponent): number {
         return this.tours.findIndex(({ component }) => component === tour);
@@ -277,7 +306,7 @@ export class CoreUserToursService {
      * Is user Tour disabled?
      *
      * @param tourId Tour Id or undefined to check all user tours.
-     * @return Wether a particular or all user tours are disabled.
+     * @returns Whether a particular or all user tours are disabled.
      */
     isDisabled(tourId?: string): boolean {
         if (CoreConstants.CONFIG.disableUserTours) {
@@ -298,6 +327,30 @@ export class CoreUserToursService {
         await this.table.delete();
     }
 
+    /**
+     * Wait for another user tour to be shown.
+     *
+     * @param id Id of the user tour to wait for.
+     * @param timeout Timeout after which the waiting will end regardless of the user tour having been shown or not.
+     */
+    async waitForUserTour(id: string, timeout?: number): Promise<void> {
+        const listener = new CorePromisedValue<void>();
+        const listeners = this.toursListeners[id] = this.toursListeners[id] ?? [];
+        const removeListener = () => {
+            const index = listeners.indexOf(listener);
+
+            if (index !== -1) {
+                listeners.splice(index, 1);
+            }
+        };
+
+        listeners.push(listener);
+        listener.then(removeListener).catch(removeListener);
+        timeout && setTimeout(() => listener.resolve(), timeout);
+
+        await listener;
+    }
+
 }
 
 export const CoreUserTours = makeSingleton(CoreUserToursService);
@@ -308,8 +361,8 @@ export const CoreUserTours = makeSingleton(CoreUserToursService);
 export interface CoreUserToursUserTour {
 
     /**
-     * Cancelling a User Tours removed it from the queue if it was pending or dimisses it without
-     * acknowledging if it existed.
+     * Cancelling a User Tour removes it from the queue if it was pending or dismisses it without
+     * acknowledging.
      */
     cancel(): Promise<void>;
 
@@ -369,6 +422,16 @@ export interface CoreUserToursBasicOptions {
      * the focused element, but it can be disabled by explicitly using `false` here.
      */
     watch?: HTMLElement | false;
+
+    /**
+     * Whether to show this user tour only after another user tour with the given id has been shown.
+     */
+    after?: string;
+
+    /**
+     * Whether to show this user tour after the given timeout (in milliseconds) if the other user-tour hasn't been shown.
+     */
+    afterTimeout?: number;
 
 }
 

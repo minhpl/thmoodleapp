@@ -1,46 +1,70 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
     display: inline-block;
-    --size: var(--module-icon-size);
+    --size: var(--module-icon-size, 32px);
+    --padding-start: var(--module-icon-padding, 4px);
+    --padding-top: var(--module-icon-padding, 4px);
+    --padding-end: var(--module-icon-padding, 4px);
+    --padding-bottom: var(--module-icon-padding, 4px);
+    --icon-radius: var(--module-icon-radius, var(--mdl-shape-borderRadius-xs));
     --margin-end: 0px;
     --margin-vertical: 0px;
-    --icon-radius: var(--small-radius);
-    --filter: brightness(0) invert(1);
+
+    min-width: calc(var(--size) + var(--padding-start) + var(--padding-end));
+    min-height: calc(var(--size) + var(--padding-top) + var(--padding-bottom));
 
     margin-top: var(--margin-vertical);
     margin-bottom: var(--margin-vertical);
-    @include margin-horizontal(null, var(--margin-end));
+    @include margin-horizontal(0px, var(--margin-end));
 
     border-radius: var(--icon-radius);
-    padding: 0.7rem;
-    background-color: $gray-100;
+    @include padding(var(--padding-top), var(--padding-end), var(--padding-bottom), var(--padding-start));
+    background-color: transparent;
     line-height: var(--size);
 
-    @each $type, $value in $activity-icon-colors {
-        &.#{$type} {
-            background-color: var(--activity#{$type});
-            img {
-                filter: var(--filter);
+    &.colorize {
+        &.version_current {
+            @each $type, $value in $activity-icon-color-filters {
+                &.#{$type}:not(.branded) {
+                    img {
+                        filter: var(--activity#{$type});
+                    }
+                }
+            }
+        }
+
+        &.version_40 {
+            background-color: var(--gray-100);
+
+            @each $type, $value in $activity-icon-background-colors {
+                &.#{$type}:not(.branded) {
+                    background-color: var(--activity-40-#{$type});
+                    img {
+                        filter: brightness(0) invert(1);
+                    }
+                }
             }
         }
     }
 
-}
+    &.version_40,
+    &.version_legacy {
+        --size: var(--module-legacy-icon-size, 24px);
+        --padding-start: var(--module-legacy-icon-padding, 8px);
+        --padding-top: var(--module-legacy-icon-padding, 8px);
+        --padding-end: var(--module-legacy-icon-padding, 8px);
+        --padding-bottom: var(--module-legacy-icon-padding, 8px);
+    }
 
-img {
-    width: var(--size);
-    height: var(--size);
-    max-width: var(--size);
-    max-height: var(--size);
-    min-width: var(--size);
-    min-height: var(--size);
-    vertical-align: top;
-
-    &[alt] {
-        text-indent: -999999px;
-        white-space: nowrap;
-        overflow: hidden;
+    img {
+        width: var(--size);
+        height: var(--size);
+        max-width: var(--size);
+        max-height: var(--size);
+        min-width: var(--size);
+        min-height: var(--size);
+        vertical-align: top;
     }
 }
 
@@ -52,5 +76,11 @@ img {
 :host-context(ion-card ion-item) {
     --margin-vertical: 12px;
     --margin-end: 12px;
-    --icon-radius: var(--module-icon-radius);
+}
+
+:host-context(html.dark) {
+    &.version_40:not(.colorize),
+    &.version_current {
+        background-color: var(--white);
+    }
 }

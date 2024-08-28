@@ -13,13 +13,9 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { Camera, CameraOptions } from '@ionic-native/camera/ngx';
+import { Camera, CameraOptions } from '@awesome-cordova-plugins/camera/ngx';
 
 import { CoreEmulatorCaptureHelper } from './capture-helper';
-
-// @todo remove android.media.action.IMAGE_CAPTURE and android.intent.action.GET_CONTENT entries
-// from config.xml once https://github.com/apache/cordova-plugin-camera/issues/673 is resolved.
-// (this is written here because comments get stripped out from config.xml)
 
 /**
  * Emulates the Cordova Camera plugin in browser.
@@ -30,7 +26,7 @@ export class CameraMock extends Camera {
     /**
      * Remove intermediate image files that are kept in temporary storage after calling camera.getPicture.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     cleanup(): Promise<any> {
@@ -42,7 +38,7 @@ export class CameraMock extends Camera {
      * Take a picture.
      *
      * @param options Options that you want to pass to the camera.
-     * @return Promise resolved when captured.
+     * @returns Promise resolved when captured.
      */
     getPicture(options: CameraOptions): Promise<string> {
         return CoreEmulatorCaptureHelper.captureMedia('image', options);

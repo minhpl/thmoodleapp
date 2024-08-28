@@ -31,6 +31,7 @@ import { AddonModPageHelper } from '../../services/page-helper';
 export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComponent implements OnInit {
 
     component = AddonModPageProvider.COMPONENT;
+    pluginName = 'page';
     contents?: string;
     displayDescription = false;
     displayTimemodified = true;
@@ -45,7 +46,7 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         super.ngOnInit();
@@ -56,7 +57,7 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         await AddonModPage.invalidateContent(this.module.id, this.courseId);
@@ -84,7 +85,7 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
     /**
      * Load page data from WS.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadPageData(): Promise<void> {
         // Get latest title, description and some extra data. Data should've been updated in download.
@@ -114,7 +115,9 @@ export class AddonModPageIndexComponent extends CoreCourseModuleMainResourceComp
      * @inheritdoc
      */
     protected async logActivity(): Promise<void> {
-        await AddonModPage.logView(this.module.instance, this.module.name);
+        await CoreUtils.ignoreErrors(AddonModPage.logView(this.module.instance));
+
+        this.analyticsLogEvent('mod_page_view_page');
     }
 
 }

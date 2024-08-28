@@ -1,19 +1,16 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
-ion-item {
+ion-item.addon-notification-item {
+
     ion-label {
         margin-top: 8px;
         margin-bottom: 8px;
-        p.item-heading {
-            font-size: var(--text-size);
-            -webkit-line-clamp: 3;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            -webkit-box-orient: vertical;
-            display: -webkit-box;
-        }
         p {
-            font-size: 12px;
+            font: var(--mdl-typography-body-font-sm);
+            &.item-heading {
+                font-size: var(--text-size);
+                @include ellipsis(3);
+            }
         }
     }
 
@@ -23,7 +20,7 @@ ion-item {
         padding-top: 12px;
 
         ion-icon {
-            font-size: 6px;
+            font-size: #{dynamic-font(6px)};
             vertical-align: middle;
         }
     }
@@ -31,17 +28,6 @@ ion-item {
     [slot=start] {
         align-self: start;
         margin-top: 16px;
-    }
-
-    --icon-size: 16px;
-    --extra-icon-size: 12px;
-    --core-avatar-size: 32px;
-
-    div.core-notification-icon,
-    core-mod-icon.core-notification-icon {
-        padding: 8px;
-        max-width: var(--core-avatar-size);
-        max-height:  var(--core-avatar-size);
     }
 }
 
@@ -56,9 +42,7 @@ ion-item {
     pointer-events: none;
 
     ion-chip.ion-color {
-        pointer-events: all;
         margin: 0 auto;
-        box-shadow: 0 2px 4px rgba(0, 0, 0, .4);
 
         ion-spinner {
             width: 16px;

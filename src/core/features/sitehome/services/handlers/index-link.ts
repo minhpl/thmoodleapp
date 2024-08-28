@@ -22,6 +22,7 @@ import { makeSingleton } from '@singletons';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSiteHomeHomeHandlerService } from './sitehome-home';
 import { CoreMainMenuHomeHandlerService } from '@features/mainmenu/services/handlers/mainmenu';
+import { Params } from '@angular/router';
 
 /**
  * Handler to treat links to site home index.
@@ -31,19 +32,27 @@ export class CoreSiteHomeIndexLinkHandlerService extends CoreContentLinksHandler
 
     name = 'CoreSiteHomeIndexLinkHandler';
     featureName = 'CoreMainMenuDelegate_CoreSiteHome';
-    pattern = /(\/course\/view\.php.*([?&]id=\d+)|\/index\.php(\?redirect=0)?)/;
+    pattern = /(\/course\/view\.php.*([?&]id=\d+)|\/index\.php(\?redirect=0)?|\/?\?redirect=0)/;
 
     /**
      * @inheritdoc
      */
-    getActions(): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
+    getActions(siteIds: string[], url: string): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
+        const pageParams: Params = {};
+        const matches = url.match(/#inst(\d+)/);
+
+        if (matches && matches[1]) {
+            pageParams.blockInstanceId = parseInt(matches[1], 10);
+        }
+
         return [{
-            action: (siteId: string): void => {
-                CoreNavigator.navigateToSitePath(
+            action: async (siteId: string): Promise<void> => {
+                await CoreNavigator.navigateToSitePath(
                     `/${CoreMainMenuHomeHandlerService.PAGE_NAME}/${CoreSiteHomeHomeHandlerService.PAGE_NAME}`,
                     {
                         preferCurrentTab: false,
                         siteId,
+                        params: pageParams,
                     },
                 );
             },
@@ -53,10 +62,11 @@ export class CoreSiteHomeIndexLinkHandlerService extends CoreContentLinksHandler
     /**
      * @inheritdoc
      */
-    async isEnabled(siteId: string, url: string, params: Record<string, string>, courseId?: number): Promise<boolean> {
-        courseId = parseInt(params.id, 10);
+    async isEnabled(siteId: string, url: string, params: Record<string, string>): Promise<boolean> {
+        const courseId = parseInt(params.id, 10);
+
         if (!courseId) {
-            return url.includes('index.php');
+            return url.includes('index.php') || url.includes('?redirect=0');
         }
 
         const site = await CoreSites.getSite(siteId);

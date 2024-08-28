@@ -16,6 +16,7 @@ import { Component, OnInit } from '@angular/core';
 import { CoreConstants } from '@/core/constants';
 import { Http } from '@singletons';
 import { IonSearchbar } from '@ionic/angular';
+import { firstValueFrom } from 'rxjs';
 
 /**
  * Defines license info
@@ -51,8 +52,8 @@ export class CoreSettingsLicensesPage implements OnInit {
     protected allLicenses: CoreSettingsLicense[] = [];
 
     constructor() {
-        this.appLicenseVersion = CoreConstants.CONFIG.versionname.indexOf('-') > 0
-            ? 'integration'
+        this.appLicenseVersion = CoreConstants.BUILD.isDevelopment
+            ? 'main'
             : 'v' + CoreConstants.CONFIG.versionname;
 
         this.licensesUrl = 'https://raw.githubusercontent.com/moodlehq/moodleapp/' + this.appLicenseVersion + '/licenses.json';
@@ -63,7 +64,7 @@ export class CoreSettingsLicensesPage implements OnInit {
      */
     async ngOnInit(): Promise<void> {
         try {
-            const licenses = await Http.get(this.licensesUrl).toPromise();
+            const licenses = await firstValueFrom(Http.get(this.licensesUrl));
             this.allLicenses = Object.keys(licenses).map((name) => {
                 const license = licenses[name];
 

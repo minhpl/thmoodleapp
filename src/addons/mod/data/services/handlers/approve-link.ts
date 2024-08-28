@@ -13,11 +13,11 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { Params } from '@angular/router';
 import { CoreContentLinksHandlerBase } from '@features/contentlinks/classes/base-handler';
 import { CoreContentLinksAction } from '@features/contentlinks/services/contentlinks-delegate';
 import { makeSingleton } from '@singletons';
 import { AddonModDataHelper } from '../data-helper';
+import { ADDON_MOD_DATA_FEATURE_NAME } from '../../constants';
 
 /**
  * Content links handler for database approve/disapprove entry.
@@ -27,21 +27,21 @@ import { AddonModDataHelper } from '../data-helper';
 export class AddonModDataApproveLinkHandlerService extends CoreContentLinksHandlerBase {
 
     name = 'AddonModDataApproveLinkHandler';
-    featureName = 'CoreCourseModuleDelegate_AddonModData';
+    featureName = ADDON_MOD_DATA_FEATURE_NAME;
     pattern = /\/mod\/data\/view\.php.*([?&](d|approve|disapprove)=\d+)/;
     priority = 50; // Higher priority than the default link handler for view.php.
 
     /**
      * @inheritdoc
      */
-    getActions(siteIds: string[], url: string, params: Params, courseId?: number): CoreContentLinksAction[] {
+    getActions(siteIds: string[], url: string, params: Record<string, string>, courseId?: number): CoreContentLinksAction[] {
         return [{
-            action: (siteId): void => {
+            action: async (siteId): Promise<void> => {
                 const dataId = parseInt(params.d, 10);
                 const entryId = parseInt(params.approve, 10) || parseInt(params.disapprove, 10);
                 const approve = parseInt(params.approve, 10) ? true : false;
 
-                AddonModDataHelper.approveOrDisapproveEntry(dataId, entryId, approve, courseId, siteId);
+                await AddonModDataHelper.approveOrDisapproveEntry(dataId, entryId, approve, courseId, siteId);
             },
         }];
     }
@@ -49,7 +49,7 @@ export class AddonModDataApproveLinkHandlerService extends CoreContentLinksHandl
     /**
      * @inheritdoc
      */
-    async isEnabled(siteId: string, url: string, params: Params): Promise<boolean> {
+    async isEnabled(siteId: string, url: string, params: Record<string, string>): Promise<boolean> {
         if (params.d === undefined || (params.approve === undefined && params.disapprove === undefined)) {
             // Required fields not defined. Cannot treat the URL.
             return false;

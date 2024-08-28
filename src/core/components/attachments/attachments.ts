@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import { Component, Input, OnInit } from '@angular/core';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 
 import { CoreFileUploader, CoreFileUploaderTypeList } from '@features/fileuploader/services/fileuploader';
 import { CoreSites } from '@services/sites';
 import { CoreTextUtils } from '@services/utils/text';
 import { Translate } from '@singletons';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreFileUploaderHelper } from '@features/fileuploader/services/fileuploader-helper';
 import { CoreFileEntry } from '@services/file-helper';
@@ -46,7 +46,7 @@ import { CoreUtils } from '@services/utils/utils';
 })
 export class CoreAttachmentsComponent implements OnInit {
 
-    @Input() files?: CoreFileEntry[]; // List of attachments. New attachments will be added to this array.
+    @Input() files: CoreFileEntry[] = []; // List of attachments. New attachments will be added to this array.
     @Input() maxSize?: number; // Max size. -1 means unlimited, 0 means course/user max size, not defined means unknown.
     @Input() maxSubmissions?: number; // Max number of attachments. -1 means unlimited, not defined means unknown limit.
     @Input() component?: string; // Component the downloaded files will be linked to.
@@ -55,6 +55,7 @@ export class CoreAttachmentsComponent implements OnInit {
     @Input() acceptedTypes?: string; // List of supported filetypes. If undefined, all types supported.
     @Input() required?: boolean; // Whether to display the required mark.
     @Input() courseId?: number; // Course ID.
+    @Input() title = Translate.instant('core.fileuploader.attachedfiles'); // Title to display.
 
     maxSizeReadable?: string;
     maxSubmissionsReadable?: string;
@@ -99,7 +100,7 @@ export class CoreAttachmentsComponent implements OnInit {
     /**
      * Get max size of the area.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async getMaxSizeOfArea(): Promise<void> {
         if (this.courseId) {
@@ -132,7 +133,7 @@ export class CoreAttachmentsComponent implements OnInit {
     async add(): Promise<void> {
         const allowOffline = !!this.allowOffline && this.allowOffline !== 'false';
 
-        if (!allowOffline && !CoreApp.isOnline()) {
+        if (!allowOffline && !CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal('core.fileuploader.errormustbeonlinetoupload', true);
 
             return;
@@ -177,7 +178,7 @@ export class CoreAttachmentsComponent implements OnInit {
      * @param data The data received.
      */
     renamed(index: number, data: { file: FileEntry }): void {
-        this.files![index] = data.file;
+        this.files[index] = data.file;
     }
 
 }

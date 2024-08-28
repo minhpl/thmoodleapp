@@ -1,5 +1,4 @@
-@import "~theme/components/discussion.scss";
-@import "~theme/globals.scss";
+@use "theme/globals" as *;
 
 :host {
 
@@ -24,26 +23,37 @@
         color: var(--addon-messages-discussion-badge-text);
         background-color: var(--addon-messages-discussion-badge);
         display: block;
-        @include position(0, 0, null, null);
+        @include position(0px, 0px, null, null);
     }
 
     ion-header ion-toolbar ion-title {
-        padding: 0;
+        padding: 0px;
 
         h1 {
             display: flex;
             align-items: center;
-            padding: 0;
+            padding: 0px;
 
             .core-bar-button-image {
+                --userpicture-padding: 4px;
                 @include margin-horizontal(null, 6px);
             }
 
+            // Group avatar.
+            img.core-bar-button-image {
+                padding: var(--userpicture-padding);
+                width: var(--core-header-toolbar-button-image-size);
+                height: var(--core-header-toolbar-button-image-size);
+                max-width: var(--core-header-toolbar-button-image-size);
+                max-height: var(--core-header-toolbar-button-image-size);
+                border-radius: var(--core-avatar-radius);
+                display: block;
+            }
+
             core-format-text {
-                overflow: hidden;
-                text-overflow: ellipsis;
-                white-space: nowrap;
+                @include ellipsis();
                 flex-shrink: 1;
+                display: block;
             }
 
             ion-icon {

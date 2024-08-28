@@ -15,25 +15,20 @@
 import { Injectable } from '@angular/core';
 import { CoreSites } from '@services/sites';
 import {
-    AddonCalendarEvents,
-    AddonCalendarEventsGroupedByCourse,
     AddonCalendarEvent,
-    AddonCalendarGetActionEventsByCourseWSParams,
-    AddonCalendarGetActionEventsByTimesortWSParams,
-    AddonCalendarGetActionEventsByCoursesWSParams,
 } from '@addons/calendar/services/calendar';
-import moment from 'moment';
+import moment from 'moment-timezone';
 import { makeSingleton } from '@singletons';
-import { CoreSiteWSPreSets } from '@classes/site';
-
-// Cache key was maintained from block myoverview when blocks were splitted.
-const ROOT_CACHE_KEY = 'myoverview:';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
 
 /**
  * Service that provides some features regarding course overview.
  */
 @Injectable({ providedIn: 'root' })
 export class AddonBlockTimelineProvider {
+
+    // Cache key was maintained from block myoverview when blocks were splitted.
+    protected static readonly ROOT_CACHE_KEY = 'myoverview:';
 
     static readonly EVENTS_LIMIT = 20;
     static readonly EVENTS_LIMIT_PER_COURSE = 10;
@@ -45,7 +40,7 @@ export class AddonBlockTimelineProvider {
      * @param afterEventId The last seen event id.
      * @param searchValue The value a user wishes to search against.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise resolved when the info is retrieved.
+     * @returns Promise resolved when the info is retrieved.
      */
     async getActionEventsByCourse(
         courseId: number,
@@ -57,7 +52,7 @@ export class AddonBlockTimelineProvider {
 
         const time = this.getDayStart(-14); // Check two weeks ago.
 
-        const data: AddonCalendarGetActionEventsByCourseWSParams = {
+        const data: AddonBlockTimelineGetActionEventsByCourseWSParams = {
             timesortfrom: time,
             courseid: courseId,
             limitnum: AddonBlockTimelineProvider.EVENTS_LIMIT_PER_COURSE,
@@ -75,7 +70,7 @@ export class AddonBlockTimelineProvider {
             preSets.getFromCache = false;
         }
 
-        const courseEvents = await site.read<AddonCalendarEvents>(
+        const courseEvents = await site.read<AddonBlockTimelineGetActionEventsByCourseWSResponse>(
             'core_calendar_get_action_events_by_course',
             data,
             preSets,
@@ -88,7 +83,7 @@ export class AddonBlockTimelineProvider {
      * Get cache key for get calendar action events for the given course value WS call.
      *
      * @param courseId Only events in this course.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getActionEventsByCourseCacheKey(courseId: number): string {
         return this.getActionEventsByCoursesCacheKey() + ':' + courseId;
@@ -98,20 +93,24 @@ export class AddonBlockTimelineProvider {
      * Get calendar action events for a given list of courses.
      *
      * @param courseIds Course IDs.
-     * @param siteId Site ID. If not defined, use current site.
      * @param searchValue The value a user wishes to search against.
-     * @return Promise resolved when the info is retrieved.
+     * @param siteId Site ID. If not defined, use current site.
+     * @returns Promise resolved when the info is retrieved.
      */
     async getActionEventsByCourses(
         courseIds: number[],
         searchValue = '',
         siteId?: string,
     ): Promise<{[courseId: string]: { events: AddonCalendarEvent[]; canLoadMore?: number } }> {
+        if (courseIds.length === 0) {
+            return {};
+        }
+
         const site = await CoreSites.getSite(siteId);
 
         const time = this.getDayStart(-14); // Check two weeks ago.
 
-        const data: AddonCalendarGetActionEventsByCoursesWSParams = {
+        const data: AddonBlockTimelineGetActionEventsByCoursesWSParams = {
             timesortfrom: time,
             courseids: courseIds,
             limitnum: AddonBlockTimelineProvider.EVENTS_LIMIT_PER_COURSE,
@@ -125,7 +124,7 @@ export class AddonBlockTimelineProvider {
             preSets.getFromCache = false;
         }
 
-        const events = await site.read<AddonCalendarEventsGroupedByCourse>(
+        const events = await site.read<AddonBlockTimelineGetActionEventsByCoursesWSResponse>(
             'core_calendar_get_action_events_by_courses',
             data,
             preSets,
@@ -143,10 +142,10 @@ export class AddonBlockTimelineProvider {
     /**
      * Get cache key for get calendar action events for a given list of courses value WS call.
      *
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getActionEventsByCoursesCacheKey(): string {
-        return ROOT_CACHE_KEY + 'bycourse';
+        return AddonBlockTimelineProvider.ROOT_CACHE_KEY + 'bycourse';
     }
 
     /**
@@ -155,7 +154,7 @@ export class AddonBlockTimelineProvider {
      * @param afterEventId The last seen event id.
      * @param searchValue The value a user wishes to search against.
      * @param siteId Site ID. If not defined, use current site.
-     * @return Promise resolved when the info is retrieved.
+     * @returns Promise resolved when the info is retrieved.
      */
     async getActionEventsByTimesort(
         afterEventId?: number,
@@ -167,9 +166,10 @@ export class AddonBlockTimelineProvider {
         const timesortfrom = this.getDayStart(-14); // Check two weeks ago.
         const limitnum = AddonBlockTimelineProvider.EVENTS_LIMIT;
 
-        const data: AddonCalendarGetActionEventsByTimesortWSParams = {
+        const data: AddonBlockTimelineGetActionEventsByTimesortWSParams = {
             timesortfrom,
             limitnum,
+            limittononsuspendedevents: true,
         };
         if (afterEventId) {
             data.aftereventid = afterEventId;
@@ -187,7 +187,7 @@ export class AddonBlockTimelineProvider {
             preSets.cacheKey += ':' + searchValue;
         }
 
-        const result = await site.read<AddonCalendarEvents>(
+        const result = await site.read<AddonBlockTimelineGetActionEventsByTimesortWSResponse>(
             'core_calendar_get_action_events_by_timesort',
             data,
             preSets,
@@ -207,10 +207,10 @@ export class AddonBlockTimelineProvider {
     /**
      * Get prefix cache key for calendar action events based on the timesort value WS calls.
      *
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getActionEventsByTimesortPrefixCacheKey(): string {
-        return ROOT_CACHE_KEY + 'bytimesort:';
+        return AddonBlockTimelineProvider.ROOT_CACHE_KEY + 'bytimesort:';
     }
 
     /**
@@ -218,7 +218,7 @@ export class AddonBlockTimelineProvider {
      *
      * @param afterEventId The last seen event id.
      * @param limit Limit num of the call.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getActionEventsByTimesortCacheKey(afterEventId?: number, limit?: number): string {
         afterEventId = afterEventId || 0;
@@ -231,7 +231,7 @@ export class AddonBlockTimelineProvider {
      * Invalidates get calendar action events for a given list of courses WS call.
      *
      * @param siteId Site ID to invalidate. If not defined, use current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateActionEventsByCourses(siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -243,7 +243,7 @@ export class AddonBlockTimelineProvider {
      * Invalidates get calendar action events based on the timesort value WS call.
      *
      * @param siteId Site ID to invalidate. If not defined, use current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateActionEventsByTimesort(siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -256,10 +256,10 @@ export class AddonBlockTimelineProvider {
      *
      * @param course Object containing response course events info.
      * @param timeFrom Current time to filter events from.
-     * @return Object with course events and last loaded event id if more can be loaded.
+     * @returns Object with course events and last loaded event id if more can be loaded.
      */
     protected treatCourseEvents(
-        course: AddonCalendarEvents,
+        course: AddonBlockTimelineEvents,
         timeFrom: number,
     ): { events: AddonCalendarEvent[]; canLoadMore?: number } {
 
@@ -279,7 +279,7 @@ export class AddonBlockTimelineProvider {
      * Returns the timestamp at the start of the day with an optional offset.
      *
      * @param daysOffset Offset days to add or substract.
-     * @return timestamp.
+     * @returns timestamp.
      */
     getDayStart(daysOffset = 0): number {
         return moment().startOf('day').add(daysOffset, 'days').unix();
@@ -288,3 +288,77 @@ export class AddonBlockTimelineProvider {
 }
 
 export const AddonBlockTimeline = makeSingleton(AddonBlockTimelineProvider);
+
+/**
+ * Params of core_calendar_get_action_events_by_timesort WS.
+ */
+type AddonBlockTimelineGetActionEventsByTimesortWSParams = {
+    timesortfrom?: number; // Time sort from.
+    timesortto?: number; // Time sort to.
+    aftereventid?: number; // The last seen event id.
+    limitnum?: number; // Limit number.
+    limittononsuspendedevents?: boolean; // Limit the events to courses the user is not suspended in.
+    userid?: number; // The user id.
+    searchvalue?: string; // The value a user wishes to search against.
+};
+
+/**
+ * Data returned by core_calendar_get_action_events_by_timesort WS.
+ *
+ * WS Description: Get calendar action events by tiemsort
+ */
+type AddonBlockTimelineGetActionEventsByTimesortWSResponse = AddonBlockTimelineEvents;
+
+/**
+ * Params of core_calendar_get_action_events_by_course WS.
+ */
+type AddonBlockTimelineGetActionEventsByCourseWSParams = {
+    courseid: number; // Course id.
+    timesortfrom?: number; // Time sort from.
+    timesortto?: number; // Time sort to.
+    aftereventid?: number; // The last seen event id.
+    limitnum?: number; // Limit number.
+    searchvalue?: string; // The value a user wishes to search against.
+};
+
+/**
+ * Params of core_calendar_get_action_events_by_courses WS.
+ */
+type AddonBlockTimelineGetActionEventsByCoursesWSParams = {
+    courseids: number[];
+    timesortfrom?: number; // Time sort from.
+    timesortto?: number; // Time sort to.
+    limitnum?: number; // Limit number.
+    searchvalue?: string; // The value a user wishes to search against.
+};
+
+/**
+ * Data returned by calendar's events_grouped_by_course_exporter.
+ * Data returned by core_calendar_get_action_events_by_courses WS.
+ */
+type AddonBlockTimelineGetActionEventsByCoursesWSResponse = {
+    groupedbycourse: AddonBlockTimelineEventsSameCourse[]; // Groupped by course.
+};
+
+/**
+ * Data returned by calendar's events_same_course_exporter.
+ */
+type AddonBlockTimelineEventsSameCourse = AddonBlockTimelineEvents & {
+    courseid: number; // Courseid.
+};
+
+/**
+ * Data returned by core_calendar_get_action_events_by_course WS.
+ *
+ * WS Description: Get calendar action events by course
+ */
+type AddonBlockTimelineGetActionEventsByCourseWSResponse = AddonBlockTimelineEvents;
+
+/**
+ * Data returned by calendar's events_exporter.
+ */
+export type AddonBlockTimelineEvents = {
+    events: AddonCalendarEvent[]; // Events.
+    firstid: number; // Firstid.
+    lastid: number; // Lastid.
+};

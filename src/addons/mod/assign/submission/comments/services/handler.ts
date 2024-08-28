@@ -12,12 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import type { AddonModAssignSubmissionPluginBaseComponent } from '@addons/mod/assign/classes/base-submission-plugin-component';
 import { AddonModAssignAssign, AddonModAssignSubmission, AddonModAssignPlugin } from '@addons/mod/assign/services/assign';
 import { AddonModAssignSubmissionHandler } from '@addons/mod/assign/services/submission-delegate';
 import { Injectable, Type } from '@angular/core';
 import { CoreComments } from '@features/comments/services/comments';
 import { makeSingleton } from '@singletons';
 import { AddonModAssignSubmissionCommentsComponent } from '../component/comments';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Handler for comments submission plugin.
@@ -29,11 +31,7 @@ export class AddonModAssignSubmissionCommentsHandlerService implements AddonModA
     type = 'comments';
 
     /**
-     * Whether the plugin can be edited in offline for existing submissions. In general, this should return false if the
-     * plugin uses Moodle filters. The reason is that the app only prefetches filtered data, and the user should edit
-     * unfiltered data.
-     *
-     * @return Boolean or promise resolved with boolean: whether it can be edited in offline.
+     * @inheritdoc
      */
     canEditOffline(): boolean {
         // This plugin is read only, but return true to prevent blocking the edition.
@@ -41,44 +39,28 @@ export class AddonModAssignSubmissionCommentsHandlerService implements AddonModA
     }
 
     /**
-     * Return the Component to use to display the plugin data, either in read or in edit mode.
-     * It's recommended to return the class of the component, but you can also return an instance of the component.
-     *
-     * @param plugin The plugin object.
-     * @param edit Whether the user is editing.
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @inheritdoc
      */
-    getComponent(plugin: AddonModAssignPlugin, edit = false): Type<unknown> | undefined {
+    getComponent(plugin: AddonModAssignPlugin, edit = false): Type<AddonModAssignSubmissionPluginBaseComponent> | undefined {
         return edit ? undefined : AddonModAssignSubmissionCommentsComponent;
     }
 
     /**
-     * Whether or not the handler is enabled on a site level.
-     *
-     * @return True or promise resolved with true if enabled.
+     * @inheritdoc
      */
     async isEnabled(): Promise<boolean> {
         return true;
     }
 
     /**
-     * Whether or not the handler is enabled for edit on a site level.
-     *
-     * @return Whether or not the handler is enabled for edit on a site level.
+     * @inheritdoc
      */
     isEnabledForEdit(): boolean{
         return true;
     }
 
     /**
-     * Prefetch any required data for the plugin.
-     * This should NOT prefetch files. Files to be prefetched should be returned by the getPluginFiles function.
-     *
-     * @param assign The assignment.
-     * @param submission The submission.
-     * @param plugin The plugin object.
-     * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
     async prefetch(
         assign: AddonModAssignAssign,
@@ -87,7 +69,7 @@ export class AddonModAssignSubmissionCommentsHandlerService implements AddonModA
         siteId?: string,
     ): Promise<void> {
         await CoreComments.getComments(
-            'module',
+            ContextLevel.MODULE,
             assign.cmid,
             'assignsubmission_comments',
             submission.id,

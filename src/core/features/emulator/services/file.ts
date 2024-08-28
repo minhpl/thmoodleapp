@@ -12,10 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Injectable } from '@angular/core';
-import { File, Entry, DirectoryEntry, FileEntry, IWriteOptions, RemoveResult } from '@ionic-native/file/ngx';
+/* eslint-disable deprecation/deprecation */
 
-import { CoreText } from '@singletons/text';
+import { Injectable } from '@angular/core';
+import {
+    File,
+    Entry,
+    FileEntry,
+    FileSystem,
+    IWriteOptions,
+    RemoveResult,
+    DirectoryEntry,
+    DirectoryReader,
+} from '@awesome-cordova-plugins/file/ngx';
+import { CorePath } from '@singletons/path';
 
 /**
  * Implement the File Error because the ionic-native plugin doesn't implement it.
@@ -44,6 +54,86 @@ class FileError {
 }
 
 /**
+ * Native APIs used in webkit window.
+ *
+ * @deprecated since 4.4
+ */
+interface WebkitWindow {
+
+    /**
+     * @deprecated since 4.4
+     * @see https://www.w3.org/TR/2012/WD-file-system-api-20120417/
+     */
+    // eslint-disable-next-line @typescript-eslint/naming-convention
+    LocalFileSystem: {
+        readonly TEMPORARY: number;
+        readonly PERSISTENT: number;
+    };
+
+    /**
+     * @deprecated since 4.4
+     * @see https://developer.mozilla.org/en-US/docs/Web/API/Window/requestFileSystem
+     */
+    requestFileSystem(
+        type: LocalFileSystem,
+        size: number,
+        successCallback: (fileSystem: FileSystem) => void,
+        errorCallback?: (fileError: FileError) => void,
+    ): void;
+
+    /**
+     * @deprecated since 4.4
+     */
+    webkitRequestFileSystem(
+        type: LocalFileSystem,
+        size: number,
+        successCallback: (fileSystem: FileSystem) => void,
+        errorCallback?: (fileError: FileError) => void,
+    ): void;
+
+    /**
+     * @deprecated since 4.4
+     * @see https://www.w3.org/TR/2012/WD-file-system-api-20120417/
+     */
+    resolveLocalFileSystemURL(
+        url: string,
+        successCallback: (entry: Entry) => void,
+        errorCallback?: (fileError: FileError) => void,
+    ): void;
+
+    /**
+     * @deprecated since 4.4
+     */
+    webkitResolveLocalFileSystemURL(
+        url: string,
+        successCallback: (entry: Entry) => void,
+        errorCallback?: (fileError: FileError) => void,
+    ): void;
+
+}
+
+/**
+ * Native APIs used in webkit navigator.
+ *
+ * @deprecated since 4.4
+ */
+interface WebkitNavigator {
+
+    /**
+     * @deprecated since 4.4
+     * @see https://developer.chrome.com/docs/apps/offline_storage/
+     */
+    webkitPersistentStorage: {
+        requestQuota(
+            newQuotaInBytes: number,
+            successCallback?: (bytesGranted: number) => void,
+            errorCallback?: (error: Error) => void,
+        ): void;
+    };
+
+}
+
+/**
  * Emulates the Cordova File plugin in browser.
  * Most of the code is extracted from the File class of Ionic Native.
  */
@@ -55,10 +145,10 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem.
      * @param dir Name of directory to check
-     * @return Returns a Promise that resolves to true if the directory exists or rejects with an error.
+     * @returns Returns a Promise that resolves to true if the directory exists or rejects with an error.
      */
     async checkDir(path: string, dir: string): Promise<boolean> {
-        const fullPath = CoreText.concatenatePaths(path, dir);
+        const fullPath = CorePath.concatenatePaths(path, dir);
 
         await this.resolveDirectoryUrl(fullPath);
 
@@ -70,10 +160,10 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem.
      * @param file Name of file to check.
-     * @return Returns a Promise that resolves with a boolean or rejects with an error.
+     * @returns Returns a Promise that resolves with a boolean or rejects with an error.
      */
     async checkFile(path: string, file: string): Promise<boolean> {
-        const entry = await this.resolveLocalFilesystemUrl(CoreText.concatenatePaths(path, file));
+        const entry = await this.resolveLocalFilesystemUrl(CorePath.concatenatePaths(path, file));
 
         if (entry.isFile) {
             return true;
@@ -91,7 +181,7 @@ export class FileMock extends File {
      * @param srce The Entry to copy.
      * @param destDir The directory where to put the copy.
      * @param newName New name of the file/dir.
-     * @return Returns a Promise that resolves to the new Entry object or rejects with an error.
+     * @returns Returns a Promise that resolves to the new Entry object or rejects with an error.
      */
     private copyMock(srce: Entry, destDir: DirectoryEntry, newName: string): Promise<Entry> {
         return new Promise<Entry>((resolve, reject): void => {
@@ -113,7 +203,7 @@ export class FileMock extends File {
      * @param dirName Name of directory to copy.
      * @param newPath Base FileSystem of new location.
      * @param newDirName New name of directory to copy to (leave blank to remain the same).
-     * @return Returns a Promise that resolves to the new Entry object or rejects with an error.
+     * @returns Returns a Promise that resolves to the new Entry object or rejects with an error.
      */
     copyDir(path: string, dirName: string, newPath: string, newDirName: string): Promise<Entry> {
         return this.copyFileOrDir(path, dirName, newPath, newDirName);
@@ -126,7 +216,7 @@ export class FileMock extends File {
      * @param fileName Name of file to copy
      * @param newPath Base FileSystem of new location
      * @param newFileName New name of file to copy to (leave blank to remain the same)
-     * @return Returns a Promise that resolves to an Entry or rejects with an error.
+     * @returns Returns a Promise that resolves to an Entry or rejects with an error.
      */
     copyFile(path: string, fileName: string, newPath: string, newFileName: string): Promise<Entry> {
         return this.copyFileOrDir(path, fileName, newPath, newFileName || fileName);
@@ -139,12 +229,12 @@ export class FileMock extends File {
      * @param sourceName Name of file/dir to copy
      * @param destPath Path where to copy.
      * @param destName New name of file/dir.
-     * @return Returns a Promise that resolves to the new Entry or rejects with an error.
+     * @returns Returns a Promise that resolves to the new Entry or rejects with an error.
      */
     async copyFileOrDir(sourcePath: string, sourceName: string, destPath: string, destName: string): Promise<Entry> {
         const destFixed = this.fixPathAndName(destPath, destName);
 
-        const source = await this.resolveLocalFilesystemUrl(CoreText.concatenatePaths(sourcePath, sourceName));
+        const source = await this.resolveLocalFilesystemUrl(CorePath.concatenatePaths(sourcePath, sourceName));
 
         const destParentDir = await this.resolveDirectoryUrl(destFixed.path);
 
@@ -159,7 +249,7 @@ export class FileMock extends File {
      * @param path Base FileSystem.
      * @param dirName Name of directory to create
      * @param replace If true, replaces file with same name. If false returns error
-     * @return Returns a Promise that resolves with a DirectoryEntry or rejects with an error.
+     * @returns Returns a Promise that resolves with a DirectoryEntry or rejects with an error.
      */
     async createDir(path: string, dirName: string, replace: boolean): Promise<DirectoryEntry> {
         const options: Flags = {
@@ -183,7 +273,7 @@ export class FileMock extends File {
      * @param path Base FileSystem.
      * @param fileName Name of file to create.
      * @param replace If true, replaces file with same name. If false returns error.
-     * @return Returns a Promise that resolves to a FileEntry or rejects with an error.
+     * @returns Returns a Promise that resolves to a FileEntry or rejects with an error.
      */
     async createFile(path: string, fileName: string, replace: boolean): Promise<FileEntry> {
         const options: Flags = {
@@ -203,7 +293,7 @@ export class FileMock extends File {
      * Create a file writer for a certain file.
      *
      * @param fe File entry object.
-     * @return Promise resolved with the FileWriter.
+     * @returns Promise resolved with the FileWriter.
      */
     private createWriterMock(fe: FileEntry): Promise<FileWriter> {
         return new Promise<FileWriter>((resolve, reject): void => {
@@ -235,6 +325,7 @@ export class FileMock extends File {
      * @param directoryEntry Directory entry, obtained by resolveDirectoryUrl method
      * @param directoryName Directory name
      * @param flags Options
+     * @returns Promise resolved with the directory entry.
      */
     getDirectory(directoryEntry: DirectoryEntry, directoryName: string, flags: Flags): Promise<DirectoryEntry> {
         return new Promise<DirectoryEntry>((resolve, reject): void => {
@@ -260,6 +351,7 @@ export class FileMock extends File {
      * @param directoryEntry Directory entry, obtained by resolveDirectoryUrl method
      * @param fileName File name
      * @param flags Options
+     * @returns Promise resolved with the file entry.
      */
     getFile(directoryEntry: DirectoryEntry, fileName: string, flags: Flags): Promise<FileEntry> {
         return new Promise<FileEntry>((resolve, reject): void => {
@@ -280,43 +372,44 @@ export class FileMock extends File {
     /**
      * Get free disk space.
      *
-     * @return Promise resolved with the free space.
+     * @returns Promise resolved with the free space.
      */
     async getFreeDiskSpace(): Promise<number> {
         // Request a file system instance with a minimum size until we get an error.
-        if (window.requestFileSystem) {
-            let iterations = 0;
-            let maxIterations = 50;
-            const calculateByRequest = (size: number, ratio: number): Promise<number> =>
-                new Promise((resolve): void => {
-                    window.requestFileSystem(LocalFileSystem.PERSISTENT, size, () => {
-                        iterations++;
-                        if (iterations > maxIterations) {
-                            resolve(size);
+        const window = this.getEmulatorWindow();
 
-                            return;
-                        }
-                        // eslint-disable-next-line promise/catch-or-return
-                        calculateByRequest(size * ratio, ratio).then(resolve);
-                    }, () => {
-                        resolve(size / ratio);
-                    });
-                });
-
-            // General calculation, base 1MB and increasing factor 1.3.
-            let size = await calculateByRequest(1048576, 1.3);
-
-            // More accurate. Factor is 1.1.
-            iterations = 0;
-            maxIterations = 10;
-
-            size = await calculateByRequest(size, 1.1);
-
-            return size / 1024; // Return size in KB.
-
-        } else {
+        if (!window.requestFileSystem) {
             throw new Error('File system not available.');
         }
+
+        let iterations = 0;
+        let maxIterations = 50;
+        const calculateByRequest = (size: number, ratio: number): Promise<number> =>
+            new Promise((resolve): void => {
+                window.requestFileSystem(LocalFileSystem.PERSISTENT, size, () => {
+                    iterations++;
+                    if (iterations > maxIterations) {
+                        resolve(size);
+
+                        return;
+                    }
+                    // eslint-disable-next-line promise/catch-or-return
+                    calculateByRequest(size * ratio, ratio).then(resolve);
+                }, () => {
+                    resolve(size / ratio);
+                });
+            });
+
+        // General calculation, base 1MB and increasing factor 1.3.
+        let size = await calculateByRequest(1048576, 1.3);
+
+        // More accurate. Factor is 1.1.
+        iterations = 0;
+        maxIterations = 10;
+
+        size = await calculateByRequest(size, 1.1);
+
+        return size / 1024; // Return size in KB.
     }
 
     /**
@@ -324,7 +417,7 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem. Please refer to the iOS and Android filesystems above
      * @param dirName Name of directory
-     * @return Returns a Promise that resolves to an array of Entry objects or rejects with an error.
+     * @returns Returns a Promise that resolves to an array of Entry objects or rejects with an error.
      */
     async listDir(path: string, dirName: string): Promise<Entry[]> {
         const parentDir = await this.resolveDirectoryUrl(path);
@@ -337,28 +430,27 @@ export class FileMock extends File {
     /**
      * Loads an initialize the API for browser.
      *
-     * @return Promise resolved when loaded.
+     * @returns Promise resolved when loaded.
      */
     load(): Promise<string> {
         return new Promise((resolve, reject): void => {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const win = <any> window; // Convert to <any> to be able to use non-standard properties.
+            const window = this.getEmulatorWindow();
 
-            if (win.requestFileSystem === undefined) {
-                win.requestFileSystem = win.webkitRequestFileSystem;
+            if (window.requestFileSystem === undefined) {
+                window.requestFileSystem = window.webkitRequestFileSystem;
             }
-            if (win.resolveLocalFileSystemURL === undefined) {
-                win.resolveLocalFileSystemURL = win.webkitResolveLocalFileSystemURL;
+            if (window.resolveLocalFileSystemURL === undefined) {
+                window.resolveLocalFileSystemURL = window.webkitResolveLocalFileSystemURL;
             }
-            win.LocalFileSystem = {
+            window.LocalFileSystem = {
+                TEMPORARY: 0, // eslint-disable-line @typescript-eslint/naming-convention
                 PERSISTENT: 1, // eslint-disable-line @typescript-eslint/naming-convention
             };
 
             // Request a quota to use. Request 500MB.
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (<any> navigator).webkitPersistentStorage.requestQuota(500 * 1024 * 1024, (granted) => {
-                window.requestFileSystem(LocalFileSystem.PERSISTENT, granted, (entry) => {
-                    resolve(entry.root.toURL());
+            this.getEmulatorNavigator().webkitPersistentStorage.requestQuota(500 * 1024 * 1024, (granted) => {
+                window.requestFileSystem(LocalFileSystem.PERSISTENT, granted, (fileSystem: FileSystem) => {
+                    resolve(fileSystem.root.toURL());
                 }, reject);
             }, reject);
         });
@@ -370,7 +462,7 @@ export class FileMock extends File {
      * @param srce The Entry to copy.
      * @param destDir The directory where to move the file/dir.
      * @param newName New name of the file/dir.
-     * @return Returns a Promise that resolves to the new Entry object or rejects with an error.
+     * @returns Returns a Promise that resolves to the new Entry object or rejects with an error.
      */
     private moveMock(srce: Entry, destDir: DirectoryEntry, newName: string): Promise<Entry> {
         return new Promise<Entry>((resolve, reject): void => {
@@ -392,7 +484,7 @@ export class FileMock extends File {
      * @param dirName The source directory name.
      * @param newPath The destionation path to the directory.
      * @param newDirName The destination directory name.
-     * @return Returns a Promise that resolves to the new DirectoryEntry object or rejects with
+     * @returns Returns a Promise that resolves to the new DirectoryEntry object or rejects with
      *         an error.
      */
     moveDir(path: string, dirName: string, newPath: string, newDirName: string): Promise<DirectoryEntry | Entry> {
@@ -406,7 +498,7 @@ export class FileMock extends File {
      * @param fileName Name of file to move
      * @param newPath Base FileSystem of new location
      * @param newFileName New name of file to move to (leave blank to remain the same)
-     * @return Returns a Promise that resolves to the new Entry or rejects with an error.
+     * @returns Returns a Promise that resolves to the new Entry or rejects with an error.
      */
     moveFile(path: string, fileName: string, newPath: string, newFileName: string): Promise<Entry> {
         return this.moveFileOrDir(path, fileName, newPath, newFileName || fileName);
@@ -419,12 +511,12 @@ export class FileMock extends File {
      * @param sourceName Name of file/dir to copy
      * @param destPath Path where to copy.
      * @param destName New name of file/dir.
-     * @return Returns a Promise that resolves to the new Entry or rejects with an error.
+     * @returns Returns a Promise that resolves to the new Entry or rejects with an error.
      */
     async moveFileOrDir(sourcePath: string, sourceName: string, destPath: string, destName: string): Promise<Entry> {
         const destFixed = this.fixPathAndName(destPath, destName);
 
-        const source = await this.resolveLocalFilesystemUrl(CoreText.concatenatePaths(sourcePath, sourceName));
+        const source = await this.resolveLocalFilesystemUrl(CorePath.concatenatePaths(sourcePath, sourceName));
 
         const destParentDir = await this.resolveDirectoryUrl(destFixed.path);
 
@@ -436,11 +528,11 @@ export class FileMock extends File {
      *
      * @param path Path to fix.
      * @param name Name to fix.
-     * @return Fixed values.
+     * @returns Fixed values.
      */
     protected fixPathAndName(path: string, name: string): {path: string; name: string} {
 
-        const fullPath = CoreText.concatenatePaths(path, name);
+        const fullPath = CorePath.concatenatePaths(path, name);
 
         return {
             path: fullPath.substring(0, fullPath.lastIndexOf('/')),
@@ -453,7 +545,7 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem.
      * @param file Name of file, relative to path.
-     * @return Returns a Promise that resolves with the contents of the file as ArrayBuffer or rejects
+     * @returns Returns a Promise that resolves with the contents of the file as ArrayBuffer or rejects
      *         with an error.
      */
     readAsArrayBuffer(path: string, file: string): Promise<ArrayBuffer> {
@@ -465,7 +557,7 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem.
      * @param file Name of file, relative to path.
-     * @return Returns a Promise that resolves with the contents of the file as string rejects with an error.
+     * @returns Returns a Promise that resolves with the contents of the file as string rejects with an error.
      */
     readAsBinaryString(path: string, file: string): Promise<string> {
         return this.readFileMock<string>(path, file, 'BinaryString');
@@ -478,7 +570,7 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem.
      * @param file Name of file, relative to path.
-     * @return Returns a Promise that resolves with the contents of the file as data URL or rejects
+     * @returns Returns a Promise that resolves with the contents of the file as data URL or rejects
      *         with an error.
      */
     readAsDataURL(path: string, file: string): Promise<string> {
@@ -490,7 +582,7 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem.
      * @param file Name of file, relative to path.
-     * @return Returns a Promise that resolves with the contents of the file as string or rejects with an error.
+     * @returns Returns a Promise that resolves with the contents of the file as string or rejects with an error.
      */
     readAsText(path: string, file: string): Promise<string> {
         return this.readFileMock<string>(path, file, 'Text');
@@ -500,7 +592,7 @@ export class FileMock extends File {
      * Read all the files and directories inside a directory.
      *
      * @param directoryReader The directory reader.
-     * @return Promise resolved with the list of files/dirs.
+     * @returns Promise resolved with the list of files/dirs.
      */
     private readEntriesMock(directoryReader: DirectoryReader): Promise<Entry[]> {
         return new Promise<Entry[]>((resolve, reject): void => {
@@ -519,7 +611,7 @@ export class FileMock extends File {
      * @param path Base FileSystem.
      * @param file Name of file, relative to path.
      * @param readAs Format to read as.
-     * @return Returns a Promise that resolves with the contents of the file or rejects with an error.
+     * @returns Returns a Promise that resolves with the contents of the file or rejects with an error.
      */
     private async readFileMock<T>(
         path: string,
@@ -555,7 +647,7 @@ export class FileMock extends File {
      * Delete a file.
      *
      * @param entry The file to remove.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     private removeMock(entry: Entry): Promise<RemoveResult> {
         return new Promise<RemoveResult>((resolve, reject): void => {
@@ -573,7 +665,7 @@ export class FileMock extends File {
      *
      * @param path The path to the directory.
      * @param dirName The directory name.
-     * @return Returns a Promise that resolves to a RemoveResult or rejects with an error.
+     * @returns Returns a Promise that resolves to a RemoveResult or rejects with an error.
      */
     async removeDir(path: string, dirName: string): Promise<RemoveResult> {
         const parentDir = await this.resolveDirectoryUrl(path);
@@ -588,7 +680,7 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem.
      * @param fileName Name of file to remove.
-     * @return Returns a Promise that resolves to a RemoveResult or rejects with an error.
+     * @returns Returns a Promise that resolves to a RemoveResult or rejects with an error.
      */
     async removeFile(path: string, fileName: string): Promise<RemoveResult> {
         const parentDir = await this.resolveDirectoryUrl(path);
@@ -603,7 +695,7 @@ export class FileMock extends File {
      *
      * @param path Base FileSystem. Please refer to the iOS and Android filesystems above
      * @param dirName Name of directory
-     * @return Returns a Promise that resolves with a RemoveResult or rejects with an error.
+     * @returns Returns a Promise that resolves with a RemoveResult or rejects with an error.
      */
     async removeRecursively(path: string, dirName: string): Promise<RemoveResult> {
         const parentDir = await this.resolveDirectoryUrl(path);
@@ -616,7 +708,8 @@ export class FileMock extends File {
     /**
      * Resolves a local directory url.
      *
-     * @param directoryUrl directory system url
+     * @param directoryUrl Directory system url.
+     * @returns Promise resolved with the file system Entry referred to by local URL
      */
     async resolveDirectoryUrl(directoryUrl: string): Promise<DirectoryEntry> {
         const dirEntry = await this.resolveLocalFilesystemUrl(directoryUrl);
@@ -634,12 +727,13 @@ export class FileMock extends File {
     /**
      * Resolves a local file system URL.
      *
-     * @param fileUrl file system url
+     * @param fileUrl file system url.
+     * @returns Promise resolved with the file system Entry referred to by local URL
      */
     resolveLocalFilesystemUrl(fileUrl: string): Promise<Entry> {
         return new Promise<Entry>((resolve, reject): void => {
             try {
-                window.resolveLocalFileSystemURL(fileUrl, (entry: Entry) => {
+                this.getEmulatorWindow().resolveLocalFileSystemURL(fileUrl, (entry: Entry) => {
                     resolve(entry);
                 }, (error: FileError) => {
                     this.fillErrorMessageMock(error);
@@ -656,7 +750,7 @@ export class FileMock extends File {
      * Remove a directory and all its contents.
      *
      * @param de Directory to remove.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     private rimrafMock(de: DirectoryEntry): Promise<RemoveResult> {
         return new Promise<RemoveResult>((resolve, reject): void => {
@@ -674,7 +768,7 @@ export class FileMock extends File {
      *
      * @param writer File writer.
      * @param data The data to write.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected writeMock(writer: FileWriter, data: string | Blob | ArrayBuffer): Promise<void> {
         if (data instanceof Blob) {
@@ -704,7 +798,7 @@ export class FileMock extends File {
      * @param path Base FileSystem.
      * @param fileName path relative to base path.
      * @param text content or blob to write.
-     * @return Returns a Promise that resolves or rejects with an error.
+     * @returns Returns a Promise that resolves or rejects with an error.
      */
     async writeExistingFile(path: string, fileName: string, text: string | Blob): Promise<void> {
         await this.writeFile(path, fileName, text, { replace: true });
@@ -717,7 +811,7 @@ export class FileMock extends File {
      * @param fileName path relative to base path
      * @param text content or blob to write
      * @param options replace file if set to true. See WriteOptions for more information.
-     * @return Returns a Promise that resolves to updated file entry or rejects with an error.
+     * @returns Returns a Promise that resolves to updated file entry or rejects with an error.
      */
     async writeFile(
         path: string,
@@ -740,27 +834,29 @@ export class FileMock extends File {
     /**
      * Write content to FileEntry.
      *
-     * @param fe File entry object.
+     * @param fileEntry File entry object.
      * @param text Content or blob to write.
      * @param options replace file if set to true. See WriteOptions for more information.
-     * @return Returns a Promise that resolves to updated file entry or rejects with an error.
+     * @returns Returns a Promise that resolves to updated file entry or rejects with an error.
      */
-    private writeFileEntryMock(
+    private async writeFileEntryMock(
         fileEntry: FileEntry,
         text: string | Blob | ArrayBuffer,
         options: IWriteOptions,
     ): Promise<FileEntry> {
-        return this.createWriterMock(fileEntry).then((writer) => {
-            if (options.append) {
-                writer.seek(writer.length);
-            }
+        const writer = await this.createWriterMock(fileEntry);
 
-            if (options.truncate) {
-                writer.truncate(options.truncate);
-            }
+        if (options.append) {
+            writer.seek(writer.length);
+        }
 
-            return this.writeMock(writer, text);
-        }).then(() => fileEntry);
+        if (options.truncate) {
+            writer.truncate(options.truncate);
+        }
+
+        await this.writeMock(writer, text);
+
+        return fileEntry;
     }
 
     /**
@@ -768,7 +864,7 @@ export class FileMock extends File {
      *
      * @param writer File writer.
      * @param data Data to write.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     private writeFileInChunksMock(writer: FileWriter, data: Blob): Promise<void> {
         let writtenSize = 0;
@@ -792,6 +888,24 @@ export class FileMock extends File {
             };
             writeNextChunk();
         });
+    }
+
+    /**
+     * Get emulator window.
+     *
+     * @returns Emulator window.
+     */
+    private getEmulatorWindow(): WebkitWindow {
+        return window as unknown as WebkitWindow;
+    }
+
+    /**
+     * Get emulator navigator.
+     *
+     * @returns Emulator navigator.
+     */
+    private getEmulatorNavigator(): WebkitNavigator {
+        return navigator as unknown as WebkitNavigator;
     }
 
 }

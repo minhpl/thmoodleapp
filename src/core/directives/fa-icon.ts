@@ -14,12 +14,12 @@
 
 import { AfterViewInit, Directive, ElementRef, Input, OnChanges, SimpleChange } from '@angular/core';
 import { CoreLogger } from '@singletons/logger';
-import { Http } from '@singletons';
-import { CoreConstants } from '@/core/constants';
+import { CoreIcons } from '@singletons/icons';
+import { CoreConstants } from '../constants';
 
 /**
- * Directive to enable font-awesome 5 as ionicons.
- * Check available icons at https://fontawesome.com/icons?d=gallery&m=free
+ * Directive to enable font-awesome 6.4 as ionicons.
+ * Check available icons at https://fontawesome.com/search?o=r&m=free
  *
  * Example usage:
  *
@@ -42,59 +42,28 @@ export class CoreFaIconDirective implements AfterViewInit, OnChanges {
     }
 
     /**
-     * Detect icon name and use svg.
+     * Validate icon, e.g. checking if it's using a deprecated name.
      */
-    async setIcon(): Promise<void> {
-        let library = '';
-        let iconName = this.name;
-        let font = 'ionicons';
-        const parts = iconName.split('-', 2);
-        if (parts.length == 2) {
-            switch (parts[0]) {
-                case 'far':
-                    library = 'regular';
-                    font = 'font-awesome';
-                    break;
-                case 'fa':
-                case 'fas':
-                    library = 'solid';
-                    font = 'font-awesome';
-                    break;
-                case 'fab':
-                    library = 'brands';
-                    font = 'font-awesome';
-                    break;
-                case 'moodle':
-                    library = 'moodle';
-                    font = 'moodle';
-                    break;
-                case 'fam':
-                    library = 'font-awesome';
-                    font = 'moodle';
-                    break;
-                default:
-                    break;
-            }
+    async validateIcon(): Promise<void> {
+        if (CoreConstants.BUILD.isDevelopment && !CoreIcons.isIconNamePrefixed(this.name)) {
+            this.logger.warn(`Not prefixed icon ${this.name} detected, it could be an Ionic icon. Font-awesome is preferred.`);
         }
 
-        if (font == 'ionicons') {
-            this.element.removeAttribute('src');
-            this.logger.warn(`Ionic icon ${this.name} detected`);
-
-            return;
+        if (this.name.includes('_')) {
+            // Ionic icons cannot contain a '_' in the name, Ionic doesn't load them, replace it with '-'.
+            this.logger.warn(`Icon ${this.name} contains '_' character and it's not allowed, replacing it with '-'.`);
+            this.updateName(this.name.replace(/_/g, '-'));
         }
 
-        iconName = iconName.substring(parts[0].length + 1);
+        if (this.name.match(/^fa[brs]?-/)) {
+            // It's a font-awesome icon, check if it's using a deprecated name.
+            const iconName = this.name.substring(this.name.indexOf('-') + 1);
+            const { fileName, newLibrary } = await CoreIcons.getFontAwesomeIconFileName(iconName);
 
-        const src = `assets/fonts/${font}/${library}/${iconName}.svg`;
-        this.element.setAttribute('src', src);
-        this.element.classList.add('faicon');
-
-        if (CoreConstants.BUILD.isDevelopment || CoreConstants.BUILD.isTesting) {
-            try {
-                await Http.get(src, { responseType: 'text' }).toPromise();
-            } catch (error) {
-                this.logger.error(`Icon ${this.name} not found`);
+            if (newLibrary) {
+                this.updateName(CoreIcons.prefixIconName('font-awesome', newLibrary, fileName));
+            } else if (fileName !== iconName) {
+                this.updateName(this.name.replace(iconName, fileName));
             }
         }
     }
@@ -105,7 +74,7 @@ export class CoreFaIconDirective implements AfterViewInit, OnChanges {
     ngAfterViewInit(): void {
         if (!this.element.getAttribute('aria-label') &&
             !this.element.getAttribute('aria-labelledby') &&
-            this.element.getAttribute('aria-hidden') != 'true') {
+            this.element.getAttribute('aria-hidden') !== 'true') {
             this.logger.warn('Aria label not set on icon ' + this.name, this.element);
 
             this.element.setAttribute('aria-hidden', 'true');
@@ -113,14 +82,24 @@ export class CoreFaIconDirective implements AfterViewInit, OnChanges {
     }
 
     /**
-     * Detect changes on input properties.
+     * @inheritdoc
      */
     ngOnChanges(changes: { [name: string]: SimpleChange }): void {
         if (!changes.name || !this.name) {
             return;
         }
 
-        this.setIcon();
+        this.validateIcon();
+    }
+
+    /**
+     * Update the icon name.
+     *
+     * @param newName New name to use.
+     */
+    protected updateName(newName: string): void {
+        this.name = newName;
+        this.element.setAttribute('name', newName);
     }
 
 }

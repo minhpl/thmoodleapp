@@ -14,7 +14,6 @@
 
 import { Component, OnInit } from '@angular/core';
 import { CoreUser, CoreUserProfile } from '@features/user/services/user';
-import { IonRefresher } from '@ionic/angular';
 
 import { CoreNavigator } from '@services/navigator';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -25,6 +24,8 @@ import {
     AddonModH5PActivityProvider,
     AddonModH5PActivityUserAttempts,
 } from '../../services/h5pactivity';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Page that displays all users that can attempt an H5P activity.
@@ -32,6 +33,7 @@ import {
 @Component({
     selector: 'page-addon-mod-h5pactivity-users-attempts',
     templateUrl: 'users-attempts.html',
+    styleUrls: ['users-attempts.scss'],
 })
 export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
 
@@ -44,7 +46,25 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
     canLoadMore = false;
 
     protected page = 0;
-    protected fetchSuccess = false;
+    protected logView: () => void;
+
+    constructor() {
+        this.logView = CoreTime.once(async () => {
+            if (!this.h5pActivity) {
+                return;
+            }
+
+            await CoreUtils.ignoreErrors(AddonModH5PActivity.logViewReport(this.h5pActivity.id));
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+                ws: 'mod_h5pactivity_log_report_viewed',
+                name: this.h5pActivity.name,
+                data: { id: this.h5pActivity.id, category: 'h5pactivity' },
+                url: `/mod/h5pactivity/report.php?a=${this.h5pActivity.id}`,
+            });
+        });
+    }
 
     /**
      * @inheritdoc
@@ -69,7 +89,7 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
      *
      * @param refresher Refresher.
      */
-    doRefresh(refresher: IonRefresher): void {
+    doRefresh(refresher: HTMLIonRefresherElement): void {
         this.refreshData().finally(() => {
             refresher.complete();
         });
@@ -79,7 +99,7 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
      * Get quiz data and attempt data.
      *
      * @param refresh Whether user is refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchData(refresh?: boolean): Promise<void> {
         try {
@@ -89,10 +109,7 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
                 this.fetchUsers(refresh),
             ]);
 
-            if (!this.fetchSuccess) {
-                this.fetchSuccess = true;
-                CoreUtils.ignoreErrors(AddonModH5PActivity.logViewReport(this.h5pActivity.id, this.h5pActivity.name));
-            }
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'Error loading attempts.');
         } finally {
@@ -104,7 +121,7 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
      * Get users.
      *
      * @param refresh Whether user is refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchUsers(refresh?: boolean): Promise<void> {
         if (!this.h5pActivity) {
@@ -137,13 +154,13 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
      *
      * @param h5pActivity Activity data.
      * @param users Users to format.
-     * @return Formatted users.
+     * @returns Formatted users.
      */
     protected async formatUsers(
         h5pActivity: AddonModH5PActivityData,
         users: AddonModH5PActivityUserAttempts[],
     ): Promise<AddonModH5PActivityUserAttemptsFormatted[]> {
-        return await Promise.all(users.map(async (user: AddonModH5PActivityUserAttemptsFormatted) => {
+        return Promise.all(users.map(async (user: AddonModH5PActivityUserAttemptsFormatted) => {
             user.user = await CoreUser.getProfile(user.userid, this.courseId, true);
 
             // Calculate the score of the user.
@@ -186,7 +203,7 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
     /**
      * Refresh the data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshData(): Promise<void> {
         const promises = [
@@ -208,6 +225,10 @@ export class AddonModH5PActivityUsersAttemptsPage implements OnInit {
      * @param user User to open.
      */
     openUser(user: AddonModH5PActivityUserAttemptsFormatted): void {
+        if (!user.attempts.length) {
+            return;
+        }
+
         CoreNavigator.navigate(`../userattempts/${user.userid}`);
     }
 

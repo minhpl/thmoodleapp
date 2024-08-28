@@ -15,11 +15,12 @@
 import { Injectable, ViewContainerRef } from '@angular/core';
 
 import { CoreSites } from '@services/sites';
-import { CoreFilterFilter, CoreFilterFormatTextOptions } from './filter';
+import { CoreFilter, CoreFilterFilter, CoreFilterFormatTextOptions, CoreFilterStateValue } from './filter';
 import { CoreFilterDefaultHandler } from './handlers/default-filter';
 import { CoreDelegate, CoreDelegateHandler } from '@classes/delegate';
-import { CoreSite } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { makeSingleton } from '@singletons';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Interface that all filter handlers must implement.
@@ -37,7 +38,7 @@ export interface CoreFilterHandler extends CoreDelegateHandler {
      * @param filter The filter.
      * @param options Options passed to the filters.
      * @param siteId Site ID. If not defined, current site.
-     * @return Filtered text (or promise resolved with the filtered text).
+     * @returns Filtered text (or promise resolved with the filtered text).
      */
     filter(text: string, filter: CoreFilterFilter, options: CoreFilterFormatTextOptions, siteId?: string): string | Promise<string>;
 
@@ -52,7 +53,7 @@ export interface CoreFilterHandler extends CoreDelegateHandler {
      * @param component Component.
      * @param componentId Component ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return If async, promise resolved when done.
+     * @returns If async, promise resolved when done.
      */
     handleHtml?(
         container: HTMLElement,
@@ -69,7 +70,7 @@ export interface CoreFilterHandler extends CoreDelegateHandler {
      *
      * @param options Options.
      * @param site Site.
-     * @return Whether filter should be applied.
+     * @returns Whether filter should be applied.
      */
     shouldBeApplied(options: CoreFilterFormatTextOptions, site?: CoreSite): boolean;
 }
@@ -84,7 +85,14 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
     protected handlerNameProperty = 'filterName';
 
     constructor(protected defaultHandler: CoreFilterDefaultHandler) {
-        super('CoreFilterDelegate', true);
+        super('CoreFilterDelegate');
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async isEnabled(): Promise<boolean> {
+        return CoreFilter.canGetFiltersInSite();
     }
 
     /**
@@ -95,7 +103,7 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
      * @param options Options passed to the filters.
      * @param skipFilters Names of filters that shouldn't be applied.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the filtered text.
+     * @returns Promise resolved with the filtered text.
      */
     async filterText(
         text: string,
@@ -106,7 +114,11 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
     ): Promise<string> {
 
         // Wait for filters to be initialized.
-        await this.handlersInitPromise;
+        const enabled = await this.handlersInitPromise;
+        if (!enabled) {
+            // No enabled filters, return the text.
+            return text;
+        }
 
         const site = await CoreSites.getSite(siteId);
 
@@ -143,9 +155,9 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
      *
      * @param contextLevel Context level of the filters.
      * @param instanceId Instance ID.
-     * @return Filters.
+     * @returns Filters.
      */
-    getEnabledFilters(contextLevel: string, instanceId: number): CoreFilterFilter[] {
+    getEnabledFilters(contextLevel: ContextLevel, instanceId: number): CoreFilterFilter[] {
         const filters: CoreFilterFilter[] = [];
 
         for (const name in this.enabledHandlers) {
@@ -157,7 +169,7 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
                 filter: handler.filterName,
                 inheritedstate: 1,
                 instanceid: instanceId,
-                localstate: 1,
+                localstate: CoreFilterStateValue.ON,
             });
         }
 
@@ -175,7 +187,7 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
      * @param component Component.
      * @param componentId Component ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async handleHtml(
         container: HTMLElement,
@@ -189,7 +201,10 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
     ): Promise<void> {
 
         // Wait for filters to be initialized.
-        await this.handlersInitPromise;
+        const enabled = await this.handlersInitPromise;
+        if (!enabled) {
+            return;
+        }
 
         const site = await CoreSites.getSite(siteId);
 
@@ -217,11 +232,11 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
     /**
      * Check if a filter is enabled and should be applied.
      *
-     * @param filters Filters to apply.
+     * @param filter Filter to apply.
      * @param options Options passed to the filters.
      * @param site Site.
      * @param skipFilters Names of filters that shouldn't be applied.
-     * @return Whether the filter is enabled and should be applied.
+     * @returns Whether the filter is enabled and should be applied.
      */
     isEnabledAndShouldApply(
         filter: CoreFilterFilter,
@@ -230,7 +245,10 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
         skipFilters?: string[],
     ): boolean {
 
-        if (filter.localstate == -1 || (filter.localstate == 0 && filter.inheritedstate == -1)) {
+        if (
+            filter.localstate === CoreFilterStateValue.OFF ||
+            (filter.localstate === CoreFilterStateValue.INHERIT && filter.inheritedstate === CoreFilterStateValue.OFF)
+        ) {
             // Filter is disabled, ignore it.
             return false;
         }
@@ -240,7 +258,7 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
             return false;
         }
 
-        if (skipFilters && skipFilters.indexOf(filter.filter) != -1) {
+        if (skipFilters && skipFilters.indexOf(filter.filter) !== -1) {
             // Skip this filter.
             return false;
         }
@@ -251,22 +269,19 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
     /**
      * Check if at least 1 filter should be applied in a certain site and with certain options.
      *
-     * @param filter Filter to check.
+     * @param filters Filters to check.
      * @param options Options passed to the filters.
      * @param site Site. If not defined, current site.
-     * @return Promise resolved with true: whether the filter should be applied.
+     * @returns Promise resolved with true: whether the filter should be applied.
      */
     async shouldBeApplied(filters: CoreFilterFilter[], options: CoreFilterFormatTextOptions, site?: CoreSite): Promise<boolean> {
         // Wait for filters to be initialized.
-        await this.handlersInitPromise;
-
-        for (let i = 0; i < filters.length; i++) {
-            if (this.shouldFilterBeApplied(filters[i], options, site)) {
-                return true;
-            }
+        const enabled = await this.handlersInitPromise;
+        if (!enabled) {
+            return false;
         }
 
-        return false;
+        return filters.some((filter) => this.shouldFilterBeApplied(filter, options, site));
     }
 
     /**
@@ -275,7 +290,7 @@ export class CoreFilterDelegateService extends CoreDelegate<CoreFilterHandler> {
      * @param filter Filter to check.
      * @param options Options passed to the filters.
      * @param site Site. If not defined, current site.
-     * @return Whether the filter should be applied.
+     * @returns Whether the filter should be applied.
      */
     protected shouldFilterBeApplied(filter: CoreFilterFilter, options: CoreFilterFormatTextOptions, site?: CoreSite): boolean {
         if (!this.hasHandler(filter.filter, true)) {

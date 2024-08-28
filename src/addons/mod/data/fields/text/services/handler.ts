@@ -23,6 +23,7 @@ import { Injectable, Type } from '@angular/core';
 import { CoreFormFields } from '@singletons/form';
 import { makeSingleton, Translate } from '@singletons';
 import { AddonModDataFieldTextComponent } from '../component/text';
+import type { AddonModDataFieldPluginBaseComponent } from '@addons/mod/data/classes/base-field-plugin-component';
 
 /**
  * Handler for number data field plugin.
@@ -36,7 +37,7 @@ export class AddonModDataFieldTextHandlerService implements AddonModDataFieldHan
     /**
      * @inheritdoc
      */
-    getComponent(): Type<unknown>{
+    getComponent(): Type<AddonModDataFieldPluginBaseComponent> {
         return AddonModDataFieldTextComponent;
     }
 
@@ -69,7 +70,7 @@ export class AddonModDataFieldTextHandlerService implements AddonModDataFieldHan
 
         return [{
             fieldid: field.id,
-            value: inputData[fieldName] || '',
+            value: inputData[fieldName] ?? '',
         }];
     }
 
@@ -82,10 +83,10 @@ export class AddonModDataFieldTextHandlerService implements AddonModDataFieldHan
         originalFieldData: AddonModDataEntryField,
     ): boolean {
         const fieldName = 'f_' + field.id;
-        const input = inputData[fieldName] || '';
-        const content = originalFieldData?.content || '';
+        const input = inputData[fieldName] ?? '';
+        const content = originalFieldData?.content ?? '';
 
-        return input != content;
+        return input !== content;
     }
 
     /**
@@ -101,7 +102,7 @@ export class AddonModDataFieldTextHandlerService implements AddonModDataFieldHan
      * @inheritdoc
      */
     overrideData(originalContent: AddonModDataEntryField, offlineContent: CoreFormFields<string>): AddonModDataEntryField {
-        originalContent.content = offlineContent[''] || '';
+        originalContent.content = offlineContent[''] ?? '';
 
         return originalContent;
     }

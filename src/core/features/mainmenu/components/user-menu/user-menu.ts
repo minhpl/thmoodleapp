@@ -14,20 +14,24 @@
 
 import { CoreConstants } from '@/core/constants';
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { CoreSite, CoreSiteInfo } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
+import { CoreSiteInfo } from '@classes/sites/unauthenticated-site';
 import { CoreFilter } from '@features/filter/services/filter';
-import { CoreLoginSitesComponent } from '@features/login/components/sites/sites';
+import { CoreLoginSitesModalComponent } from '@features/login/components/sites-modal/sites-modal';
 import { CoreLoginHelper } from '@features/login/services/login-helper';
+import { CoreUserAuthenticatedSupportConfig } from '@features/user/classes/support/authenticated-support-config';
+import { CoreUserSupport } from '@features/user/services/support';
 import { CoreUser, CoreUserProfile } from '@features/user/services/user';
 import {
     CoreUserProfileHandlerData,
     CoreUserDelegate,
-    CoreUserDelegateService,
+    CoreUserProfileHandlerType,
     CoreUserDelegateContext,
 } from '@features/user/services/user-delegate';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
+import { CoreUtils } from '@services/utils/utils';
 import { ModalController, Translate } from '@singletons';
 import { Subscription } from 'rxjs';
 
@@ -47,10 +51,13 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
     siteLogo?: string;
     siteLogoLoaded = false;
     siteUrl?: string;
+    displaySiteUrl = false;
     handlers: CoreUserProfileHandlerData[] = [];
+    accountHandlers: CoreUserProfileHandlerData[] = [];
     handlersLoaded = false;
     user?: CoreUserProfile;
     displaySwitchAccount = true;
+    displayContactSupport = false;
     removeAccountOnLogout = false;
 
     protected subscription!: Subscription;
@@ -62,62 +69,76 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         const currentSite = CoreSites.getRequiredCurrentSite();
         this.siteId = currentSite.getId();
         this.siteInfo = currentSite.getInfo();
-        this.siteName = currentSite.getSiteName();
+        this.siteName = await currentSite.getSiteName();
         this.siteUrl = currentSite.getURL();
         this.displaySwitchAccount = !currentSite.isFeatureDisabled('NoDelegate_SwitchAccount');
+        this.displayContactSupport = new CoreUserAuthenticatedSupportConfig(currentSite).canContactSupport();
         this.removeAccountOnLogout = !!CoreConstants.CONFIG.removeaccountonlogout;
+        this.displaySiteUrl = currentSite.shouldDisplayInformativeLinks();
 
         this.loadSiteLogo(currentSite);
 
-        // Load the handlers.
-        if (this.siteInfo) {
-            this.user = await CoreUser.getProfile(this.siteInfo.userid);
-
-            this.subscription = CoreUserDelegate.getProfileHandlersFor(this.user, CoreUserDelegateContext.USER_MENU)
-                .subscribe((handlers) => {
-                    if (!handlers || !this.user) {
-                        return;
-                    }
-
-                    const newHandlers = handlers
-                        .filter((handler) => handler.type === CoreUserDelegateService.TYPE_NEW_PAGE)
-                        .map((handler) => handler.data);
-
-                    // Only update handlers if they have changed, to prevent a blink effect.
-                    if (newHandlers.length !== this.handlers.length ||
-                            JSON.stringify(newHandlers) !== JSON.stringify(this.handlers)) {
-                        this.handlers = newHandlers;
-                    }
-
-                    this.handlersLoaded = CoreUserDelegate.areHandlersLoaded(this.user.id, CoreUserDelegateContext.USER_MENU);
-                });
-
+        if (!this.siteInfo) {
+            return;
         }
+
+        // Load the handlers.
+        try {
+            this.user = await CoreUser.getProfile(this.siteInfo.userid);
+        } catch {
+            this.user = {
+                id: this.siteInfo.userid,
+                fullname: this.siteInfo.fullname,
+            };
+        }
+
+        this.subscription = CoreUserDelegate.getProfileHandlersFor(this.user, CoreUserDelegateContext.USER_MENU)
+            .subscribe((handlers) => {
+                if (!handlers.length || !this.user) {
+                    return;
+                }
+
+                let newHandlers = handlers
+                    .filter((handler) => handler.type === CoreUserProfileHandlerType.LIST_ITEM)
+                    .map((handler) => handler.data);
+
+                // Only update handlers if they have changed, to prevent a blink effect.
+                if (newHandlers.length !== this.handlers.length ||
+                        JSON.stringify(newHandlers) !== JSON.stringify(this.handlers)) {
+                    this.handlers = newHandlers;
+                }
+
+                newHandlers = handlers
+                    .filter((handler) => handler.type === CoreUserProfileHandlerType.LIST_ACCOUNT_ITEM)
+                    .map((handler) => handler.data);
+
+                // Only update handlers if they have changed, to prevent a blink effect.
+                if (newHandlers.length !== this.handlers.length ||
+                        JSON.stringify(newHandlers) !== JSON.stringify(this.handlers)) {
+                    this.accountHandlers = newHandlers;
+                }
+
+                this.handlersLoaded = CoreUserDelegate.areHandlersLoaded(this.user.id, CoreUserDelegateContext.USER_MENU);
+            });
     }
 
     /**
      * Load site logo from current site public config.
      *
      * @param currentSite Current site object.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSiteLogo(currentSite: CoreSite): Promise<void> {
-        if (CoreConstants.CONFIG.forceLoginLogo) {
-            this.siteLogo = 'assets/img/login_logo.png';
+        if (currentSite.forcesLocalLogo()) {
+            this.siteLogo = currentSite.getLogoUrl();
             this.siteLogoLoaded = true;
 
             return;
         }
 
-        try {
-            const siteConfig = await currentSite.getPublicConfig();
-
-            this.siteLogo = CoreLoginHelper.getLogoUrl(siteConfig);
-        } catch {
-            // Ignore errors.
-        } finally {
-            this.siteLogoLoaded = true;
-        }
+        const siteConfig = await CoreUtils.ignoreErrors(currentSite.getPublicConfig());
+        this.siteLogo = currentSite.getLogoUrl(siteConfig);
+        this.siteLogoLoaded = true;
     }
 
     /**
@@ -164,6 +185,16 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         await this.close(event);
 
         handler.action(event, this.user, CoreUserDelegateContext.USER_MENU);
+    }
+
+    /**
+     * Contact site support.
+     *
+     * @param event Click event.
+     */
+    async contactSupport(event: Event): Promise<void> {
+        await this.close(event);
+        await CoreUserSupport.contact();
     }
 
     /**
@@ -218,11 +249,11 @@ export class CoreMainMenuUserMenuComponent implements OnInit, OnDestroy {
         event.stopPropagation();
 
         const closeAll = await CoreDomUtils.openSideModal<boolean>({
-            component: CoreLoginSitesComponent,
+            component: CoreLoginSitesModalComponent,
             cssClass: 'core-modal-lateral core-modal-lateral-sm',
         });
 
-        if (closeAll) {
+        if (thisModal && closeAll) {
             await ModalController.dismiss(undefined, undefined, thisModal.id);
         }
     }

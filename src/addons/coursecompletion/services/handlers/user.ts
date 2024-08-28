@@ -16,7 +16,7 @@ import { Injectable } from '@angular/core';
 import { CoreUserProfile } from '@features/user/services/user';
 import {
     CoreUserProfileHandler,
-    CoreUserDelegateService,
+    CoreUserProfileHandlerType,
     CoreUserProfileHandlerData,
     CoreUserDelegateContext,
 } from '@features/user/services/user-delegate';
@@ -31,7 +31,7 @@ import { AddonCourseCompletion } from '../coursecompletion';
 export class AddonCourseCompletionUserHandlerService implements CoreUserProfileHandler {
 
     name = 'AddonCourseCompletion:viewCompletion';
-    type = CoreUserDelegateService.TYPE_NEW_PAGE;
+    type = CoreUserProfileHandlerType.LIST_ITEM;
     priority = 350;
     cacheEnabled = true;
 
@@ -57,7 +57,7 @@ export class AddonCourseCompletionUserHandlerService implements CoreUserProfileH
      * @inheritdoc
      */
     async isEnabledForUser(user: CoreUserProfile, context: CoreUserDelegateContext,  contextId: number): Promise<boolean> {
-        return await AddonCourseCompletion.isPluginViewEnabledForUser(contextId, user.id);
+        return AddonCourseCompletion.isPluginViewEnabledForUser(contextId, user.id);
     }
 
     /**
@@ -65,7 +65,7 @@ export class AddonCourseCompletionUserHandlerService implements CoreUserProfileH
      */
     getDisplayData(): CoreUserProfileHandlerData {
         return {
-            icon: 'fas-tasks',
+            icon: 'fas-list-check',
             title: 'addon.coursecompletion.coursecompletion',
             class: 'addon-coursecompletion-handler',
             action: (event, user, context, contextId): void => {

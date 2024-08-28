@@ -17,6 +17,8 @@ import { CoreDelegateHandler, CoreDelegate } from '@classes/delegate';
 import { makeSingleton } from '@singletons';
 import { CoreFormFields } from '@singletons/form';
 import { AddonModWorkshopGetAssessmentFormDefinitionData, AddonModWorkshopGetAssessmentFormFieldsParsedData } from './workshop';
+import { CoreSites } from '@services/sites';
+import { ADDON_MOD_WORKSHOP_FEATURE_NAME } from '../constants';
 
 /**
  * Interface that all assessment strategy handlers must implement.
@@ -32,16 +34,16 @@ export interface AddonWorkshopAssessmentStrategyHandler extends CoreDelegateHand
      * It's recommended to return the class of the component, but you can also return an instance of the component.
      *
      * @param injector Injector.
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @returns The component (or promise resolved with component) to use, undefined if not found.
      */
-    getComponent?(): Type<unknown>;
+    getComponent?(): Promise<Type<unknown>> | Type<unknown>;
 
     /**
      * Prepare original values to be shown and compared.
      *
      * @param form Original data of the form.
      * @param workshopId WorkShop Id
-     * @return Promise resolved with original values sorted.
+     * @returns Promise resolved with original values sorted.
      */
     getOriginalValues?(
         form: AddonModWorkshopGetAssessmentFormDefinitionData,
@@ -53,19 +55,19 @@ export interface AddonWorkshopAssessmentStrategyHandler extends CoreDelegateHand
      *
      * @param originalValues Original values of the form.
      * @param currentValues Current values of the form.
-     * @return True if data has changed, false otherwise.
+     * @returns True if data has changed, false otherwise.
      */
     hasDataChanged?(
         originalValues: AddonModWorkshopGetAssessmentFormFieldsParsedData[],
         currentValues: AddonModWorkshopGetAssessmentFormFieldsParsedData[],
-    ): boolean;
+    ): Promise<boolean> | boolean;
 
     /**
      * Prepare assessment data to be sent to the server depending on the strategy selected.
      *
      * @param currentValues Current values of the form.
      * @param form Assessment form data.
-     * @return Promise resolved with the data to be sent. Or rejected with the input errors object.
+     * @returns Promise resolved with the data to be sent. Or rejected with the input errors object.
      */
     prepareAssessmentData(
         currentValues: AddonModWorkshopGetAssessmentFormFieldsParsedData[],
@@ -83,14 +85,21 @@ export class AddonWorkshopAssessmentStrategyDelegateService extends CoreDelegate
     protected handlerNameProperty = 'strategyName';
 
     constructor() {
-        super('AddonWorkshopAssessmentStrategyDelegate', true);
+        super('AddonWorkshopAssessmentStrategyDelegate');
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async isEnabled(): Promise<boolean> {
+        return !(await CoreSites.isFeatureDisabled(ADDON_MOD_WORKSHOP_FEATURE_NAME));
     }
 
     /**
      * Check if an assessment strategy plugin is supported.
      *
      * @param workshopStrategy Assessment strategy name.
-     * @return True if supported, false otherwise.
+     * @returns True if supported, false otherwise.
      */
     isPluginSupported(workshopStrategy: string): boolean {
         return this.hasHandler(workshopStrategy, true);
@@ -99,11 +108,10 @@ export class AddonWorkshopAssessmentStrategyDelegateService extends CoreDelegate
     /**
      * Get the directive to use for a certain assessment strategy plugin.
      *
-     * @param injector Injector.
      * @param workshopStrategy Assessment strategy name.
-     * @return The component, undefined if not found.
+     * @returns The component, undefined if not found.
      */
-    getComponentForPlugin(workshopStrategy: string): Type<unknown> | undefined {
+    getComponentForPlugin(workshopStrategy: string): Promise<Type<unknown>> | Type<unknown> | undefined {
         return this.executeFunctionOnEnabled(workshopStrategy, 'getComponent');
     }
 
@@ -113,7 +121,7 @@ export class AddonWorkshopAssessmentStrategyDelegateService extends CoreDelegate
      * @param workshopStrategy Workshop strategy.
      * @param form Original data of the form.
      * @param workshopId Workshop ID.
-     * @return Resolved with original values sorted.
+     * @returns Resolved with original values sorted.
      */
     getOriginalValues(
         workshopStrategy: string,
@@ -129,7 +137,7 @@ export class AddonWorkshopAssessmentStrategyDelegateService extends CoreDelegate
      * @param workshopStrategy Workshop strategy.
      * @param originalValues Original values of the form.
      * @param currentValues Current values of the form.
-     * @return True if data has changed, false otherwise.
+     * @returns True if data has changed, false otherwise.
      */
     hasDataChanged(
         workshopStrategy: string,
@@ -145,7 +153,7 @@ export class AddonWorkshopAssessmentStrategyDelegateService extends CoreDelegate
      * @param workshopStrategy Workshop strategy to follow.
      * @param currentValues Current values of the form.
      * @param form Assessment form data.
-     * @return Promise resolved with the data to be sent. Or rejected with the input errors object.
+     * @returns Promise resolved with the data to be sent. Or rejected with the input errors object.
      */
     prepareAssessmentData(
         workshopStrategy: string,

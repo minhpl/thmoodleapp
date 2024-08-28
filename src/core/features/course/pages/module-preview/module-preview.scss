@@ -1,8 +1,8 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 .core-module-availabilityinfo {
     background: var(--light);
-    border-radius: var(--small-radius);
+    border-radius: var(--mdl-shape-borderRadius-xs);
     padding: 8px;
     font-size: 90%;
     ::ng-deep  ul {

@@ -50,8 +50,9 @@ import { AddonModForumPostOptionsMenuComponent } from '../post-options-menu/post
 import { CoreRatingInfo } from '@features/rating/services/rating';
 import { CoreForms } from '@singletons/form';
 import { CoreFileEntry } from '@services/file-helper';
-import { AddonModForumSharedPostFormData } from '../../pages/discussion/discussion.page';
+import { AddonModForumSharedPostFormData } from '../../pages/discussion/discussion';
 import { CoreDom } from '@singletons/dom';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Components that shows a discussion post, its attachments and the action buttons allowed (reply, etc.).
@@ -82,7 +83,7 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
 
     @ViewChild('replyFormEl') formElement!: ElementRef;
 
-    messageControl = new FormControl();
+    messageControl = new FormControl<string | null>(null);
 
     uniqueId!: string;
     defaultReplySubject!: string;
@@ -103,7 +104,7 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         this.tagsEnabled = CoreTag.areTagsAvailableInSite();
@@ -141,6 +142,9 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
      * Deletes an online post.
      */
     async deletePost(): Promise<void> {
+        // Log analytics even if the user cancels for consistency with LMS.
+        this.analyticsLogEvent('mod_forum_delete_post', `/mod/forum/post.php?delete=${this.post.id}`);
+
         try {
             await CoreDomUtils.showDeleteConfirm('addon.mod_forum.deletesure');
 
@@ -290,6 +294,8 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
         }
 
         this.scrollToForm();
+
+        this.analyticsLogEvent('mod_forum_add_discussion_post', `/mod/forum/post.php?reply=${this.post.id}`);
     }
 
     /**
@@ -314,6 +320,8 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
             );
 
             this.scrollToForm();
+
+            this.analyticsLogEvent('mod_forum_update_discussion_post', `/mod/forum/post.php?edit=${this.post.id}`);
         } catch {
             // Cancelled.
         }
@@ -324,8 +332,8 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
      *
      * @param text The new text.
      */
-    onMessageChange(text: string): void {
-        this.formData.message = text;
+    onMessageChange(text?: string | null): void {
+        this.formData.message = text ?? null;
     }
 
     /**
@@ -510,7 +518,7 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.unblockOperation();
@@ -519,7 +527,7 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
     /**
      * Confirm discard changes if any.
      *
-     * @return Promise resolved if the user confirms or data was not changed and rejected otherwise.
+     * @returns Promise resolved if the user confirms or data was not changed and rejected otherwise.
      */
     protected async confirmDiscard(): Promise<void> {
         if (AddonModForumHelper.hasPostDataChanged(this.formData, this.originalData)) {
@@ -545,13 +553,33 @@ export class AddonModForumPostComponent implements OnInit, OnDestroy, OnChanges 
     /**
      * Scroll to reply/edit form.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async scrollToForm(): Promise<void> {
         await CoreDom.scrollToElement(
             this.elementRef.nativeElement,
             '#addon-forum-reply-edit-form-' + this.uniqueId,
         );
+    }
+
+    /**
+     * Log analytics event.
+     *
+     * @param wsName WS name.
+     * @param url URL.
+     */
+    protected analyticsLogEvent(wsName: string, url: string): void {
+        if (this.post.id <= 0) {
+            return;
+        }
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM,
+            ws: wsName,
+            name: this.post.subject,
+            data: { id: this.post.id, forumid: this.forum.id, category: 'forum' },
+            url,
+        });
     }
 
 }

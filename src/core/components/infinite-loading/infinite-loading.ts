@@ -22,7 +22,7 @@ const THRESHOLD = .15; // % of the scroll element height that must be close to t
  * Component to show a infinite loading trigger and spinner while more data is being loaded.
  *
  * Usage:
- * <core-infinite-loading [action]="loadingAction" [enabled]="dataLoaded"></core-inifinite-loading>
+ * <core-infinite-loading [action]="loadingAction" [enabled]="dataLoaded"></core-infinite-loading>
  */
 @Component({
     selector: 'core-infinite-loading',
@@ -38,6 +38,7 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
     @ViewChild(IonInfiniteScroll) infiniteScroll?: IonInfiniteScroll;
 
     loadingMore = false; // Hide button and avoid loading more.
+    loadingForced = false; // Whether loading is forced or happened on scroll.
     hostElement: HTMLElement;
 
     constructor(element: ElementRef<HTMLElement>) {
@@ -69,17 +70,17 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
             return;
         }
 
-        // Wait until next tick to allow items to render and scroll content to grow.
-        await CoreUtils.nextTick();
+        const scrollElement = await this.hostElement.closest('ion-content')?.getScrollElement();
 
-        // Calculate distance from edge.
-        const content = this.hostElement.closest('ion-content');
-        if (!content) {
+        if (!scrollElement) {
             return;
         }
 
-        const scrollElement = await content.getScrollElement();
+        // Wait to allow items to render and scroll content to grow.
+        await CoreUtils.nextTick();
+        await CoreUtils.waitFor(() => scrollElement.scrollHeight > scrollElement.clientHeight, { timeout: 1000 });
 
+        // Calculate distance from edge.
         const infiniteHeight = this.hostElement.getBoundingClientRect().height;
         const scrollTop = scrollElement.scrollTop;
         const height = scrollElement.offsetHeight;
@@ -96,26 +97,28 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
 
     /**
      * Load More items calling the action provided.
+     *
+     * @param forced Whether loading happened on scroll or was forced.
      */
-    loadMore(): void {
+    loadMore(forced: boolean = false): void {
         if (this.loadingMore) {
             return;
         }
 
         this.loadingMore = true;
-        this.action.emit(this.complete.bind(this));
+        this.loadingForced = forced;
+
+        this.action.emit(() => this.complete());
     }
 
     /**
      * Complete loading.
      */
-    complete(): void {
-        if (this.position == 'top') {
-            // Wait a bit before allowing loading more, otherwise it could be re-triggered automatically when it shouldn't.
-            setTimeout(this.completeLoadMore.bind(this), 400);
-        } else {
-            this.completeLoadMore();
-        }
+    async complete(): Promise<void> {
+        // Wait a bit before allowing loading more, otherwise it could be re-triggered automatically when it shouldn't.
+        await CoreUtils.wait(400);
+
+        await this.completeLoadMore();
     }
 
     /**
@@ -123,6 +126,8 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
      */
     protected async completeLoadMore(): Promise<void> {
         this.loadingMore = false;
+        this.loadingForced = false;
+
         await this.infiniteScroll?.complete();
 
         // More items loaded. If the list doesn't fill the full height, infinite scroll isn't triggered automatically.
@@ -130,21 +135,9 @@ export class CoreInfiniteLoadingComponent implements OnChanges {
     }
 
     /**
-     * Get the height of the element.
-     *
-     * @return Height.
-     * @todo erase if not needed: I'm depreacating it because if not needed or getBoundingClientRect has the same result, it should
-     * be erased, also with getElementHeight
-     * @deprecated since 3.9.5
-     */
-    getHeight(): number {
-        return this.hostElement.getBoundingClientRect().height;
-    }
-
-    /**
      * Get the infinite scroll element.
      *
-     * @return Element or null.
+     * @returns Element or null.
      */
     get infiniteScrollElement(): HTMLIonInfiniteScrollElement | null {
         return this.hostElement.querySelector('ion-infinite-scroll');

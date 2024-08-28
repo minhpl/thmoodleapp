@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { Component, OnInit, OnDestroy } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
 
 import { CoreConfig } from '@services/config';
 import { CoreLocalNotifications } from '@services/local-notifications';
@@ -37,6 +36,9 @@ import {
     AddonNotificationsPreferencesProcessorFormatted,
 } from '@addons/notifications/services/notifications-helper';
 import { CoreNavigator } from '@services/navigator';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { Translate } from '@singletons';
 
 /**
  * Page that displays notifications settings.
@@ -58,16 +60,27 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
     loggedInOffLegacyMode = false;
 
     protected updateTimeout?: number;
+    protected logView: () => void;
 
     constructor() {
         this.canChangeSound = CoreLocalNotifications.canDisableSound();
 
         const currentSite = CoreSites.getRequiredCurrentSite();
         this.loggedInOffLegacyMode = !currentSite.isVersionGreaterEqualThan('4.0');
+
+        this.logView = CoreTime.once(async () => {
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+                ws: 'core_message_get_user_notification_preferences',
+                name: Translate.instant('addon.notifications.notificationpreferences'),
+                data: { category: 'notifications' },
+                url: '/message/notificationpreferences.php',
+            });
+        });
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         if (this.canChangeSound) {
@@ -80,7 +93,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
     /**
      * Fetches preferences data.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchPreferences(): Promise<void> {
         try {
@@ -100,6 +113,8 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
             preferences.enableall = !preferences.disableall;
             this.preferences = AddonNotificationsHelper.formatPreferences(preferences);
             this.loadProcessor(currentProcessor);
+
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
         } finally {
@@ -150,7 +165,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
     /**
      * Update preferences. The purpose is to store the updated data, it won't be reflected in the view.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async updatePreferences(): Promise<void> {
         await CoreUtils.ignoreErrors(AddonNotifications.invalidateNotificationPreferences());
@@ -176,7 +191,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
      *
      * @param refresher Refresher.
      */
-    async refreshPreferences(refresher?: IonRefresher): Promise<void> {
+    async refreshPreferences(refresher?: HTMLIonRefresherElement): Promise<void> {
         try {
             await CoreUtils.ignoreErrors(AddonNotifications.invalidateNotificationPreferences());
 
@@ -189,7 +204,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
     /**
      * Open extra preferences.
      *
-     * @param handlerData
+     * @param handlerData The handler data to open.
      */
     openExtraPreferences(handlerData: AddonMessageOutputHandlerData): void {
         CoreNavigator.navigateToSitePath(handlerData.page, { params: handlerData.pageParams });
@@ -200,7 +215,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
      *
      * @param notification Notification object.
      * @param state State name, ['loggedin', 'loggedoff'].
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async changePreferenceLegacy(notification: AddonNotificationsPreferencesNotificationFormatted, state: string): Promise<void> {
         const processor = notification.processorsByName?.[this.currentProcessorName];
@@ -240,7 +255,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
      * Change the value of a certain preference.
      *
      * @param notification Notification object.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async changePreference(notification: AddonNotificationsPreferencesNotificationFormatted): Promise<void> {
         const processor = notification.processorsByName?.[this.currentProcessorName];
@@ -279,7 +294,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
      * Enable all notifications changed.
      *
      * @param enable Whether to enable or disable.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async enableAll(enable?: boolean): Promise<void> {
         if (!this.preferences) {
@@ -316,7 +331,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Page destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         // If there is a pending action to update preferences, execute it right now.
@@ -331,7 +346,7 @@ export class AddonNotificationsSettingsPage implements OnInit, OnDestroy {
 /**
  * State in notification processor in notification preferences component with some calculated data.
  *
- * @deprecated 4.0
+ * @deprecatedonmoodle since 4.0
  */
 type ProcessorStateFormatted = AddonNotificationsPreferencesNotificationProcessorState & {
     updating?: boolean; // Calculated in the app. Whether the state is being updated.

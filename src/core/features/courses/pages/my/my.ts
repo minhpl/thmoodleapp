@@ -14,17 +14,23 @@
 
 import { AddonBlockMyOverviewComponent } from '@addons/block/myoverview/components/myoverview/myoverview';
 import { Component, OnDestroy, OnInit, ViewChild } from '@angular/core';
+import { AsyncDirective } from '@classes/async-directive';
+import { PageLoadsManager } from '@classes/page-loads-manager';
+import { CorePromisedValue } from '@classes/promised-value';
 import { CoreBlockComponent } from '@features/block/components/block/block';
 import { CoreBlockDelegate } from '@features/block/services/block-delegate';
 import { CoreCourseBlock } from '@features/course/services/course';
 import { CoreCoursesDashboard, CoreCoursesDashboardProvider } from '@features/courses/services/dashboard';
 import { CoreMainMenuDeepLinkManager } from '@features/mainmenu/classes/deep-link-manager';
-import { IonRefresher } from '@ionic/angular';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
+import { Subscription } from 'rxjs';
 import { CoreCourses } from '../../services/courses';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { Translate } from '@singletons';
 
 /**
  * Page that shows a my courses.
@@ -33,8 +39,12 @@ import { CoreCourses } from '../../services/courses';
     selector: 'page-core-courses-my',
     templateUrl: 'my.html',
     styleUrls: ['my.scss'],
+    providers: [{
+        provide: PageLoadsManager,
+        useClass: PageLoadsManager,
+    }],
 })
-export class CoreCoursesMyCoursesPage implements OnInit, OnDestroy {
+export class CoreCoursesMyPage implements OnInit, OnDestroy, AsyncDirective {
 
     @ViewChild(CoreBlockComponent) block!: CoreBlockComponent;
 
@@ -48,36 +58,59 @@ export class CoreCoursesMyCoursesPage implements OnInit, OnDestroy {
     hasSideBlocks = false;
 
     protected updateSiteObserver: CoreEventObserver;
+    protected onReadyPromise = new CorePromisedValue<void>();
+    protected loadsManagerSubscription: Subscription;
+    protected logView: () => void;
 
-    constructor() {
+    constructor(protected loadsManager: PageLoadsManager) {
         // Refresh the enabled flags if site is updated.
-        this.updateSiteObserver = CoreEvents.on(CoreEvents.SITE_UPDATED, () => {
+        this.updateSiteObserver = CoreEvents.on(CoreEvents.SITE_UPDATED, async () => {
             this.downloadCoursesEnabled = !CoreCourses.isDownloadCoursesDisabledInSite();
-            this.loadSiteName();
+            await this.loadSiteName();
 
         }, CoreSites.getCurrentSiteId());
 
         this.userId = CoreSites.getCurrentSiteUserId();
+
+        this.loadsManagerSubscription = this.loadsManager.onRefreshPage.subscribe(() => {
+            this.loaded = false;
+            this.loadContent();
+        });
+
+        this.logView = CoreTime.once(async () => {
+            await CoreUtils.ignoreErrors(CoreCourses.logView('my'));
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: 'core_my_view_page',
+                name: Translate.instant('core.courses.mycourses'),
+                data: { category: 'course', page: 'my' },
+                url: '/my/courses.php',
+            });
+        });
     }
 
     /**
      * @inheritdoc
      */
-    ngOnInit(): void {
+    async ngOnInit(): Promise<void> {
         this.downloadCoursesEnabled = !CoreCourses.isDownloadCoursesDisabledInSite();
 
         const deepLinkManager = new CoreMainMenuDeepLinkManager();
         deepLinkManager.treatLink();
 
-        this.loadSiteName();
+        await this.loadSiteName();
 
-        this.loadContent();
+        this.loadContent(true);
     }
 
     /**
-     * Load my overview block instance.
+     * Load data.
+     *
+     * @param firstLoad Whether it's the first load.
      */
-    protected async loadContent(): Promise<void> {
+    protected async loadContent(firstLoad = false): Promise<void> {
+        const loadWatcher = this.loadsManager.startPageLoad(this, !!firstLoad);
         const available = await CoreCoursesDashboard.isAvailable();
         const disabled = await CoreCourses.isMyCoursesDisabled();
 
@@ -85,10 +118,11 @@ export class CoreCoursesMyCoursesPage implements OnInit, OnDestroy {
 
         if (available && !disabled) {
             try {
-                const blocks = await CoreCoursesDashboard.getDashboardBlocks(
-                    undefined,
-                    undefined,
-                    supportsMyParam ? this.myPageCourses : undefined,
+                const blocks = await loadWatcher.watchRequest(
+                    CoreCoursesDashboard.getDashboardBlocksObservable({
+                        myPage: supportsMyParam ? this.myPageCourses : undefined,
+                        readingStrategy: loadWatcher.getReadingStrategy(),
+                    }),
                 );
 
                 // My overview block should always be in main blocks, but check side blocks too just in case.
@@ -118,13 +152,17 @@ export class CoreCoursesMyCoursesPage implements OnInit, OnDestroy {
         }
 
         this.loaded = true;
+        this.onReadyPromise.resolve();
+
+        this.logView();
     }
 
     /**
      * Load the site name.
      */
-    protected loadSiteName(): void {
-        this.siteName = CoreSites.getRequiredCurrentSite().getSiteName() || '';
+    protected async loadSiteName(): Promise<void> {
+        const site = CoreSites.getRequiredCurrentSite();
+        this.siteName = await site.getSiteName() || '';
     }
 
     /**
@@ -142,7 +180,7 @@ export class CoreCoursesMyCoursesPage implements OnInit, OnDestroy {
      *
      * @param refresher Refresher.
      */
-    async refresh(refresher?: IonRefresher): Promise<void> {
+    async refresh(refresher?: HTMLIonRefresherElement): Promise<void> {
 
         const promises: Promise<void>[] = [];
 
@@ -150,7 +188,7 @@ export class CoreCoursesMyCoursesPage implements OnInit, OnDestroy {
 
         // Invalidate the blocks.
         if (this.myOverviewBlock) {
-            promises.push(CoreUtils.ignoreErrors(this.myOverviewBlock.doRefresh()));
+            promises.push(CoreUtils.ignoreErrors(this.myOverviewBlock.invalidateContent()));
         }
 
         Promise.all(promises).finally(() => {
@@ -165,6 +203,14 @@ export class CoreCoursesMyCoursesPage implements OnInit, OnDestroy {
      */
     ngOnDestroy(): void {
         this.updateSiteObserver?.off();
+        this.loadsManagerSubscription.unsubscribe();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async ready(): Promise<void> {
+        return await this.onReadyPromise;
     }
 
 }

@@ -17,6 +17,7 @@ import { CoreContentLinksHandlerBase } from '@features/contentlinks/classes/base
 import { CoreContentLinksAction } from '@features/contentlinks/services/contentlinks-delegate';
 import { makeSingleton } from '@singletons';
 import { AddonModQuizHelper } from '../quiz-helper';
+import { ADDON_MOD_QUIZ_FEATURE_NAME } from '../../constants';
 
 /**
  * Handler to treat links to quiz review.
@@ -25,7 +26,7 @@ import { AddonModQuizHelper } from '../quiz-helper';
 export class AddonModQuizReviewLinkHandlerService extends CoreContentLinksHandlerBase {
 
     name = 'AddonModQuizReviewLinkHandler';
-    featureName = 'CoreCourseModuleDelegate_AddonModQuiz';
+    featureName = ADDON_MOD_QUIZ_FEATURE_NAME;
     pattern = /\/mod\/quiz\/review\.php.*([&?]attempt=\d+)/;
 
     /**
@@ -36,7 +37,7 @@ export class AddonModQuizReviewLinkHandlerService extends CoreContentLinksHandle
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param courseId Course ID related to the URL. Optional but recommended.
      * @param data Extra data to handle the URL.
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
 
     getActions(
@@ -49,10 +50,10 @@ export class AddonModQuizReviewLinkHandlerService extends CoreContentLinksHandle
         const quizId = data?.instance ? Number(data.instance) : undefined;
 
         return [{
-            action: (siteId): void => {
+            action: async (siteId): Promise<void> => {
                 const attemptId = parseInt(params.attempt, 10);
                 const page = parseInt(params.page, 10);
-                AddonModQuizHelper.handleReviewLink(attemptId, page, quizId, siteId);
+                await AddonModQuizHelper.handleReviewLink(attemptId, page, quizId, siteId);
             },
         }];
     }

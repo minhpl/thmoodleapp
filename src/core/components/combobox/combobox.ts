@@ -12,11 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, EventEmitter, Input, Output, ViewChild } from '@angular/core';
+import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Translate } from '@singletons';
 import { ModalOptions } from '@ionic/core';
 import { CoreDomUtils } from '@services/utils/dom';
-import { IonSelect } from '@ionic/angular';
+import { ControlValueAccessor, NG_VALUE_ACCESSOR } from '@angular/forms';
 
 /**
  * Component that show a combo select button (combobox).
@@ -40,10 +40,15 @@ import { IonSelect } from '@ionic/angular';
     selector: 'core-combobox',
     templateUrl: 'core-combobox.html',
     styleUrls: ['combobox.scss'],
+    providers: [
+        {
+            provide: NG_VALUE_ACCESSOR,
+            multi:true,
+            useExisting: CoreComboboxComponent,
+        },
+    ],
 })
-export class CoreComboboxComponent {
-
-    @ViewChild(IonSelect) select!: IonSelect;
+export class CoreComboboxComponent implements ControlValueAccessor {
 
     @Input() interface: 'popover' | 'modal' = 'popover';
     @Input() label = Translate.instant('core.show'); // Aria label.
@@ -58,32 +63,84 @@ export class CoreComboboxComponent {
 
     expanded = false;
 
+    protected touched = false;
+    protected formOnChange?: (value: unknown) => void;
+    protected formOnTouched?: () => void;
+
+    /**
+     * @inheritdoc
+     */
+    writeValue(selection: string): void {
+        this.selection = selection;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    registerOnChange(onChange: (value: unknown) => void): void {
+        this.formOnChange = onChange;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    registerOnTouched(onTouched: () => void): void {
+        this.formOnTouched = onTouched;
+    }
+
+    /**
+     * @inheritdoc
+     */
+    setDisabledState(disabled: boolean): void {
+        this.disabled = disabled;
+    }
+
+    /**
+     * Callback when the selected value changes.
+     *
+     * @param selection Selected value.
+     */
+    onValueChanged(selection: unknown): void {
+        this.touch();
+        this.onChange.emit(selection);
+        this.formOnChange?.(selection);
+    }
+
     /**
      * Shows combobox modal.
      *
-     * @param event Event.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async openSelect(event?: UIEvent): Promise<void> {
-        if (this.interface == 'modal') {
-            if (this.expanded || !this.modalOptions) {
-                return;
-            }
-            this.expanded = true;
+    async openModal(): Promise<void> {
+        this.touch();
 
-            if (this.listboxId) {
-                this.modalOptions.id = this.listboxId;
-            }
-
-            const data = await CoreDomUtils.openModal(this.modalOptions);
-            this.expanded = false;
-
-            if (data) {
-                this.onChange.emit(data);
-            }
-        } else if (this.select) {
-            this.select.open(event);
+        if (this.expanded || !this.modalOptions) {
+            return;
         }
+        this.expanded = true;
+
+        if (this.listboxId) {
+            this.modalOptions.id = this.listboxId;
+        }
+
+        const data = await CoreDomUtils.openModal(this.modalOptions);
+        this.expanded = false;
+
+        if (data) {
+            this.onValueChanged(data);
+        }
+    }
+
+    /**
+     * Mark as touched.
+     */
+    protected touch(): void {
+        if (this.touched) {
+            return;
+        }
+
+        this.touched = true;
+        this.formOnTouched?.();
     }
 
 }

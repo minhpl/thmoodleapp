@@ -23,6 +23,7 @@ import {
     QueryList,
     Type,
     ElementRef,
+    ChangeDetectorRef,
 } from '@angular/core';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreDynamicComponent } from '@components/dynamic-component/dynamic-component';
@@ -38,7 +39,7 @@ import {
 } from '@features/course/services/course-helper';
 import { CoreCourseFormatDelegate } from '@features/course/services/format-delegate';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { IonContent, IonRefresher } from '@ionic/angular';
+import { IonContent } from '@ionic/angular';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreCourseCourseIndexComponent, CoreCourseIndexSectionWithModule } from '../course-index/course-index';
 import { CoreBlockHelper } from '@features/block/services/block-helper';
@@ -49,6 +50,9 @@ import { CoreUserToursAlignment, CoreUserToursSide } from '@features/usertours/s
 import { CoreCourseCourseIndexTourComponent } from '../course-index-tour/course-index-tour';
 import { CoreDom } from '@singletons/dom';
 import { CoreUserTourDirectiveOptions } from '@directives/user-tour';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreBlockSideBlocksComponent } from '@features/block/components/side-blocks/side-blocks';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Component to display course contents using a certain format. If the format isn't found, use default one.
@@ -67,24 +71,26 @@ import { CoreUserTourDirectiveOptions } from '@directives/user-tour';
 })
 export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
 
-    static readonly LOAD_MORE_ACTIVITIES = 20; // How many activities should load each time showMoreActivities is called.
+    static readonly LOAD_MORE_ACTIVITIES = 10; // How many activities should load each time showMoreActivities is called.
 
     @Input() course!: CoreCourseAnyCourseData; // The course to render.
     @Input() sections: CoreCourseSectionToDisplay[] = []; // List of course sections.
     @Input() initialSectionId?: number; // The section to load first (by ID).
     @Input() initialSectionNumber?: number; // The section to load first (by number).
+    @Input() initialBlockInstanceId?: number; // The instance to focus.
     @Input() moduleId?: number; // The module ID to scroll to. Must be inside the initial selected section.
+    @Input() isGuest?: boolean; // If user is accessing using an ACCESS_GUEST enrolment method.
 
-    @ViewChildren(CoreDynamicComponent) dynamicComponents?: QueryList<CoreDynamicComponent>;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    @ViewChildren(CoreDynamicComponent) dynamicComponents?: QueryList<CoreDynamicComponent<any>>;
 
     // All the possible component classes.
     courseFormatComponent?: Type<unknown>;
-    courseSummaryComponent?: Type<unknown>;
     singleSectionComponent?: Type<unknown>;
     allSectionsComponent?: Type<unknown>;
 
     canLoadMore = false;
-    showSectionId = 0;
+    lastShownSectionIndex = 0;
     data: Record<string, unknown> = {}; // Data to pass to the components.
     courseIndexTour: CoreUserTourDirectiveOptions = {
         id: 'course-index',
@@ -112,6 +118,8 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
     viewedModules: Record<number, boolean> = {};
     completionStatusIncomplete = CoreCourseModuleCompletionStatus.COMPLETION_INCOMPLETE;
 
+    communicationRoomUrl?: string;
+
     protected selectTabObserver?: CoreEventObserver;
     protected modViewedObserver?: CoreEventObserver;
     protected lastCourseFormat?: string;
@@ -120,6 +128,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
     constructor(
         protected content: IonContent,
         protected elementRef: ElementRef,
+        protected changeDetectorRef: ChangeDetectorRef,
     ) {
         // Pass this instance to all components so they can use its methods and properties.
         this.data.coreCourseFormatComponent = this;
@@ -173,6 +182,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
                     }
                 }
             }
+            this.changeDetectorRef.markForCheck();
         });
     }
 
@@ -190,11 +200,14 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
             this.displayBlocks = CoreCourseFormatDelegate.displayBlocks(this.course);
 
             this.hasBlocks = await CoreBlockHelper.hasCourseBlocks(this.course.id);
+
+            this.communicationRoomUrl = await CoreCourseHelper.getCourseCommunicationRoom(this.course);
         }
 
         if (changes.sections && this.sections) {
             this.treatSections(this.sections);
         }
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
@@ -225,34 +238,25 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
 
         await Promise.all([
             this.loadCourseFormatComponent(),
-            this.loadCourseSummaryComponent(),
             this.loadSingleSectionComponent(),
             this.loadAllSectionsComponent(),
         ]);
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
      * Load course format component.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadCourseFormatComponent(): Promise<void> {
         this.courseFormatComponent = await CoreCourseFormatDelegate.getCourseFormatComponent(this.course);
     }
 
     /**
-     * Load course summary component.
-     *
-     * @return Promise resolved when done.
-     */
-    protected async loadCourseSummaryComponent(): Promise<void> {
-        this.courseSummaryComponent = await CoreCourseFormatDelegate.getCourseSummaryComponent(this.course);
-    }
-
-    /**
      * Load single section component.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSingleSectionComponent(): Promise<void> {
         this.singleSectionComponent = await CoreCourseFormatDelegate.getSingleSectionComponent(this.course);
@@ -261,7 +265,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
     /**
      * Load all sections component.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadAllSectionsComponent(): Promise<void> {
         this.allSectionsComponent = await CoreCourseFormatDelegate.getAllSectionsComponent(this.course);
@@ -271,7 +275,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      * Treat received sections.
      *
      * @param sections Sections to treat.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async treatSections(sections: CoreCourseSection[]): Promise<void> {
         const hasAllSections = sections[0].id == CoreCourseProvider.ALL_SECTIONS_ID;
@@ -300,16 +304,26 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
             // Always load "All sections" to display the section title. If it isn't there just load the section.
             this.loaded = true;
             this.sectionChanged(sections[0]);
-        } else if (this.initialSectionId || this.initialSectionNumber) {
+        } else if (this.initialSectionId || this.initialSectionNumber !== undefined) {
             // We have an input indicating the section ID to load. Search the section.
             const section = sections.find((section) =>
-                section.id == this.initialSectionId || (section.section && section.section == this.initialSectionNumber));
+                section.id == this.initialSectionId ||
+                    (section.section !== undefined && section.section == this.initialSectionNumber));
 
             // Don't load the section if it cannot be viewed by the user.
             if (section && this.canViewSection(section)) {
                 this.loaded = true;
                 this.sectionChanged(section);
             }
+        } else if (this.initialBlockInstanceId && this.displayBlocks && this.hasBlocks) {
+            CoreDomUtils.openSideModal({
+                component: CoreBlockSideBlocksComponent,
+                componentProps: {
+                    contextLevel: ContextLevel.COURSE,
+                    instanceId: this.course.id,
+                    initialBlockInstanceId: this.initialBlockInstanceId,
+                },
+            });
         }
 
         if (!this.loaded) {
@@ -341,7 +355,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
     /**
      * Initialize viewed modules.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async initializeViewedModules(): Promise<void> {
         if (this.viewedModulesInitialized) {
@@ -362,30 +376,30 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      *
      * @param sections List of sections.
      * @param viewedModule Viewed module.
-     * @return Section, undefined if not found.
+     * @returns Section, undefined if not found.
      */
     protected getViewedModuleSection(
         sections: CoreCourseSection[],
         viewedModule: CoreCourseViewedModulesDBRecord,
     ): CoreCourseSection | undefined {
-        if (viewedModule.sectionId) {
-            const lastModuleSection = sections.find(section => section.id === viewedModule.sectionId);
+        let lastModuleSection: CoreCourseSection | undefined;
 
-            if (lastModuleSection) {
-                return lastModuleSection;
-            }
+        if (viewedModule.sectionId) {
+            lastModuleSection = sections.find(section => section.id === viewedModule.sectionId);
         }
 
-        // No sectionId or section not found. Search the module.
-        return sections.find(
-            section => section.modules.some(module => module.id === viewedModule.cmId),
-        );
+        if (!lastModuleSection) {
+            // No sectionId or section not found. Search the module.
+            lastModuleSection = sections.find(section => section.modules.some(module => module.id === viewedModule.cmId));
+        }
+
+        return lastModuleSection && lastModuleSection.id !== this.stealthModulesSectionId ? lastModuleSection : undefined;
     }
 
     /**
      * Get selected section ID. If viewing all sections, use current scrolled section.
      *
-     * @return Section ID, undefined if not found.
+     * @returns Section ID, undefined if not found.
      */
     protected async getSelectedSectionId(): Promise<number | undefined> {
         if (this.selectedSection?.id !== this.allSectionsId) {
@@ -417,6 +431,8 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
 
         const data = await CoreDomUtils.openModal<CoreCourseIndexSectionWithModule>({
             component: CoreCourseCourseIndexComponent,
+            initialBreakpoint: 1,
+            breakpoints: [0, 1],
             componentProps: {
                 course: this.course,
                 sections: this.sections,
@@ -446,8 +462,10 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
                             await CoreCourseModuleDelegate.getModuleDataFor(module.modname, module, this.course.id);
         }
 
-        if (CoreCourseHelper.canUserViewModule(module, section) && module.handlerData?.action) {
-            module.handlerData.action(data.event, module, module.course);
+        if (CoreCourseHelper.canUserViewModule(module, section)) {
+            this.scrollToModule(module.id);
+
+            module.handlerData?.action?.(data.event, module, module.course);
         }
 
         this.moduleId = data.moduleId;
@@ -465,6 +483,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
                 params: {
                     title: this.course.fullname,
                     sectionId: selectedId,
+                    isGuest: this.isGuest,
                 },
             },
         );
@@ -502,8 +521,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
         } else {
             this.previousSection = undefined;
             this.nextSection = undefined;
-            this.canLoadMore = false;
-            this.showSectionId = 0;
+            this.lastShownSectionIndex = -1;
             this.showMoreActivities();
         }
 
@@ -519,10 +537,9 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
                 this.content.scrollToTop(0);
             }
 
-            CoreUtils.ignoreErrors(
-                CoreCourse.logView(this.course.id, newSection.section, undefined, this.course.fullname),
-            );
+            this.logView(newSection.section, !previousValue);
         }
+        this.changeDetectorRef.markForCheck();
     }
 
     /**
@@ -543,7 +560,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      *
      * @param section1 First section.
      * @param section2 Second section.
-     * @return Whether they're equal.
+     * @returns Whether they're equal.
      */
     compareSections(section1: CoreCourseSection, section2: CoreCourseSection): boolean {
         return section1 && section2 ? section1.id === section2.id : section1 === section2;
@@ -555,11 +572,11 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      * @param refresher Refresher.
      * @param done Function to call when done.
      * @param afterCompletionChange Whether the refresh is due to a completion change.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async doRefresh(refresher?: IonRefresher, done?: () => void, afterCompletionChange?: boolean): Promise<void> {
+    async doRefresh(refresher?: HTMLIonRefresherElement, done?: () => void, afterCompletionChange?: boolean): Promise<void> {
         const promises = this.dynamicComponents?.map(async (component) => {
-            await component.callComponentFunction('doRefresh', [refresher, done, afterCompletionChange]);
+            await component.callComponentMethod('doRefresh', refresher, done, afterCompletionChange);
         }) || [];
 
         if (this.course) {
@@ -583,40 +600,22 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      * @param infiniteComplete Infinite scroll complete function. Only used from core-infinite-loading.
      */
     showMoreActivities(infiniteComplete?: () => void): void {
-        this.canLoadMore = false;
-
-        const sections = this.sections || [];
         let modulesLoaded = 0;
-        let i: number;
-        for (i = this.showSectionId + 1; i < sections.length; i++) {
-            if (!sections[i].hasContent || !sections[i].modules) {
+        while (this.lastShownSectionIndex < this.sections.length - 1 &&
+            modulesLoaded < CoreCourseFormatComponent.LOAD_MORE_ACTIVITIES) {
+            this.lastShownSectionIndex++;
+
+            if (!this.sections[this.lastShownSectionIndex].hasContent || !this.sections[this.lastShownSectionIndex].modules) {
                 continue;
             }
 
-            modulesLoaded += sections[i].modules.reduce((total, module) =>
-                !CoreCourseHelper.isModuleStealth(module, sections[i]) ? total + 1 : total, 0);
-
-            if (modulesLoaded >= CoreCourseFormatComponent.LOAD_MORE_ACTIVITIES) {
-                break;
-            }
+            modulesLoaded += this.sections[this.lastShownSectionIndex].modules.reduce((total, module) =>
+                !CoreCourseHelper.isModuleStealth(module, this.sections[this.lastShownSectionIndex]) ? total + 1 : total, 0);
         }
 
-        this.showSectionId = i;
-        this.canLoadMore = i < sections.length;
+        this.canLoadMore = this.lastShownSectionIndex < this.sections.length - 1;
 
-        if (this.canLoadMore) {
-            // Check if any of the following sections have any content.
-            let thereAreMore = false;
-            for (i++; i < sections.length; i++) {
-                if (sections[i].hasContent && sections[i].modules && sections[i].modules?.length > 0) {
-                    thereAreMore = true;
-                    break;
-                }
-            }
-            this.canLoadMore = thereAreMore;
-        }
-
-        infiniteComplete && infiniteComplete();
+        infiniteComplete?.();
     }
 
     /**
@@ -632,7 +631,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      */
     ionViewDidEnter(): void {
         this.dynamicComponents?.forEach((component) => {
-            component.callComponentFunction('ionViewDidEnter');
+            component.callComponentMethod('ionViewDidEnter');
         });
     }
 
@@ -641,7 +640,7 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      */
     ionViewDidLeave(): void {
         this.dynamicComponents?.forEach((component) => {
-            component.callComponentFunction('ionViewDidLeave');
+            component.callComponentMethod('ionViewDidLeave');
         });
     }
 
@@ -649,10 +648,41 @@ export class CoreCourseFormatComponent implements OnInit, OnChanges, OnDestroy {
      * Check whether a section can be viewed.
      *
      * @param section The section to check.
-     * @return Whether the section can be viewed.
+     * @returns Whether the section can be viewed.
      */
     canViewSection(section: CoreCourseSection): boolean {
         return CoreCourseHelper.canUserViewSection(section) && !CoreCourseHelper.isSectionStealth(section);
+    }
+
+    /**
+     * Log view.
+     *
+     * @param sectionNumber Section loaded (if any).
+     * @param firstLoad Whether it's the first load when opening the course.
+     */
+    async logView(sectionNumber?: number, firstLoad = false): Promise<void> {
+        await CoreUtils.ignoreErrors(
+            CoreCourse.logView(this.course.id, sectionNumber),
+        );
+
+        let extraParams = sectionNumber !== undefined ? `&section=${sectionNumber}` : '';
+        if (firstLoad && sectionNumber !== undefined) {
+            // If course is configured to show all sections in one page, don't include section in URL in first load.
+            const courseDisplay = 'courseformatoptions' in this.course &&
+                this.course.courseformatoptions?.find(option => option.name === 'coursedisplay');
+
+            if (!courseDisplay || Number(courseDisplay.value) !== 0) {
+                extraParams = '';
+            }
+        }
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM,
+            ws: 'core_course_view_course',
+            name: this.course.fullname,
+            data: { id: this.course.id, sectionnumber: sectionNumber, category: 'course' },
+            url: `/course/view.php?id=${this.course.id}${extraParams}`,
+        });
     }
 
 }

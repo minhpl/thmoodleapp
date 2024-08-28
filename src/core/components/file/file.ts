@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Component, Input, Output, OnInit, OnDestroy, EventEmitter } from '@angular/core';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFilepool } from '@services/filepool';
 import { CoreFileHelper } from '@services/file-helper';
 import { CorePluginFileDelegate } from '@services/plugin-file-delegate';
@@ -23,9 +23,10 @@ import { CoreMimetypeUtils } from '@services/utils/mimetype';
 import { CoreUrlUtils } from '@services/utils/url';
 import { CoreUtils, CoreUtilsOpenFileOptions, OpenFileAction } from '@services/utils/utils';
 import { CoreTextUtils } from '@services/utils/text';
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
 import { CoreWSFile } from '@services/ws';
+import { CorePlatform } from '@services/platform';
 
 /**
  * Component to handle a remote file. Shows the file name, icon (depending on mimetype) and a button
@@ -52,7 +53,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
     fileIcon?: string;
     fileName!: string;
     fileSizeReadable?: string;
-    state?: string;
+    state?: DownloadStatus;
     timemodified!: number;
     isIOS = false;
     openButtonIcon = '';
@@ -69,7 +70,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         if (!this.file) {
@@ -86,9 +87,9 @@ export class CoreFileComponent implements OnInit, OnDestroy {
         this.fileSize = this.file.filesize;
         this.fileName = this.file.filename || '';
 
-        this.isIOS = CoreApp.isIOS();
+        this.isIOS = CorePlatform.isIOS();
         this.defaultIsOpenWithPicker = CoreFileHelper.defaultIsOpenWithPicker();
-        this.openButtonIcon = this.defaultIsOpenWithPicker ? 'fas-file' : 'fas-share-square';
+        this.openButtonIcon = this.defaultIsOpenWithPicker ? 'fas-file' : 'fas-share-from-square';
         this.openButtonLabel = this.defaultIsOpenWithPicker ? 'core.openfile' : 'core.openwith';
 
         if (CoreUtils.isTrueOrOne(this.showSize) && this.fileSize && this.fileSize >= 0) {
@@ -114,7 +115,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
                 this.observer = CoreEvents.on(eventName, () => {
                     this.calculateState();
                 });
-            } catch (error) {
+            } catch {
                 // File not downloadable.
             }
         }
@@ -123,7 +124,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
     /**
      * Convenience function to get the file state and set variables based on it.
      *
-     * @return Promise resolved when state has been calculated.
+     * @returns Promise resolved when state has been calculated.
      */
     protected async calculateState(): Promise<void> {
         if (!this.siteId) {
@@ -137,7 +138,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
         this.canDownload = site.canDownloadFiles();
 
         this.state = state;
-        this.isDownloading = this.canDownload && state === CoreConstants.DOWNLOADING;
+        this.isDownloading = this.canDownload && state === DownloadStatus.DOWNLOADING;
         this.isDownloaded = this.canDownload && CoreFileHelper.isStateDownloaded(state);
     }
 
@@ -146,11 +147,15 @@ export class CoreFileComponent implements OnInit, OnDestroy {
      *
      * @param ev Click event (if any).
      * @param isOpenButton Whether the open button was clicked.
-     * @return Promise resolved when file is opened.
+     * @returns Promise resolved when file is opened.
      */
-    openFile(ev?: Event, isOpenButton = false): Promise<void> {
+    async openFile(ev?: Event, isOpenButton = false): Promise<void> {
         ev?.preventDefault();
         ev?.stopPropagation();
+
+        if (!this.file) {
+            return;
+        }
 
         const options: CoreUtilsOpenFileOptions = {};
         if (isOpenButton) {
@@ -158,14 +163,16 @@ export class CoreFileComponent implements OnInit, OnDestroy {
             options.iOSOpenFileAction = this.defaultIsOpenWithPicker ? OpenFileAction.OPEN : OpenFileAction.OPEN_WITH;
         }
 
-        return CoreFileHelper.downloadAndOpenFile(this.file!, this.component, this.componentId, this.state, (event) => {
-            if (event && 'calculating' in event && event.calculating) {
-                // The process is calculating some data required for the download, show the spinner.
-                this.isDownloading = true;
-            }
-        }, undefined, options).catch((error) => {
+        try {
+            return await CoreFileHelper.downloadAndOpenFile(this.file, this.component, this.componentId, this.state, (event) => {
+                if (event && 'calculating' in event && event.calculating) {
+                    // The process is calculating some data required for the download, show the spinner.
+                    this.isDownloading = true;
+                }
+            }, undefined, options);
+        } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'core.errordownloading', true);
-        });
+        }
     }
 
     /**
@@ -186,7 +193,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
             return;
         }
 
-        if (!this.canDownload || !this.state || this.state == CoreConstants.NOT_DOWNLOADABLE) {
+        if (!this.canDownload || !this.state || this.state === DownloadStatus.NOT_DOWNLOADABLE) {
             // File cannot be downloaded, just open it.
             if (CoreUrlUtils.isLocalFileUrl(this.fileUrl)) {
                 CoreUtils.openFile(this.fileUrl);
@@ -197,7 +204,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
             return;
         }
 
-        if (!CoreApp.isOnline() && (!openAfterDownload || (openAfterDownload &&
+        if (!CoreNetwork.isOnline() && (!openAfterDownload || (openAfterDownload &&
                 !CoreFileHelper.isStateDownloaded(this.state)))) {
             CoreDomUtils.showErrorModal('core.networkerrormsg', true);
 
@@ -221,7 +228,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
                 }
 
                 // User confirmed, add the file to queue.
-                // @todo: Is the invalidate really needed?
+                // @todo Is the invalidate really needed?
                 await CoreUtils.ignoreErrors(CoreFilepool.invalidateFileByUrl(this.siteId, this.fileUrl));
 
                 this.isDownloading = true;
@@ -263,7 +270,7 @@ export class CoreFileComponent implements OnInit, OnDestroy {
     }
 
     /**
-     * Component destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.observer?.off();

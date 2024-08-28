@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { CoreContentLinksHandlerBase } from './base-handler';
-import { Params } from '@angular/router';
 import { CoreContentLinksAction } from '../services/contentlinks-delegate';
 import { CoreCourseHelper } from '@features/course/services/course-helper';
 import { CoreNavigationOptions } from '@services/navigator';
@@ -53,27 +52,13 @@ export class CoreContentLinksModuleIndexHandler extends CoreContentLinksHandlerB
     }
 
     /**
-     * Get the mod params necessary to open an activity.
-     *
-     * @param url The URL to treat.
-     * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
-     * @param courseId Course ID related to the URL. Optional but recommended.
-     * @return List of params to pass to navigateToModule / navigateToModuleByInstance.
-     * @deprecated since 4.0
-     */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    getPageParams(url: string, params: Record<string, string>, courseId?: number): Params {
-        return {};
-    }
-
-    /**
      * Get the navigation options to open the module.
      *
      * @param url The URL to treat.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param siteId The site ID.
      * @param courseId Course ID related to the URL. Optional but recommended.
-     * @return Navigation options to open the module.
+     * @returns Navigation options to open the module.
      */
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     getModNavOptions(url: string, params: Record<string, string>, siteId: string, courseId?: number): CoreNavigationOptions {
@@ -87,7 +72,7 @@ export class CoreContentLinksModuleIndexHandler extends CoreContentLinksHandlerB
      * @param url The URL to treat.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
      * @param courseId Course ID related to the URL. Optional but recommended.
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
     getActions(
         siteIds: string[],
@@ -97,31 +82,19 @@ export class CoreContentLinksModuleIndexHandler extends CoreContentLinksHandlerB
     ): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
 
         courseId = Number(courseId || params.courseid || params.cid);
-        const getModNavOptions = (siteId: string): CoreNavigationOptions => {
-            let modNavOptions = this.getModNavOptions(url, params, siteId, courseId);
-            if (!modNavOptions) {
-                // Use the old function, currently deprecated.
-                const pageParams = this.getPageParams(url, params, courseId);
-                if (pageParams && Object.keys(pageParams).length > 0) {
-                    modNavOptions = { params: pageParams };
-                }
-            }
-
-            return modNavOptions;
-        };
 
         if (this.instanceIdParam && params[this.instanceIdParam] !== undefined) {
             const instanceId = parseInt(params[this.instanceIdParam], 10);
 
             return [{
-                action: (siteId) => {
-                    CoreCourseHelper.navigateToModuleByInstance(
+                action: async (siteId) => {
+                    await CoreCourseHelper.navigateToModuleByInstance(
                         instanceId,
                         this.modName,
                         {
                             courseId,
                             useModNameToGetModule: this.useModNameToGetModule,
-                            modNavOptions: getModNavOptions(siteId),
+                            modNavOptions: this.getModNavOptions(url, params, siteId, courseId),
                             siteId,
                         },
                     );
@@ -130,13 +103,13 @@ export class CoreContentLinksModuleIndexHandler extends CoreContentLinksHandlerB
         }
 
         return [{
-            action: (siteId) => {
-                CoreCourseHelper.navigateToModule(
+            action: async (siteId) => {
+                await CoreCourseHelper.navigateToModule(
                     parseInt(params.id, 10),
                     {
                         courseId,
                         modName: this.useModNameToGetModule ? this.modName : undefined,
-                        modNavOptions: getModNavOptions(siteId),
+                        modNavOptions: this.getModNavOptions(url, params, siteId, courseId),
                         siteId,
                     },
                 );

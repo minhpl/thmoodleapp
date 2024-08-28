@@ -1,0 +1,43 @@
+
+// Checkbox.
+ion-checkbox,
+input[type=checkbox] {
+    --border-radius: 2px;
+    --border-width: 2px;
+    --outer-border-width: 2px;
+    --border-style: solid;
+    --size: 20px;
+
+    &:not(.ion-color) {
+        --border-color-checked: var(--text-color);
+        --checkbox-background-checked: var(--text-color);
+        --checkmark-color: var(--contrast-background);
+    }
+}
+
+ion-checkbox::part(label) {
+    white-space: normal;
+}
+
+ion-checkbox {
+    &.checkbox-disabled {
+        @include pointer-events-on-buttons();
+
+        &.md::part(label),
+        &.ios {
+            opacity: var(--mdl-input-disabled-opacity);
+        }
+
+        &::part(container) {
+            opacity: var(--mdl-input-disabled-opacity);
+        }
+    }
+}
+
+.ios input[type=checkbox] {
+    --outer-border-width: 1px;
+}
+
+input[type=checkbox][disabled] {
+    opacity: var(--mdl-input-disabled-opacity);
+}

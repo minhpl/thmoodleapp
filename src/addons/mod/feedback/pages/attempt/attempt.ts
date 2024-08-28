@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { ActivatedRouteSnapshot } from '@angular/router';
+import { ActivatedRoute, ActivatedRouteSnapshot } from '@angular/router';
 import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/routed-items-manager-sources-tracker';
 import { CoreSwipeNavigationItemsManager } from '@classes/items-management/swipe-navigation-items-manager';
 import { CoreNavigator } from '@services/navigator';
@@ -24,10 +24,11 @@ import {
     AddonModFeedback,
     AddonModFeedbackProvider,
     AddonModFeedbackWSAnonAttempt,
-    AddonModFeedbackWSAttempt,
     AddonModFeedbackWSFeedback,
 } from '../../services/feedback';
-import { AddonModFeedbackFormItem, AddonModFeedbackHelper } from '../../services/feedback-helper';
+import { AddonModFeedbackAttempt, AddonModFeedbackFormItem, AddonModFeedbackHelper } from '../../services/feedback-helper';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Page that displays a feedback attempt review.
@@ -41,7 +42,7 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
     cmId: number;
     courseId: number;
     feedback?: AddonModFeedbackWSFeedback;
-    attempt?: AddonModFeedbackWSAttempt;
+    attempt?: AddonModFeedbackAttempt;
     attempts: AddonModFeedbackAttemptsSwipeManager;
     anonAttempt?: AddonModFeedbackWSAnonAttempt;
     items: AddonModFeedbackAttemptItem[] = [];
@@ -49,11 +50,14 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
     loaded = false;
 
     protected attemptId: number;
+    protected groupId?: number;
+    protected logView: () => void;
 
     constructor() {
         this.cmId = CoreNavigator.getRequiredRouteNumberParam('cmId');
         this.courseId = CoreNavigator.getRequiredRouteNumberParam('courseId');
         this.attemptId = CoreNavigator.getRequiredRouteNumberParam('attemptId');
+        this.groupId = CoreNavigator.getRouteNumberParam('groupId');
 
         const source = CoreRoutedItemsManagerSourcesTracker.getOrCreateSource(
             AddonModFeedbackAttemptsSource,
@@ -61,14 +65,29 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
         );
 
         this.attempts = new AddonModFeedbackAttemptsSwipeManager(source);
+
+        this.logView = CoreTime.once(() => {
+            if (!this.feedback) {
+                return;
+            }
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: 'mod_feedback_get_responses_analysis',
+                name: this.feedback.name,
+                data: { id: this.attemptId, feedbackid: this.feedback.id, category: 'feedback' },
+                url: `/mod/feedback/show_entries.php?id=${this.cmId}` +
+                    (this.attempt ? `userid=${this.attempt.userid}` : '' ) + `&showcompleted=${this.attemptId}`,
+            });
+        });
     }
 
     /**
      * @inheritdoc
      */
-    ngOnInit(): void {
+    async ngOnInit(): Promise<void> {
         try {
-            this.attempts.start();
+            await this.attempts.start();
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
 
@@ -90,19 +109,22 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
     /**
      * Fetch all the data required for the view.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchData(): Promise<void> {
         try {
             this.feedback = await AddonModFeedback.getFeedback(this.courseId, this.cmId);
 
-            const attempt = await AddonModFeedback.getAttempt(this.feedback.id, this.attemptId, { cmId: this.cmId });
+            const attempt = await AddonModFeedback.getAttempt(this.feedback.id, this.attemptId, {
+                cmId: this.cmId,
+                groupId: this.groupId,
+            });
 
             if (this.isAnonAttempt(attempt)) {
                 this.anonAttempt = attempt;
                 delete this.attempt;
             } else {
-                this.attempt = attempt;
+                this.attempt = (await AddonModFeedbackHelper.addImageProfile([attempt]))[0];
                 delete this.anonAttempt;
             }
 
@@ -130,6 +152,8 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
 
                 return attemptItem;
             }).filter((itemData) => itemData); // Filter items with errors.
+
+            this.logView();
         } catch (message) {
             // Some call failed on fetch, go back.
             CoreDomUtils.showErrorModalDefault(message, 'core.course.errorgetmodule', true);
@@ -143,8 +167,9 @@ export class AddonModFeedbackAttemptPage implements OnInit, OnDestroy {
      * Check if an attempt is anonymous or not.
      *
      * @param attempt Attempt to check.
+     * @returns If attempt is anonymous.
      */
-    isAnonAttempt(attempt: AddonModFeedbackWSAttempt | AddonModFeedbackWSAnonAttempt): attempt is AddonModFeedbackWSAnonAttempt {
+    isAnonAttempt(attempt: AddonModFeedbackAttempt | AddonModFeedbackWSAnonAttempt): attempt is AddonModFeedbackWSAnonAttempt {
         return !('fullname' in attempt);
     }
 
@@ -162,8 +187,8 @@ class AddonModFeedbackAttemptsSwipeManager extends CoreSwipeNavigationItemsManag
     /**
      * @inheritdoc
      */
-    protected getSelectedItemPathFromRoute(route: ActivatedRouteSnapshot): string | null {
-        return route.params.attemptId;
+    protected getSelectedItemPathFromRoute(route: ActivatedRouteSnapshot | ActivatedRoute): string | null {
+        return CoreNavigator.getRouteParams(route).attemptId;
     }
 
 }

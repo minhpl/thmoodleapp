@@ -24,6 +24,8 @@ import { Translate } from '@singletons';
 import { CoreCourseModuleCompletionBaseComponent } from '@features/course/classes/module-completion';
 import { CoreCourseHelper } from '@features/course/services/course-helper';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
+import { BehaviorSubject } from 'rxjs';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Component to handle activity completion in sites previous to 3.11.
@@ -43,7 +45,7 @@ export class CoreCourseModuleCompletionLegacyComponent extends CoreCourseModuleC
     implements OnInit, OnDestroy {
 
     completionImage?: string;
-    completionDescription?: string;
+    completionDescription$ = new BehaviorSubject('');
 
     protected completionObserver?: CoreEventObserver;
 
@@ -111,7 +113,7 @@ export class CoreCourseModuleCompletionLegacyComponent extends CoreCourseModuleC
 
         const result = await CoreFilterHelper.getFiltersAndFormatText(
             moduleName,
-            'module',
+            ContextLevel.MODULE,
             this.moduleId,
             { clean: true, singleLine: true, shortenLength: 50, courseId: this.completion.courseId },
         );
@@ -133,7 +135,7 @@ export class CoreCourseModuleCompletionLegacyComponent extends CoreCourseModuleC
             };
         }
 
-        this.completionDescription = Translate.instant(langKey, translateParams);
+        this.completionDescription$.next(Translate.instant(langKey, translateParams));
     }
 
     /**
@@ -146,7 +148,10 @@ export class CoreCourseModuleCompletionLegacyComponent extends CoreCourseModuleC
             return;
         }
 
-        await CoreCourseHelper.changeManualCompletion(this.completion, event);
+        event.stopPropagation();
+        event.preventDefault();
+
+        await CoreCourseHelper.changeManualCompletion(this.completion);
 
         CoreEvents.trigger(CoreEvents.MANUAL_COMPLETION_CHANGED, { completion: this.completion });
     }

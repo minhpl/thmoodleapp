@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { CorePromisedValue } from '@classes/promised-value';
 import {
     CoreSitePlugins,
     CoreSitePluginsContent,
@@ -21,12 +22,11 @@ import {
 import { CoreUserProfile } from '@features/user/services/user';
 import {
     CoreUserDelegateContext,
-    CoreUserDelegateService,
+    CoreUserProfileHandlerType,
     CoreUserProfileHandler,
     CoreUserProfileHandlerData,
 } from '@features/user/services/user-delegate';
 import { CoreNavigator } from '@services/navigator';
-import { CoreUtils, PromiseDefer } from '@services/utils/utils';
 import { Md5 } from 'ts-md5';
 import { CoreSitePluginsBaseHandler } from './base-handler';
 
@@ -36,9 +36,9 @@ import { CoreSitePluginsBaseHandler } from './base-handler';
 export class CoreSitePluginsUserProfileHandler extends CoreSitePluginsBaseHandler implements CoreUserProfileHandler {
 
     priority: number;
-    type: string;
+    type: CoreUserProfileHandlerType;
 
-    protected updatingDefer?: PromiseDefer<void>;
+    protected updatingDefer?: CorePromisedValue<void>;
 
     constructor(
         name: string,
@@ -51,9 +51,10 @@ export class CoreSitePluginsUserProfileHandler extends CoreSitePluginsBaseHandle
 
         this.priority = handlerSchema.priority || 0;
 
-        // Only support TYPE_COMMUNICATION and TYPE_NEW_PAGE.
-        this.type = handlerSchema.type != CoreUserDelegateService.TYPE_COMMUNICATION ?
-            CoreUserDelegateService.TYPE_NEW_PAGE : CoreUserDelegateService.TYPE_COMMUNICATION;
+        // Only support LIST_ITEM and BUTTON.
+        this.type = !handlerSchema.type || handlerSchema.type === CoreUserProfileHandlerType.LIST_ACCOUNT_ITEM
+            ? CoreUserProfileHandlerType.LIST_ITEM
+            : handlerSchema.type;
     }
 
     /**
@@ -97,7 +98,7 @@ export class CoreSitePluginsUserProfileHandler extends CoreSitePluginsBaseHandle
                     courseid: contextId,
                     userid: user.id,
                 };
-                const hash = <string> Md5.hashAsciiStr(JSON.stringify(args));
+                const hash = Md5.hashAsciiStr(JSON.stringify(args));
 
                 CoreNavigator.navigateToSitePath(
                     `siteplugins/content/${this.plugin.component}/${this.handlerSchema.method}/${hash}`,
@@ -130,7 +131,7 @@ export class CoreSitePluginsUserProfileHandler extends CoreSitePluginsBaseHandle
      * Mark init being updated.
      */
     updatingInit(): void {
-        this.updatingDefer = CoreUtils.promiseDefer();
+        this.updatingDefer = new CorePromisedValue();
     }
 
 }

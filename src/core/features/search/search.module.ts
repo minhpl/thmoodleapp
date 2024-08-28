@@ -12,24 +12,58 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { Routes } from '@angular/router';
+import { CoreMainMenuRoutingModule } from '@features/mainmenu/mainmenu-routing.module';
+import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
+import { CoreMainMenuDelegate } from '@features/mainmenu/services/mainmenu-delegate';
+import { CoreSearchMainMenuHandler, CORE_SEARCH_PAGE_NAME } from '@features/search/services/handlers/mainmenu';
 
 import { CORE_SITE_SCHEMAS } from '@services/sites';
 
 import { CoreSearchComponentsModule } from './components/components.module';
 import { SITE_SCHEMA } from './services/search-history-db';
-import { CoreSearchHistoryProvider } from './services/search-history.service';
+import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
+import { CoreSearchGlobalSearchLinkHandler } from '@features/search/services/handlers/global-search-link';
 
-export const CORE_SEARCH_SERVICES: Type<unknown>[] = [
-    CoreSearchHistoryProvider,
+/**
+ * Get search services.
+ *
+ * @returns Returns search services.
+ */
+export async function getSearchServices(): Promise<Type<unknown>[]> {
+    const { CoreSearchHistoryProvider } = await import('@features/search/services/search-history.service');
+    const { CoreSearchGlobalSearchService } = await import('@features/search/services/global-search');
+
+    return [
+        CoreSearchHistoryProvider,
+        CoreSearchGlobalSearchService,
+    ];
+}
+
+const mainMenuChildrenRoutes: Routes = [
+    {
+        path: CORE_SEARCH_PAGE_NAME,
+        loadChildren: () => import('./search-lazy.module').then(m => m.CoreSearchLazyModule),
+    },
 ];
 
 @NgModule({
     imports: [
         CoreSearchComponentsModule,
+        CoreMainMenuTabRoutingModule.forChild(mainMenuChildrenRoutes),
+        CoreMainMenuRoutingModule.forChild({ children: mainMenuChildrenRoutes }),
     ],
     providers: [
         { provide: CORE_SITE_SCHEMAS, useValue: [SITE_SCHEMA], multi: true },
+        {
+            provide: APP_INITIALIZER,
+            multi: true,
+            useValue() {
+                CoreMainMenuDelegate.registerHandler(CoreSearchMainMenuHandler.instance);
+                CoreContentLinksDelegate.registerHandler(CoreSearchGlobalSearchLinkHandler.instance);
+            },
+        },
     ],
 })
 export class CoreSearchModule {}

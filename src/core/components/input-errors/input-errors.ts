@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, Input, OnChanges, SimpleChange } from '@angular/core';
+import { Component, ElementRef, HostBinding, Input, OnChanges, OnInit, SimpleChange } from '@angular/core';
 import { FormControl } from '@angular/forms';
-import { Translate } from '@singletons';
 
 /**
  * Component to show errors if an input isn't valid.
@@ -30,8 +29,7 @@ import { Translate } from '@singletons';
  * Example usage:
  *
  * <ion-item class="ion-text-wrap">
- *     <ion-label stacked core-mark-required="true">{{ 'core.login.username' | translate }}</ion-label>
- *     <ion-input type="text" name="username" formControlName="username"></ion-input>
+ *     <ion-input type="text" name="username" formControlName="username" required="true"></ion-input>
  *     <core-input-errors [control]="myForm.controls.username" [errorMessages]="usernameErrors"></core-input-errors>
  * </ion-item>
  */
@@ -40,44 +38,130 @@ import { Translate } from '@singletons';
     templateUrl: 'core-input-errors.html',
     styleUrls: ['input-errors.scss'],
 })
-export class CoreInputErrorsComponent implements OnChanges {
+export class CoreInputErrorsComponent implements OnInit, OnChanges {
 
-    @Input() control?: FormControl;
-    @Input() errorMessages?: Record<string, string>;
-    @Input() errorText?: string; // Set other non automatic errors.
+    @Input() control?: FormControl<unknown>; // Needed to be able to check the validity of the input.
+    @Input() errorMessages: CoreInputErrorsMessages = {}; // Error messages to show. Keys must be the name of the error.
+    @Input() errorText = ''; // Set other non automatic errors.
     errorKeys: string[] = [];
+
+    protected hostElement: HTMLElement;
+
+    @HostBinding('class.has-errors')
+    get hasErrors(): boolean {
+        return (this.control && this.control.dirty && !this.control.valid) || !!this.errorText;
+    }
+
+    @HostBinding('role') role = 'alert';
+
+    constructor(
+        element: ElementRef,
+    ) {
+        this.hostElement = element.nativeElement;
+    }
 
     /**
      * Initialize some common errors if they aren't set.
      */
     protected initErrorMessages(): void {
-        this.errorMessages = this.errorMessages || {};
+        // Set default error messages.
+        this.errorMessages = {
+            required: 'core.required',
+            email: 'core.login.invalidemail',
+            date: 'core.login.invaliddate',
+            datetime: 'core.login.invaliddate',
+            datetimelocal: 'core.login.invaliddate',
+            time: 'core.login.invalidtime',
+            url: 'core.login.invalidurl',
+            // Set empty values by default, the default error messages will be built in the template when needed.
+            max: '',
+            min: '',
+            ...this.errorMessages,
+        };
 
-        this.errorMessages.required = this.errorMessages.required || Translate.instant('core.required');
-        this.errorMessages.email = this.errorMessages.email || Translate.instant('core.login.invalidemail');
-        this.errorMessages.date = this.errorMessages.date || Translate.instant('core.login.invaliddate');
-        this.errorMessages.datetime = this.errorMessages.datetime || Translate.instant('core.login.invaliddate');
-        this.errorMessages.datetimelocal = this.errorMessages.datetimelocal || Translate.instant('core.login.invaliddate');
-        this.errorMessages.time = this.errorMessages.time || Translate.instant('core.login.invalidtime');
-        this.errorMessages.url = this.errorMessages.url || Translate.instant('core.login.invalidurl');
+        this.errorMessages.requiredTrue = this.errorMessages.required;
 
-        // Set empty values by default, the default error messages will be built in the template when needed.
-        this.errorMessages.max = this.errorMessages.max || '';
-        this.errorMessages.min = this.errorMessages.min || '';
+        this.errorKeys = Object.keys(this.errorMessages);
     }
 
     /**
-     * Component being changed.
+     * @inheritdoc
+     */
+    ngOnInit(): void {
+        const parent = this.hostElement.parentElement;
+        let item: HTMLElement | null = null;
+
+        if (parent?.tagName === 'ION-ITEM') {
+            item = parent;
+
+            // Get all elements on the parent and wrap them with a div.
+            // This is needed because otherwise the error message will be shown on the right of the input. Or overflowing the item.
+            const wrapper = document.createElement('div');
+
+            wrapper.classList.add('core-input-errors-wrapper');
+
+            Array.from(parent.children).forEach((child) => {
+                if (!child.slot) {
+                    wrapper.appendChild(child);
+                }
+            });
+
+            parent.appendChild(wrapper);
+        } else {
+            item = this.hostElement.closest('ion-item');
+        }
+
+        item?.classList.add('has-core-input-errors');
+
+    }
+
+    /**
+     * @inheritdoc
      */
     ngOnChanges(changes: { [name: string]: SimpleChange }): void {
         if ((changes.control || changes.errorMessages) && this.control) {
             this.initErrorMessages();
-
-            this.errorKeys = this.errorMessages ? Object.keys(this.errorMessages) : [];
-        }
-        if (changes.errorText) {
-            this.errorText = changes.errorText.currentValue;
         }
     }
 
+    /**
+     * Get error message for pattern error.
+     *
+     * @returns Error message, undefined if not found.
+     */
+    getPatternErrorMessage(): string | undefined {
+        const patternError = this.control?.errors?.pattern;
+        if (!this.errorMessages?.pattern || !patternError) {
+            return;
+        }
+
+        if (typeof this.errorMessages.pattern === 'string') {
+            return this.errorMessages.pattern;
+        }
+
+        return this.errorMessages.pattern[patternError.requiredPattern];
+    }
+
 }
+
+/**
+ * Error messages for each type of error.
+ * Error messages will be translated in the template, they don't need to be translated already.
+ */
+export type CoreInputErrorsMessages = {
+    required?: string;
+    requiredTrue?: string;
+    email?: string;
+    date?: string;
+    datetime?: string;
+    datetimelocal?: string;
+    time?: string;
+    url?: string;
+    max?: string;
+    min?: string;
+    maxlength?: string;
+    minlength?: string;
+    // For pattern errors you can define an error for all patterns (string), or one error per pattern.
+    // In the latter case, the key of the object is the pattern and the value is the error message identifier.
+    pattern?: string | Record<string,string>;
+};

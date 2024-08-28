@@ -17,7 +17,7 @@ import { CoreCommentsCommentsComponent } from '@features/comments/components/com
 import { CoreComments } from '@features/comments/services/comments';
 import { CoreCourse } from '@features/course/services/course';
 import { CoreRatingInfo } from '@features/rating/services/rating';
-import { IonContent, IonRefresher } from '@ionic/angular';
+import { IonContent } from '@ionic/angular';
 import { CoreGroups, CoreGroupInfo } from '@services/groups';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
@@ -36,6 +36,8 @@ import { AddonModDataProvider,
 } from '../../services/data';
 import { AddonModDataHelper } from '../../services/data-helper';
 import { AddonModDataSyncProvider } from '../../services/data-sync';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreTime } from '@singletons/time';
 
 /**
  * Page that displays the view entry page.
@@ -55,7 +57,9 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
     protected entryChangedObserver: CoreEventObserver; // It will observe the changed entry event.
     protected fields: Record<number, AddonModDataField> = {};
     protected fieldsArray: AddonModDataField[] = [];
-    protected logAfterFetch = true;
+    protected sortBy = 0;
+    protected sortDirection = 'DESC';
+    protected logView: () => void;
 
     moduleId = 0;
     courseId!: number;
@@ -84,6 +88,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
         database: AddonModDataData;
         title: string;
         group: number;
+        access: AddonModDataGetDataAccessInformationWSResponse | undefined;
     };
 
     ratingInfo?: CoreRatingInfo;
@@ -126,6 +131,8 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
                 }
             }
         }, this.siteId);
+
+        this.logView = CoreTime.once(() => this.performLogView());
     }
 
     /**
@@ -139,6 +146,9 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
             this.title = CoreNavigator.getRouteParam<string>('title') || '';
             this.selectedGroup = CoreNavigator.getRouteNumberParam('group') || 0;
             this.offset = CoreNavigator.getRouteNumberParam('offset');
+            this.sortDirection = CoreNavigator.getRouteParam('sortDirection') ?? this.sortDirection;
+            const sortBy = Number(CoreNavigator.getRouteParam('sortBy'));
+            this.sortBy = isNaN(sortBy) ? this.sortBy : sortBy;
         } catch (error) {
             CoreDomUtils.showErrorModal(error);
 
@@ -147,7 +157,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
             return;
         }
 
-        this.commentsEnabled = !CoreComments.areCommentsDisabledInSite();
+        this.commentsEnabled = CoreComments.areCommentsEnabledInSite();
 
         await this.fetchEntryData();
     }
@@ -157,7 +167,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      *
      * @param refresh Whether to refresh the current data or not.
      * @param isPtr Whether is a pull to refresh action.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async fetchEntryData(refresh = false, isPtr = false): Promise<void> {
         this.isPullingToRefresh = isPtr;
@@ -174,7 +184,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
             this.access = await AddonModData.getDatabaseAccessInformation(this.database.id, { cmId: this.moduleId });
 
             this.groupInfo = await CoreGroups.getActivityGroupInfo(this.database.coursemodule);
-            if (this.groupInfo.visibleGroups && this.groupInfo.groups?.length) {
+            if (this.groupInfo.visibleGroups && this.groupInfo.groups.length) {
                 // There is a bug in Moodle with All participants and visible groups (MOBILE-3597). Remove it.
                 this.groupInfo.groups = this.groupInfo.groups.filter(group => group.id !== 0);
                 this.groupInfo.defaultGroupId = this.groupInfo.groups[0].id;
@@ -182,16 +192,20 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
 
             this.selectedGroup = CoreGroups.validateGroupId(this.selectedGroup, this.groupInfo);
 
-            const actions = AddonModDataHelper.getActions(this.database, this.access, this.entry!);
+            const actions = AddonModDataHelper.getActions(this.database, this.access, this.entry!, AddonModDataTemplateMode.SHOW);
 
             const template = AddonModDataHelper.getTemplate(this.database, AddonModDataTemplateType.SINGLE, this.fieldsArray);
             this.entryHtml = AddonModDataHelper.displayShowFields(
                 template,
                 this.fieldsArray,
                 this.entry!,
-                this.offset,
                 AddonModDataTemplateMode.SHOW,
                 actions,
+                {
+                    offset: this.offset,
+                    sortBy: this.sortBy,
+                    sortDirection: this.sortDirection,
+                },
             );
 
             this.showComments = actions.comments;
@@ -206,15 +220,10 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
                 database: this.database,
                 title: this.title,
                 group: this.selectedGroup,
+                access: this.access,
             };
 
-            if (this.logAfterFetch) {
-                this.logAfterFetch = false;
-                await CoreUtils.ignoreErrors(AddonModData.logView(this.database.id, this.database.name));
-
-                // Store module viewed because this page also updates recent accessed items block.
-                CoreCourse.storeModuleViewed(this.courseId, this.moduleId);
-            }
+            this.logView();
         } catch (error) {
             if (!refresh) {
                 // Some call failed, retry without using cache since it might be a new activity.
@@ -232,14 +241,14 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Go to selected entry without changing state.
      *
      * @param offset Entry offset.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async gotoEntry(offset: number): Promise<void> {
         this.offset = offset;
         this.entryId = undefined;
         this.entry = undefined;
         this.entryLoaded = false;
-        this.logAfterFetch = true;
+        this.logView = CoreTime.once(() => this.performLogView()); // Log again after loading data.
 
         await this.fetchEntryData();
     }
@@ -248,7 +257,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Refresh all the data.
      *
      * @param isPtr Whether is a pull to refresh action.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshAllData(isPtr?: boolean): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -276,9 +285,8 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Refresh the data.
      *
      * @param refresher Refresher.
-     * @return Promise resolved when done.
      */
-    refreshDatabase(refresher?: IonRefresher): void {
+    refreshDatabase(refresher?: HTMLIonRefresherElement): void {
         if (!this.entryLoaded) {
             return;
         }
@@ -292,7 +300,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
      * Set group to see the database.
      *
      * @param groupId Group identifier to set.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     async setGroup(groupId: number): Promise<void> {
         this.selectedGroup = groupId;
@@ -300,7 +308,6 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
         this.entry = undefined;
         this.entryId = undefined;
         this.entryLoaded = false;
-        this.logAfterFetch = true;
 
         await this.fetchEntryData();
     }
@@ -308,7 +315,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
     /**
      * Convenience function to fetch the entry and set next/previous entries.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async setEntryFromOffset(): Promise<void> {
         if (this.offset === undefined && this.entryId !== undefined) {
@@ -331,8 +338,8 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
 
         const entries = await AddonModDataHelper.fetchEntries(this.database!, this.fieldsArray, {
             groupId: this.selectedGroup,
-            sort: 0,
-            order: 'DESC',
+            sort: this.sortBy,
+            order: this.sortDirection,
             page,
             perPage,
         });
@@ -344,6 +351,7 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
         if (this.offset === undefined) {
             // No offset passed, display the first entry.
             pageIndex = 0;
+            this.offset = 0;
         } else if (this.offset > 0) {
             // Online entry.
             pageIndex = this.offset % perPage + (entries.offlineEntries?.length || 0);
@@ -412,7 +420,29 @@ export class AddonModDataEntryPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Component being destroyed.
+     * Log view.
+     */
+    protected async performLogView(): Promise<void> {
+        if (!this.database) {
+            return;
+        }
+
+        await CoreUtils.ignoreErrors(AddonModData.logView(this.database.id));
+
+        // Store module viewed because this page also updates recent accessed items block.
+        CoreCourse.storeModuleViewed(this.courseId, this.moduleId);
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.VIEW_ITEM,
+            ws: 'mod_data_view_database',
+            name: this.database.name,
+            data: { id: this.entryId, databaseid: this.database.id, category: 'data' },
+            url: `/mod/data/view.php?d=${this.database.id}&rid=${this.entryId}`,
+        });
+    }
+
+    /**
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.syncObserver?.off();

@@ -14,7 +14,14 @@
 
 import envJson from '@/assets/env.json';
 import { EnvironmentConfig } from '@/types/config';
+import { InjectionToken } from '@angular/core';
 import { CoreBrowser } from '@singletons/browser';
+
+/**
+ * Injection token used for dependencies marked as optional that will never
+ * be resolved by Angular injectors.
+ */
+export const NULL_INJECTION_TOKEN = new InjectionToken('null');
 
 /**
  * Context levels enumeration.
@@ -34,9 +41,40 @@ export const enum ModPurpose {
     MOD_PURPOSE_COLLABORATION = 'collaboration',
     MOD_PURPOSE_CONTENT = 'content',
     MOD_PURPOSE_ADMINISTRATION = 'administration',
-    MOD_PURPOSE_INTERFACE = 'interface',
+    MOD_PURPOSE_INTERFACE = 'interface', // @deprecatedonmoodle since 4.4.
+    MOD_PURPOSE_INTERACTIVECONTENT = 'interactivecontent',
     MOD_PURPOSE_OTHER = 'other',
-};
+}
+
+/* eslint-disable @typescript-eslint/naming-convention, @typescript-eslint/no-redeclare */
+/**
+ * Possible statuses for downloaded modules/files.
+ */
+export const DownloadedStatus = {
+    DOWNLOADED: 'downloaded',
+    DOWNLOADING: 'downloading',
+    OUTDATED: 'outdated',
+} as const;
+export type DownloadedStatus = typeof DownloadedStatus[keyof typeof DownloadedStatus];
+
+/**
+ * Possible statuses for not downloaded modules/files.
+ */
+export const NotDownloadedStatus = {
+    DOWNLOADABLE_NOT_DOWNLOADED: 'notdownloaded',
+    NOT_DOWNLOADABLE: 'notdownloadable',
+} as const;
+export type NotDownloadedStatus = typeof NotDownloadedStatus[keyof typeof NotDownloadedStatus];
+
+/**
+ * Possible statuses for modules regarding download.
+ */
+export const DownloadStatus = {
+    ...DownloadedStatus,
+    ...NotDownloadedStatus,
+} as const;
+export type DownloadStatus = typeof DownloadStatus[keyof typeof DownloadStatus];
+/* eslint-enable @typescript-eslint/naming-convention, @typescript-eslint/no-redeclare */
 
 /**
  * Static class to contain all the core constants.
@@ -62,7 +100,6 @@ export class CoreConstants {
     static readonly DOWNLOAD_THRESHOLD = 10485760; // 10MB.
     static readonly MINIMUM_FREE_SPACE = 10485760; // 10MB.
     static readonly IOS_FREE_SPACE_THRESHOLD = 524288000; // 500MB.
-    static readonly DONT_SHOW_ERROR = 'CoreDontShowError'; // @deprecated since 3.9.5. Use CoreSilentError instead.
     static readonly NO_SITE_ID = 'NoSite';
 
     // Settings constants.
@@ -79,31 +116,51 @@ export class CoreConstants {
     // WS constants.
     static readonly WS_TIMEOUT = 30000; // Timeout when not in WiFi.
     static readonly WS_TIMEOUT_WIFI = 30000; // Timeout when in WiFi.
-    static readonly WS_PREFIX = 'local_mobile_'; // @deprecated since app 4.0.
 
     // Login constants.
+    /**
+     * @deprecated since 4.3 Use TypeOfLogin.BROWSER instead.
+     */
     static readonly LOGIN_SSO_CODE = 2; // SSO in browser window is required.
+    /**
+     * @deprecated since 4.3 Use TypeOfLogin.EMBEDDED instead.
+     */
     static readonly LOGIN_SSO_INAPP_CODE = 3; // SSO in embedded browser is required.
     static readonly LOGIN_LAUNCH_DATA = 'CoreLoginLaunchData';
 
     // Download status constants.
-    static readonly DOWNLOADED = 'downloaded';
-    static readonly DOWNLOADING = 'downloading';
-    static readonly NOT_DOWNLOADED = 'notdownloaded';
-    static readonly OUTDATED = 'outdated';
-    static readonly NOT_DOWNLOADABLE = 'notdownloadable';
+    /**
+     * @deprecated since 4.4. Use DownloadStatus.DOWNLOADED instead.
+     */
+    static readonly DOWNLOADED = DownloadStatus.DOWNLOADED;
+    /**
+     * @deprecated since 4.4. Use DownloadStatus.DOWNLOADING instead.
+     */
+    static readonly DOWNLOADING = DownloadStatus.DOWNLOADING;
+    /**
+     * @deprecated since 4.4. Use DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED instead.
+     */
+    static readonly NOT_DOWNLOADED = DownloadStatus.DOWNLOADABLE_NOT_DOWNLOADED;
+    /**
+     * @deprecated since 4.4. Use DownloadStatus.OUTDATED instead.
+     */
+    static readonly OUTDATED = DownloadStatus.OUTDATED;
+    /**
+     * @deprecated since 4.4. Use DownloadStatus.NOT_DOWNLOADABLE instead.
+     */
+    static readonly NOT_DOWNLOADABLE = DownloadStatus.NOT_DOWNLOADABLE;
 
     // Download / prefetch status icon.
     static readonly ICON_DOWNLOADED = 'fam-cloud-done';
     static readonly ICON_DOWNLOADING = 'spinner';
-    static readonly ICON_NOT_DOWNLOADED = 'fas-cloud-download-alt';
+    static readonly ICON_NOT_DOWNLOADED = 'fas-cloud-arrow-down';
     static readonly ICON_OUTDATED = 'fam-cloud-refresh';
     static readonly ICON_NOT_DOWNLOADABLE = '';
 
     // General download and sync icons.
     static readonly ICON_LOADING = 'spinner';
-    static readonly ICON_REFRESH = 'fas-redo-alt';
-    static readonly ICON_SYNC = 'fas-sync-alt';
+    static readonly ICON_REFRESH = 'fas-rotate-right';
+    static readonly ICON_SYNC = 'fas-rotate';
 
     // Constants from Moodle's resourcelib.
     static readonly RESOURCELIB_DISPLAY_AUTO = 0; // Try the best way.
@@ -142,6 +199,12 @@ export class CoreConstants {
     static readonly MOD_ARCHETYPE_ASSIGNMENT = 2; // Assignment module archetype.
     static readonly MOD_ARCHETYPE_SYSTEM = 3; // System (not user-addable) module archetype.
 
+    // Other constants.
+    static readonly CALENDAR_DEFAULT_STARTING_WEEKDAY = 1;
+    static readonly DONT_SHOW_NOTIFICATIONS_PERMISSION_WARNING = 'CoreDontShowNotificationsPermissionWarning';
+    static readonly DONT_SHOW_EXACT_ALARMS_WARNING = 'CoreDontShowScheduleExactWarning';
+    static readonly EXACT_ALARMS_WARNING_DISPLAYED = 'CoreScheduleExactWarningModalDisplayed';
+
     // Config & environment constants.
     static readonly CONFIG = { ...envJson.config } as unknown as EnvironmentConfig; // Data parsed from config.json files.
     static readonly BUILD = envJson.build as unknown as EnvironmentBuild; // Build info.
@@ -168,4 +231,4 @@ interface EnvironmentBuild {
     isDevelopment: boolean;
     lastCommitHash: string;
     compilationTime: number;
-};
+}

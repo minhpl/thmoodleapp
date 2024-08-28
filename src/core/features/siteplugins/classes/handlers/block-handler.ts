@@ -14,6 +14,7 @@
 
 import { Type } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
+import type { ICoreBlockComponent } from '@features/block/classes/base-block-component';
 import { CoreBlockPreRenderedComponent } from '@features/block/components/pre-rendered-block/pre-rendered-block';
 import { CoreBlockDelegate, CoreBlockHandler, CoreBlockHandlerData } from '@features/block/services/block-delegate';
 import { CoreCourseBlock } from '@features/course/services/course';
@@ -22,6 +23,7 @@ import { CoreSitePluginsOnlyTitleBlockComponent } from '@features/siteplugins/co
 import { CoreSitePluginsBlockHandlerData, CoreSitePluginsContent } from '@features/siteplugins/services/siteplugins';
 import { CoreLogger } from '@singletons/logger';
 import { CoreSitePluginsBaseHandler } from './base-handler';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Handler to support a block using a site plugin.
@@ -47,11 +49,11 @@ export class CoreSitePluginsBlockHandler extends CoreSitePluginsBaseHandler impl
      */
     async getDisplayData(
         block: CoreCourseBlock,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
     ): Promise<CoreBlockHandlerData> {
         const className = this.handlerSchema.displaydata?.class || 'block_' + block.name;
-        let component: Type<unknown> | undefined;
+        let component: Type<ICoreBlockComponent> | undefined;
 
         if (this.handlerSchema.displaydata?.type == 'title') {
             component = CoreSitePluginsOnlyTitleBlockComponent;

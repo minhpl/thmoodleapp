@@ -12,27 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
 import { CoreCronDelegate } from '@services/cron';
-import { AddonModH5PActivityComponentsModule } from './components/components.module';
-import { AddonModH5PActivityProvider } from './services/h5pactivity';
-import { AddonModH5PActivitySyncProvider } from './services/h5pactivity-sync';
 import { AddonModH5PActivityIndexLinkHandler } from './services/handlers/index-link';
 import { AddonModH5PActivityModuleHandler, AddonModH5PActivityModuleHandlerService } from './services/handlers/module';
 import { AddonModH5PActivityPrefetchHandler } from './services/handlers/prefetch';
 import { AddonModH5PActivityReportLinkHandler } from './services/handlers/report-link';
 import { AddonModH5PActivitySyncCronHandler } from './services/handlers/sync-cron';
-
-// List of providers (without handlers).
-export const ADDON_MOD_H5P_ACTIVITY_SERVICES: Type<unknown>[] = [
-    AddonModH5PActivityProvider,
-    AddonModH5PActivitySyncProvider,
-];
 
 const routes: Routes = [
     {
@@ -44,7 +35,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModH5PActivityComponentsModule,
     ],
     providers: [
         {

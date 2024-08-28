@@ -25,6 +25,7 @@ import { AddonModAssignFeedbackDelegate } from '@addons/mod/assign/services/feed
 import { AddonModAssignOffline } from '@addons/mod/assign/services/assign-offline';
 import { CoreUtils } from '@services/utils/utils';
 import { AddonModAssignFeedbackPluginBaseComponent } from '@addons/mod/assign/classes/base-feedback-plugin-component';
+import { ContextLevel } from '@/core/constants';
 /**
  * Component to render a comments feedback plugin.
  */
@@ -34,7 +35,7 @@ import { AddonModAssignFeedbackPluginBaseComponent } from '@addons/mod/assign/cl
 })
 export class AddonModAssignFeedbackCommentsComponent extends AddonModAssignFeedbackPluginBaseComponent implements OnInit {
 
-    control?: FormControl;
+    control?: FormControl<string>;
     component = AddonModAssignProvider.COMPONENT;
     text = '';
     isSent = false;
@@ -51,7 +52,7 @@ export class AddonModAssignFeedbackCommentsComponent extends AddonModAssignFeedb
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         try {
@@ -69,14 +70,14 @@ export class AddonModAssignFeedbackCommentsComponent extends AddonModAssignFeedb
                             component: this.component,
                             componentId: this.assign.cmid,
                             filter: true,
-                            contextLevel: 'module',
+                            contextLevel: ContextLevel.MODULE,
                             instanceId: this.assign.cmid,
                             courseId: this.assign.course,
                         });
                     }
                 });
             } else if (this.edit) {
-                this.control = this.fb.control(this.text);
+                this.control = this.fb.control(this.text, { nonNullable: true });
             }
         } finally {
             this.loaded = true;
@@ -106,7 +107,7 @@ export class AddonModAssignFeedbackCommentsComponent extends AddonModAssignFeedb
     /**
      * Get the text for the plugin.
      *
-     * @return Promise resolved with the text.
+     * @returns Promise resolved with the text.
      */
     protected async getText(): Promise<string> {
         // Check if the user already modified the comment.
@@ -149,8 +150,8 @@ export class AddonModAssignFeedbackCommentsComponent extends AddonModAssignFeedb
     /**
      * Replace @@PLUGINFILE@@ wildcards with the real URL of embedded files.
      *
-     * @param Text to treat.
-     * @return Treated text.
+     * @param text Text to treat.
+     * @returns Treated text.
      */
     replacePluginfileUrls(text: string): string {
         const files = this.plugin.fileareas && this.plugin.fileareas[0] && this.plugin.fileareas[0].files;

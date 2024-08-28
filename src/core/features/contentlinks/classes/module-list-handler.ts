@@ -51,7 +51,7 @@ export class CoreContentLinksModuleListHandler extends CoreContentLinksHandlerBa
      * @param siteIds List of sites the URL belongs to.
      * @param url The URL to treat.
      * @param params The params of the URL. E.g. 'mysite.com?id=1' -> {id: 1}
-     * @return List of (or promise resolved with list of) actions.
+     * @returns List of (or promise resolved with list of) actions.
      */
     getActions(
         siteIds: string[],
@@ -60,8 +60,8 @@ export class CoreContentLinksModuleListHandler extends CoreContentLinksHandlerBa
     ): CoreContentLinksAction[] | Promise<CoreContentLinksAction[]> {
 
         return [{
-            action: (siteId): void => {
-                CoreNavigator.navigateToSitePath('course/' + params.id + '/list-mod-type', {
+            action: async (siteId): Promise<void> => {
+                await CoreNavigator.navigateToSitePath('course/' + params.id + '/list-mod-type', {
                     params: {
                         modName: this.modName,
                         title: this.title || Translate.instant('addon.mod_' + this.modName + '.modulenameplural'),

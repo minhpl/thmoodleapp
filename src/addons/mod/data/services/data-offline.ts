@@ -19,7 +19,7 @@ import { CoreSites } from '@services/sites';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton } from '@singletons';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 import { AddonModDataAction, AddonModDataEntryWSField } from './data';
 import { AddonModDataEntryDBRecord, DATA_ENTRY_TABLE } from './database/data';
 
@@ -35,7 +35,7 @@ export class AddonModDataOfflineProvider {
      * @param dataId Database ID.
      * @param entryId Database entry ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if deleted, rejected if failure.
+     * @returns Promise resolved if deleted, rejected if failure.
      */
     async deleteAllEntryActions(dataId: number, entryId: number, siteId?: string): Promise<void> {
         const actions = await this.getEntryActions(dataId, entryId, siteId);
@@ -54,7 +54,7 @@ export class AddonModDataOfflineProvider {
      * @param entryId Database entry Id.
      * @param action Action to be done
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if deleted, rejected if failure.
+     * @returns Promise resolved if deleted, rejected if failure.
      */
     async deleteEntry(dataId: number, entryId: number, action: AddonModDataAction, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -75,7 +75,7 @@ export class AddonModDataOfflineProvider {
      * @param entryId Database entry ID.
      * @param action Action to be done.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if deleted, rejected if failure.
+     * @returns Promise resolved if deleted, rejected if failure.
      */
     protected async deleteEntryFiles(dataId: number, entryId: number, action: AddonModDataAction, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -110,13 +110,13 @@ export class AddonModDataOfflineProvider {
      * Get all the stored entry data from all the databases.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with entries.
+     * @returns Promise resolved with entries.
      */
     async getAllEntries(siteId?: string): Promise<AddonModDataOfflineAction[]> {
         const site = await CoreSites.getSite(siteId);
         const entries = await site.getDb().getAllRecords<AddonModDataEntryDBRecord>(DATA_ENTRY_TABLE);
 
-        return entries.map(this.parseRecord.bind(this));
+        return entries.map((entry) => this.parseRecord(entry));
     }
 
     /**
@@ -124,7 +124,7 @@ export class AddonModDataOfflineProvider {
      *
      * @param dataId Database ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with entries.
+     * @returns Promise resolved with entries.
      */
     async getDatabaseEntries(dataId: number, siteId?: string): Promise<AddonModDataOfflineAction[]> {
         const site = await CoreSites.getSite(siteId);
@@ -134,7 +134,7 @@ export class AddonModDataOfflineProvider {
             'timemodified',
         );
 
-        return entries.map(this.parseRecord.bind(this));
+        return entries.map((entry) => this.parseRecord(entry));
     }
 
     /**
@@ -144,7 +144,7 @@ export class AddonModDataOfflineProvider {
      * @param entryId Database entry Id.
      * @param action Action to be done
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with entry.
+     * @returns Promise resolved with entry.
      */
     async getEntry(
         dataId: number,
@@ -168,7 +168,7 @@ export class AddonModDataOfflineProvider {
      * @param dataId Database ID.
      * @param entryId Database entry Id.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with entry actions.
+     * @returns Promise resolved with entry actions.
      */
     async getEntryActions(dataId: number, entryId: number, siteId?: string): Promise<AddonModDataOfflineAction[]> {
         const site = await CoreSites.getSite(siteId);
@@ -177,7 +177,7 @@ export class AddonModDataOfflineProvider {
             { dataid: dataId, entryid: entryId },
         );
 
-        return entries.map(this.parseRecord.bind(this));
+        return entries.map((entry) => this.parseRecord(entry));
     }
 
     /**
@@ -185,7 +185,7 @@ export class AddonModDataOfflineProvider {
      *
      * @param dataId Database ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: true if has offline answers, false otherwise.
+     * @returns Promise resolved with boolean: true if has offline answers, false otherwise.
      */
     async hasOfflineData(dataId: number, siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -200,14 +200,14 @@ export class AddonModDataOfflineProvider {
      *
      * @param dataId Database ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the path.
+     * @returns Promise resolved with the path.
      */
     protected async getDatabaseFolder(dataId: number, siteId?: string): Promise<string> {
         const site = await CoreSites.getSite(siteId);
         const siteFolderPath = CoreFile.getSiteFolder(site.getId());
         const folderPath = 'offlinedatabase/' + dataId;
 
-        return CoreText.concatenatePaths(siteFolderPath, folderPath);
+        return CorePath.concatenatePaths(siteFolderPath, folderPath);
     }
 
     /**
@@ -217,19 +217,19 @@ export class AddonModDataOfflineProvider {
      * @param entryId The ID of the entry.
      * @param fieldId Field ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the path.
+     * @returns Promise resolved with the path.
      */
     async getEntryFieldFolder(dataId: number, entryId: number, fieldId: number, siteId?: string): Promise<string> {
         const folderPath = await this.getDatabaseFolder(dataId, siteId);
 
-        return CoreText.concatenatePaths(folderPath, entryId + '_' + fieldId);
+        return CorePath.concatenatePaths(folderPath, entryId + '_' + fieldId);
     }
 
     /**
      * Parse "fields" of an offline record.
      *
      * @param record Record object
-     * @return Record object with columns parsed.
+     * @returns Record object with columns parsed.
      */
     protected parseRecord(record: AddonModDataEntryDBRecord): AddonModDataOfflineAction {
         return Object.assign(record, {
@@ -248,7 +248,7 @@ export class AddonModDataOfflineProvider {
      * @param fields Array of field data of the entry if needed.
      * @param timemodified The time the entry was modified. If not defined, current time.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async saveEntry(
         dataId: number,
@@ -262,7 +262,7 @@ export class AddonModDataOfflineProvider {
     ): Promise<AddonModDataEntryDBRecord> {
         const site = await CoreSites.getSite(siteId);
 
-        timemodified = timemodified || new Date().getTime();
+        timemodified = timemodified || Date.now();
         entryId = entryId === undefined || entryId === null ? -timemodified : entryId;
 
         const entry: AddonModDataEntryDBRecord = {

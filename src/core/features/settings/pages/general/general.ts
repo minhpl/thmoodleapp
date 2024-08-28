@@ -18,15 +18,16 @@ import { CoreConfig } from '@services/config';
 import { CoreEvents } from '@singletons/events';
 import { CoreLang } from '@services/lang';
 import { CoreDomUtils } from '@services/utils/dom';
-import { CorePushNotifications } from '@features/pushnotifications/services/pushnotifications';
 import { CoreSettingsHelper, CoreColorScheme, CoreZoomLevel } from '../../services/settings-helper';
-import { CoreApp } from '@services/app';
 import { CoreIframeUtils } from '@services/utils/iframe';
-import { Diagnostic, Translate } from '@singletons';
+import { Translate } from '@singletons';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { AlertButton } from '@ionic/angular';
 import { CoreNavigator } from '@services/navigator';
+import { CorePlatform } from '@services/platform';
+import { CoreAnalytics } from '@services/analytics';
+import { CoreNative } from '@features/native/services/native';
 
 /**
  * Page that displays the general settings.
@@ -41,10 +42,10 @@ export class CoreSettingsGeneralPage {
     languages: { code: string; name: string }[] = [];
     selectedLanguage = '';
     zoomLevels: { value: CoreZoomLevel; style: number; selected: boolean }[] = [];
-    selectedZoomLevel = CoreZoomLevel.NORMAL;
+    selectedZoomLevel = CoreZoomLevel.NONE;
     richTextEditor = true;
     debugDisplay = false;
-    analyticsSupported = false;
+    analyticsAvailable = false;
     analyticsEnabled = false;
     colorSchemes: CoreColorScheme[] = [];
     selectedScheme: CoreColorScheme = CoreColorScheme.LIGHT;
@@ -81,7 +82,7 @@ export class CoreSettingsGeneralPage {
                 this.colorSchemes.push(CoreColorScheme.LIGHT);
                 this.selectedScheme = this.colorSchemes[0];
             } else {
-                this.isAndroid = CoreApp.isAndroid();
+                this.isAndroid = CorePlatform.isAndroid();
                 this.colorSchemes = CoreSettingsHelper.getAllowedColorSchemes();
                 this.selectedScheme = await CoreConfig.get(CoreConstants.SETTINGS_COLOR_SCHEME, CoreColorScheme.LIGHT);
             }
@@ -101,8 +102,8 @@ export class CoreSettingsGeneralPage {
 
         this.debugDisplay = await CoreConfig.get(CoreConstants.SETTINGS_DEBUG_DISPLAY, false);
 
-        this.analyticsSupported = CoreConstants.CONFIG.enableanalytics;
-        if (this.analyticsSupported) {
+        this.analyticsAvailable = await CoreAnalytics.isAnalyticsAvailable();
+        if (this.analyticsAvailable) {
             this.analyticsEnabled = await CoreConfig.get(CoreConstants.SETTINGS_ANALYTICS_ENABLED, true);
         }
 
@@ -111,8 +112,13 @@ export class CoreSettingsGeneralPage {
 
     /**
      * Called when a new language is selected.
+     *
+     * @param ev Event
      */
-    async languageChanged(): Promise<void> {
+    async languageChanged(ev: Event): Promise<void> {
+        ev.stopPropagation();
+        ev.preventDefault();
+
         const previousLanguage = await CoreLang.getCurrentLanguage();
         if (this.selectedLanguage === previousLanguage) {
             // Prevent opening again.
@@ -162,6 +168,9 @@ export class CoreSettingsGeneralPage {
 
     /**
      * Apply language changes and restart the app.
+     *
+     * IMPORTANT NOTE: If for any reason we decide to remove this method,
+     * we'll need to listen to lang change on Slides to change direction.
      */
     protected async applyLanguageAndRestart(): Promise<void> {
         // Invalidate cache for all sites to get the content in the right language.
@@ -177,8 +186,16 @@ export class CoreSettingsGeneralPage {
 
     /**
      * Called when a new zoom level is selected.
+     *
+     * @param ev Event
+     * @param value New value
      */
-    zoomLevelChanged(): void {
+    zoomLevelChanged(ev: Event, value: CoreZoomLevel): void {
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        this.selectedZoomLevel = value;
+
         this.zoomLevels = this.zoomLevels.map((fontSize) => {
             fontSize.selected = fontSize.value === this.selectedZoomLevel;
 
@@ -191,41 +208,66 @@ export class CoreSettingsGeneralPage {
 
     /**
      * Called when a new color scheme is selected.
+     *
+     * @param ev Event
      */
-    colorSchemeChanged(): void {
+    colorSchemeChanged(ev: Event): void {
+        ev.stopPropagation();
+        ev.preventDefault();
+
         CoreSettingsHelper.setColorScheme(this.selectedScheme);
         CoreConfig.set(CoreConstants.SETTINGS_COLOR_SCHEME, this.selectedScheme);
     }
 
     /**
      * Called when the rich text editor is enabled or disabled.
+     *
+     * @param ev Event
      */
-    richTextEditorChanged(): void {
+    richTextEditorChanged(ev: Event): void {
+        ev.stopPropagation();
+        ev.preventDefault();
+
         CoreConfig.set(CoreConstants.SETTINGS_RICH_TEXT_EDITOR, this.richTextEditor ? 1 : 0);
     }
 
     /**
      * Called when the debug display setting is enabled or disabled.
+     *
+     * @param ev Event
      */
-    debugDisplayChanged(): void {
+    debugDisplayChanged(ev: Event): void {
+        ev.stopPropagation();
+        ev.preventDefault();
+
         CoreConfig.set(CoreConstants.SETTINGS_DEBUG_DISPLAY, this.debugDisplay ? 1 : 0);
         CoreDomUtils.setDebugDisplay(this.debugDisplay);
     }
 
     /**
      * Called when the analytics setting is enabled or disabled.
+     *
+     * @param ev Event
      */
-    async analyticsEnabledChanged(): Promise<void> {
-        await CorePushNotifications.enableAnalytics(this.analyticsEnabled);
+    async analyticsEnabledChanged(ev: Event):  Promise<void> {
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        await CoreAnalytics.enableAnalytics(this.analyticsEnabled);
 
         CoreConfig.set(CoreConstants.SETTINGS_ANALYTICS_ENABLED, this.analyticsEnabled ? 1 : 0);
     }
 
     /**
      * Open native settings.
+     *
+     * @param ev Event
      */
-    openNativeSettings(): void {
-        Diagnostic.switchToSettings();
+    openNativeSettings(ev: Event): void {
+        ev.stopPropagation();
+        ev.preventDefault();
+
+        CoreNative.plugin('diagnostic')?.switchToSettings();
     }
 
 }

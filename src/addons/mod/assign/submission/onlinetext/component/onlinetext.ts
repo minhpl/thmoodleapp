@@ -21,6 +21,7 @@ import { CoreSites } from '@services/sites';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreUtils } from '@services/utils/utils';
 import { AddonModAssignSubmissionOnlineTextPluginData } from '../services/handler';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Component to render an onlinetext submission plugin.
@@ -31,7 +32,7 @@ import { AddonModAssignSubmissionOnlineTextPluginData } from '../services/handle
 })
 export class AddonModAssignSubmissionOnlineTextComponent extends AddonModAssignSubmissionPluginBaseComponent implements OnInit {
 
-    control?: FormControl;
+    control?: FormControl<string>;
     words = 0;
     component = AddonModAssignProvider.COMPONENT;
     text = '';
@@ -53,7 +54,7 @@ export class AddonModAssignSubmissionOnlineTextComponent extends AddonModAssignS
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         // Get the text. Check if we have anything offline.
@@ -86,7 +87,7 @@ export class AddonModAssignSubmissionOnlineTextComponent extends AddonModAssignS
                             component: this.component,
                             componentId: this.assign.cmid,
                             filter: true,
-                            contextLevel: 'module',
+                            contextLevel: ContextLevel.MODULE,
                             instanceId: this.assign.cmid,
                             courseId: this.assign.course,
                         });
@@ -94,7 +95,7 @@ export class AddonModAssignSubmissionOnlineTextComponent extends AddonModAssignS
                 });
             } else {
                 // Create and add the control.
-                this.control = this.fb.control(this.text);
+                this.control = this.fb.control(this.text, { nonNullable: true });
             }
 
             // Calculate initial words.
@@ -111,7 +112,7 @@ export class AddonModAssignSubmissionOnlineTextComponent extends AddonModAssignS
      *
      * @param text The new text.
      */
-    onChange(text: string): void {
+    onChange(text?: string | null): void {
         // Count words if needed.
         if (this.wordLimitEnabled) {
             // Cancel previous wait.

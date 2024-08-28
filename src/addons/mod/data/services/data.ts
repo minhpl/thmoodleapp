@@ -14,12 +14,12 @@
 
 import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreCourseCommonModWSOptions } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreRatingInfo } from '@features/rating/services/rating';
 import { CoreTagItem } from '@features/tag/services/tag';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFileEntry } from '@services/file-helper';
 import { CoreFilepool } from '@services/filepool';
 import { CoreSites, CoreSitesCommonWSOptions, CoreSitesReadingStrategy } from '@services/sites';
@@ -29,6 +29,7 @@ import { makeSingleton, Translate } from '@singletons';
 import { AddonModDataFieldsDelegate } from './data-fields-delegate';
 import { AddonModDataOffline } from './data-offline';
 import { AddonModDataAutoSyncData, AddonModDataSyncProvider } from './data-sync';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
 
 const ROOT_CACHE_KEY = 'mmaModData:';
 
@@ -60,8 +61,11 @@ export enum AddonModDataAction {
     TIMEMODIFIED = 'timemodified',
     TAGS = 'tags',
     APPROVALSTATUS = 'approvalstatus',
+    APPROVALSTATUSCLASS = 'approvalstatusclass',
     DELCHECK = 'delcheck', // Unused.
     EXPORT = 'export', // Unused.
+    ACTIONSMENU = 'actionsmenu',
+    ID = 'id',
 }
 
 export enum AddonModDataTemplateType {
@@ -101,7 +105,7 @@ export class AddonModDataProvider {
      * @param fields The fields that define the contents.
      * @param siteId Site ID. If not defined, current site.
      * @param forceOffline Force editing entry in offline.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async addEntry(
         dataId: number,
@@ -136,7 +140,7 @@ export class AddonModDataProvider {
         };
 
         // Checks to store offline.
-        if (!CoreApp.isOnline() || forceOffline) {
+        if (!CoreNetwork.isOnline() || forceOffline) {
             const notifications = this.checkFields(fields, contents);
             if (notifications.length > 0) {
                 return { fieldnotifications: notifications };
@@ -147,7 +151,7 @@ export class AddonModDataProvider {
         await this.deleteEntryOfflineAction(dataId, entryId, AddonModDataAction.ADD, siteId);
 
         // App is offline, store the action.
-        if (!CoreApp.isOnline() || forceOffline) {
+        if (!CoreNetwork.isOnline() || forceOffline) {
             return storeOffline();
         }
 
@@ -174,7 +178,7 @@ export class AddonModDataProvider {
      * @param data The fields data to be created.
      * @param groupId Group id, 0 means that the function will determine the user group.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async addEntryOnline(
         dataId: number,
@@ -203,7 +207,7 @@ export class AddonModDataProvider {
      * @param approve Whether to approve (true) or unapprove the entry.
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async approveEntry(
         dataId: number,
@@ -234,7 +238,7 @@ export class AddonModDataProvider {
             return;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // App is offline, store the action.
             return storeOffline();
         }
@@ -262,7 +266,7 @@ export class AddonModDataProvider {
      * @param entryId Entry ID.
      * @param approve Whether to approve (true) or unapprove the entry.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async approveEntryOnline(entryId: number, approve: boolean, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -279,7 +283,7 @@ export class AddonModDataProvider {
      *
      * @param fields The fields that define the contents.
      * @param contents The contents data of the fields.
-     * @return Array of notifications if any or false.
+     * @returns Array of notifications if any or false.
      */
     protected checkFields(fields: AddonModDataField[], contents: AddonModDataSubfieldData[]): AddonModDataFieldNotification[] {
         const notifications: AddonModDataFieldNotification[] = [];
@@ -307,7 +311,7 @@ export class AddonModDataProvider {
      * @param entryId Entry ID.
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async deleteEntry(dataId: number, entryId: number, courseId: number, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -333,7 +337,7 @@ export class AddonModDataProvider {
             return;
         }
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // App is offline, store the action.
             return storeOffline();
         }
@@ -356,7 +360,7 @@ export class AddonModDataProvider {
      *
      * @param entryId Entry ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async deleteEntryOnline(entryId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -374,7 +378,7 @@ export class AddonModDataProvider {
      * @param entryId Entry ID.
      * @param action Action name to delete.
      * @param siteId Site ID.
-     * @return Resolved with true if the action has been found and deleted.
+     * @returns Resolved with true if the action has been found and deleted.
      */
     protected async deleteEntryOfflineAction(
         dataId: number,
@@ -404,7 +408,7 @@ export class AddonModDataProvider {
      * @param fields The fields that define the contents.
      * @param siteId Site ID. If not defined, current site.
      * @param forceOffline Force editing entry in offline.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async editEntry(
         dataId: number,
@@ -436,7 +440,7 @@ export class AddonModDataProvider {
             };
         };
 
-        if (!CoreApp.isOnline() || forceOffline) {
+        if (!CoreNetwork.isOnline() || forceOffline) {
             const notifications = this.checkFields(fields, contents);
             if (notifications.length > 0) {
                 return { fieldnotifications: notifications };
@@ -446,7 +450,7 @@ export class AddonModDataProvider {
         // Remove unnecessary not synced actions.
         await this.deleteEntryOfflineAction(dataId, entryId, AddonModDataAction.EDIT, siteId);
 
-        if (!CoreApp.isOnline() || forceOffline) {
+        if (!CoreNetwork.isOnline() || forceOffline) {
             // App is offline, store the action.
             return storeOffline();
         }
@@ -473,7 +477,7 @@ export class AddonModDataProvider {
      * @param entryId Entry ID.
      * @param data The fields data to be updated.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async editEntryOnline(
         entryId: number,
@@ -494,7 +498,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param options Other options.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     fetchAllEntries(dataId: number, options: AddonModDataGetEntriesOptions = {}): Promise<AddonModDataEntry[]> {
         options.siteId = options.siteId || CoreSites.getCurrentSiteId();
@@ -512,7 +516,7 @@ export class AddonModDataProvider {
      * @param dataId Data ID.
      * @param entries Entries already fetch (just to concatenate them).
      * @param options Other options.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchEntriesRecursive(
         dataId: number,
@@ -536,7 +540,7 @@ export class AddonModDataProvider {
      * Get cache key for data data WS calls.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getDatabaseDataCacheKey(courseId: number): string {
         return ROOT_CACHE_KEY + 'data:' + courseId;
@@ -546,7 +550,7 @@ export class AddonModDataProvider {
      * Get prefix cache key for all database activity data WS calls.
      *
      * @param dataId Data ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getDatabaseDataPrefixCacheKey(dataId: number): string {
         return ROOT_CACHE_KEY + dataId;
@@ -559,7 +563,7 @@ export class AddonModDataProvider {
      * @param key Name of the property to check.
      * @param value Value to search.
      * @param options Other options.
-     * @return Promise resolved when the data is retrieved.
+     * @returns Promise resolved when the data is retrieved.
      */
     protected async getDatabaseByKey(
         courseId: number,
@@ -595,7 +599,7 @@ export class AddonModDataProvider {
      * @param courseId Course ID.
      * @param cmId Course module ID.
      * @param options Other options.
-     * @return Promise resolved when the data is retrieved.
+     * @returns Promise resolved when the data is retrieved.
      */
     getDatabase(courseId: number, cmId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModDataData> {
         return this.getDatabaseByKey(courseId, 'coursemodule', cmId, options);
@@ -607,7 +611,7 @@ export class AddonModDataProvider {
      * @param courseId Course ID.
      * @param id Data ID.
      * @param options Other options.
-     * @return Promise resolved when the data is retrieved.
+     * @returns Promise resolved when the data is retrieved.
      */
     getDatabaseById(courseId: number, id: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModDataData> {
         return this.getDatabaseByKey(courseId, 'id', id, options);
@@ -617,7 +621,7 @@ export class AddonModDataProvider {
      * Get prefix cache key for all database access information data WS calls.
      *
      * @param dataId Data ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getDatabaseAccessInformationDataPrefixCacheKey(dataId: number): string {
         return this.getDatabaseDataPrefixCacheKey(dataId) + ':access:';
@@ -628,7 +632,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param groupId Group ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getDatabaseAccessInformationDataCacheKey(dataId: number, groupId: number = 0): string {
         return this.getDatabaseAccessInformationDataPrefixCacheKey(dataId) + groupId;
@@ -639,7 +643,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param options Other options.
-     * @return Promise resolved when the database is retrieved.
+     * @returns Promise resolved when the database is retrieved.
      */
     async getDatabaseAccessInformation(
         dataId: number,
@@ -669,7 +673,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param options Other options.
-     * @return Promise resolved when the database is retrieved.
+     * @returns Promise resolved when the database is retrieved.
      */
     async getEntries(dataId: number, options: AddonModDataGetEntriesOptions = {}): Promise<AddonModDataEntries> {
         options = Object.assign({
@@ -714,7 +718,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param groupId Group ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getEntriesCacheKey(dataId: number, groupId: number = 0): string {
         return this.getEntriesPrefixCacheKey(dataId) + groupId;
@@ -724,7 +728,7 @@ export class AddonModDataProvider {
      * Get prefix cache key for database all entries data WS calls.
      *
      * @param dataId Data ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getEntriesPrefixCacheKey(dataId: number): string {
         return this.getDatabaseDataPrefixCacheKey(dataId) + ':entries:';
@@ -736,7 +740,7 @@ export class AddonModDataProvider {
      * @param dataId Data ID for caching purposes.
      * @param entryId Entry ID.
      * @param options Other options.
-     * @return Promise resolved when the entry is retrieved.
+     * @returns Promise resolved when the entry is retrieved.
      */
     async getEntry(
         dataId: number,
@@ -782,7 +786,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID for caching purposes.
      * @param entryId Entry ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getEntryCacheKey(dataId: number, entryId: number): string {
         return this.getDatabaseDataPrefixCacheKey(dataId) + ':entry:' + entryId;
@@ -793,7 +797,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param options Other options.
-     * @return Promise resolved when the fields are retrieved.
+     * @returns Promise resolved when the fields are retrieved.
      */
     async getFields(dataId: number, options: CoreCourseCommonModWSOptions = {}): Promise<AddonModDataField[]> {
         const site = await CoreSites.getSite(options.siteId);
@@ -822,7 +826,7 @@ export class AddonModDataProvider {
      * Get cache key for database fields data WS calls.
      *
      * @param dataId Data ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getFieldsCacheKey(dataId: number): string {
         return this.getDatabaseDataPrefixCacheKey(dataId) + ':fields';
@@ -835,7 +839,7 @@ export class AddonModDataProvider {
      * @param moduleId The module ID.
      * @param courseId Course ID of the module.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateContent(moduleId: number, courseId: number, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -865,7 +869,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateDatabaseAccessInformationData(dataId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -878,7 +882,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateEntriesData(dataId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -891,7 +895,7 @@ export class AddonModDataProvider {
      *
      * @param dataId Data ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateFieldsData(dataId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -904,7 +908,7 @@ export class AddonModDataProvider {
      *
      * @param moduleId The module ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the files are invalidated.
+     * @returns Promise resolved when the files are invalidated.
      */
     async invalidateFiles(moduleId: number, siteId?: string): Promise<void> {
         await CoreFilepool.invalidateFilesByComponent(siteId, AddonModDataProvider.COMPONENT, moduleId);
@@ -915,7 +919,7 @@ export class AddonModDataProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateDatabaseData(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -928,7 +932,7 @@ export class AddonModDataProvider {
      *
      * @param databaseId Data ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateDatabaseWSData(databaseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -942,7 +946,7 @@ export class AddonModDataProvider {
      * @param dataId Data ID for caching purposes.
      * @param entryId Entry ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateEntryData(dataId: number, entryId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -954,23 +958,19 @@ export class AddonModDataProvider {
      * Report the database as being viewed.
      *
      * @param id Module ID.
-     * @param name Name of the data.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
-    async logView(id: number, name?: string, siteId?: string): Promise<void> {
+    async logView(id: number, siteId?: string): Promise<void> {
         const params: AddonModDataViewDatabaseWSParams = {
             databaseid: id,
         };
 
-        await CoreCourseLogHelper.logSingle(
+        await CoreCourseLogHelper.log(
             'mod_data_view_database',
             params,
             AddonModDataProvider.COMPONENT,
             id,
-            name,
-            'data',
-            {},
             siteId,
         );
     }
@@ -980,14 +980,14 @@ export class AddonModDataProvider {
      *
      * @param dataId The data instance id.
      * @param options Other options.
-     * @return Promise resolved when the action is done.
+     * @returns Promise resolved when the action is done.
      */
     async searchEntries(dataId: number, options: AddonModDataSearchEntriesOptions = {}): Promise<AddonModDataEntries> {
         const site = await CoreSites.getSite(options.siteId);
 
         options.groupId = options.groupId || 0;
         options.sort = options.sort || 0;
-        options.order || options.order || 'DESC';
+        options.order = options.order || 'DESC';
         options.page = options.page || 0;
         options.perPage = options.perPage || AddonModDataProvider.PER_PAGE;
         options.readingStrategy = options.readingStrategy || CoreSitesReadingStrategy.PREFER_NETWORK;

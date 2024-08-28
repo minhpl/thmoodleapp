@@ -15,10 +15,10 @@
 import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
 import { CoreWSError } from '@classes/errors/wserror';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreCourseCommonModWSOptions } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreFilepool } from '@services/filepool';
 import { CoreSites, CoreSitesCommonWSOptions } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
@@ -26,8 +26,8 @@ import { CoreStatusWithWarningsWSResponse, CoreWSExternalFile, CoreWSExternalWar
 import { makeSingleton, Translate } from '@singletons';
 import { AddonModChoiceOffline } from './choice-offline';
 import { AddonModChoiceAutoSyncData, AddonModChoiceSyncProvider } from './choice-sync';
-
-const ROOT_CACHE_KEY = 'mmaModChoice:';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { ADDON_MOD_CHOICE_COMPONENT, AddonModChoiceShowResults } from '../constants';
 
 /**
  * Service that provides some features for choices.
@@ -35,15 +35,7 @@ const ROOT_CACHE_KEY = 'mmaModChoice:';
 @Injectable({ providedIn: 'root' })
 export class AddonModChoiceProvider {
 
-    static readonly COMPONENT = 'mmaModChoice';
-
-    static readonly RESULTS_NOT = 0;
-    static readonly RESULTS_AFTER_ANSWER = 1;
-    static readonly RESULTS_AFTER_CLOSE = 2;
-    static readonly RESULTS_ALWAYS = 3;
-
-    static readonly PUBLISH_ANONYMOUS = false;
-    static readonly PUBLISH_NAMES = true;
+    protected static readonly ROOT_CACHE_KEY = 'mmaModChoice:';
 
     /**
      * Check if results can be seen by a student. The student can see the results if:
@@ -53,14 +45,41 @@ export class AddonModChoiceProvider {
      *
      * @param choice Choice to check.
      * @param hasAnswered True if user has answered the choice, false otherwise.
-     * @return True if the students can see the results.
+     * @param timeNow Current time in seconds.
+     * @returns True if the students can see the results.
      */
-    canStudentSeeResults(choice: AddonModChoiceChoice, hasAnswered: boolean): boolean {
-        const now = Date.now();
+    canStudentSeeResults(choice: AddonModChoiceChoice, hasAnswered: boolean, timeNow: number): boolean {
+        if (!this.choiceHasBeenOpened(choice, timeNow)) {
+            return false;
+        }
 
-        return choice.showresults === AddonModChoiceProvider.RESULTS_ALWAYS ||
-            choice.showresults === AddonModChoiceProvider.RESULTS_AFTER_CLOSE && choice.timeclose && choice.timeclose <= now ||
-            choice.showresults === AddonModChoiceProvider.RESULTS_AFTER_ANSWER && hasAnswered;
+        const choiceClosed = this.choiceHasBeenClosed(choice, timeNow);
+
+        return choice.showresults === AddonModChoiceShowResults.SHOWRESULTS_ALWAYS ||
+            choice.showresults === AddonModChoiceShowResults.SHOWRESULTS_AFTER_ANSWER && hasAnswered ||
+            choice.showresults === AddonModChoiceShowResults.SHOWRESULTS_AFTER_CLOSE && choiceClosed;
+    }
+
+    /**
+     * Check if a choice has been opened.
+     *
+     * @param choice Choice to check.
+     * @param timeNow Current time in seconds.
+     * @returns True if the choice open dated has passed, false otherwise.
+     */
+    choiceHasBeenOpened(choice: AddonModChoiceChoice, timeNow: number): boolean {
+        return !choice.timeopen || timeNow > choice.timeopen;
+    }
+
+    /**
+     * Check if a choice has been closed.
+     *
+     * @param choice Choice to check.
+     * @param timeNow Current time in seconds.
+     * @returns True if the choice close dated has passed, false otherwise.
+     */
+    choiceHasBeenClosed(choice: AddonModChoiceChoice, timeNow: number): boolean {
+        return !!choice.timeclose && timeNow > choice.timeclose;
     }
 
     /**
@@ -71,26 +90,25 @@ export class AddonModChoiceProvider {
      * @param courseId Course ID the choice belongs to.
      * @param responses IDs of the answers. If not defined, delete all the answers of the current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: true if response was sent to server, false if stored in device.
+     * @returns Promise resolved with boolean: true if response was sent to server, false if stored in device.
      */
     async deleteResponses(
         choiceId: number,
         name: string,
         courseId: number,
-        responses?: number[],
+        responses: number[] = [],
         siteId?: string,
     ): Promise<boolean> {
         siteId = siteId || CoreSites.getCurrentSiteId();
-        responses = responses || [];
 
         // Convenience function to store a message to be synchronized later.
         const storeOffline = async (): Promise<boolean> => {
-            await AddonModChoiceOffline.saveResponse(choiceId, name, courseId, responses!, true, siteId);
+            await AddonModChoiceOffline.saveResponse(choiceId, name, courseId, responses, true, siteId);
 
             return false;
         };
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // App is offline, store the action.
             return storeOffline();
         }
@@ -119,7 +137,7 @@ export class AddonModChoiceProvider {
      * @param choiceId Choice ID.
      * @param responses IDs of the answers. If not defined, delete all the answers of the current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when responses are successfully deleted.
+     * @returns Promise resolved when responses are successfully deleted.
      */
     async deleteResponsesOnline(choiceId: number, responses?: number[], siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -151,30 +169,30 @@ export class AddonModChoiceProvider {
      * Get cache key for choice data WS calls.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getChoiceDataCacheKey(courseId: number): string {
-        return ROOT_CACHE_KEY + 'choice:' + courseId;
+        return AddonModChoiceProvider.ROOT_CACHE_KEY + 'choice:' + courseId;
     }
 
     /**
      * Get cache key for choice options WS calls.
      *
      * @param choiceId Choice ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getChoiceOptionsCacheKey(choiceId: number): string {
-        return ROOT_CACHE_KEY + 'options:' + choiceId;
+        return AddonModChoiceProvider.ROOT_CACHE_KEY + 'options:' + choiceId;
     }
 
     /**
      * Get cache key for choice results WS calls.
      *
      * @param choiceId Choice ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getChoiceResultsCacheKey(choiceId: number): string {
-        return ROOT_CACHE_KEY + 'results:' + choiceId;
+        return AddonModChoiceProvider.ROOT_CACHE_KEY + 'results:' + choiceId;
     }
 
     /**
@@ -184,7 +202,7 @@ export class AddonModChoiceProvider {
      * @param key Name of the property to check.
      * @param value Value to search.
      * @param options Other options.
-     * @return Promise resolved when the choice is retrieved.
+     * @returns Promise resolved when the choice is retrieved.
      */
     protected async getChoiceByDataKey(
         courseId: number,
@@ -200,7 +218,7 @@ export class AddonModChoiceProvider {
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getChoiceDataCacheKey(courseId),
             updateFrequency: CoreSite.FREQUENCY_RARELY,
-            component: AddonModChoiceProvider.COMPONENT,
+            component: ADDON_MOD_CHOICE_COMPONENT,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
 
@@ -224,7 +242,7 @@ export class AddonModChoiceProvider {
      * @param courseId Course ID.
      * @param cmId Course module ID.
      * @param options Other options.
-     * @return Promise resolved when the choice is retrieved.
+     * @returns Promise resolved when the choice is retrieved.
      */
     getChoice(courseId: number, cmId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModChoiceChoice> {
         return this.getChoiceByDataKey(courseId, 'coursemodule', cmId, options);
@@ -236,7 +254,7 @@ export class AddonModChoiceProvider {
      * @param courseId Course ID.
      * @param choiceId Choice ID.
      * @param options Other options.
-     * @return Promise resolved when the choice is retrieved.
+     * @returns Promise resolved when the choice is retrieved.
      */
     getChoiceById(courseId: number, choiceId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModChoiceChoice> {
         return this.getChoiceByDataKey(courseId, 'id', choiceId, options);
@@ -247,7 +265,7 @@ export class AddonModChoiceProvider {
      *
      * @param choiceId Choice ID.
      * @param options Other options.
-     * @return Promise resolved with choice options.
+     * @returns Promise resolved with choice options.
      */
     async getOptions(choiceId: number, options: CoreCourseCommonModWSOptions = {}): Promise<AddonModChoiceOption[]> {
         const site = await CoreSites.getSite(options.siteId);
@@ -259,7 +277,7 @@ export class AddonModChoiceProvider {
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getChoiceOptionsCacheKey(choiceId),
             updateFrequency: CoreSite.FREQUENCY_RARELY,
-            component: AddonModChoiceProvider.COMPONENT,
+            component: ADDON_MOD_CHOICE_COMPONENT,
             componentId: options.cmId,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
@@ -278,7 +296,7 @@ export class AddonModChoiceProvider {
      *
      * @param choiceId Choice ID.
      * @param options Other options.
-     * @return Promise resolved with choice results.
+     * @returns Promise resolved with choice results.
      */
     async getResults(choiceId: number, options: CoreCourseCommonModWSOptions = {}): Promise<AddonModChoiceResult[]> {
         const site = await CoreSites.getSite(options.siteId);
@@ -288,7 +306,7 @@ export class AddonModChoiceProvider {
         };
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getChoiceOptionsCacheKey(choiceId),
-            component: AddonModChoiceProvider.COMPONENT,
+            component: ADDON_MOD_CHOICE_COMPONENT,
             componentId: options.cmId,
             ...CoreSites.getReadingStrategyPreSets(options.readingStrategy), // Include reading strategy preSets.
         };
@@ -307,7 +325,7 @@ export class AddonModChoiceProvider {
      *
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateChoiceData(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -321,7 +339,7 @@ export class AddonModChoiceProvider {
      * @param moduleId The module ID.
      * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when data is invalidated.
+     * @returns Promise resolved when data is invalidated.
      */
     async invalidateContent(moduleId: number, courseId: number, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -332,7 +350,7 @@ export class AddonModChoiceProvider {
             this.invalidateChoiceData(courseId),
             this.invalidateOptions(choice.id),
             this.invalidateResults(choice.id),
-            CoreFilepool.invalidateFilesByComponent(siteId, AddonModChoiceProvider.COMPONENT, moduleId),
+            CoreFilepool.invalidateFilesByComponent(siteId, ADDON_MOD_CHOICE_COMPONENT, moduleId),
         ]);
     }
 
@@ -341,7 +359,7 @@ export class AddonModChoiceProvider {
      *
      * @param choiceId Choice ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateOptions(choiceId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -354,7 +372,7 @@ export class AddonModChoiceProvider {
      *
      * @param choiceId Choice ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateResults(choiceId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -366,23 +384,19 @@ export class AddonModChoiceProvider {
      * Report the choice as being viewed.
      *
      * @param id Choice ID.
-     * @param name Name of the choice.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
-    logView(id: number, name?: string, siteId?: string): Promise<void> {
+    logView(id: number, siteId?: string): Promise<void> {
         const params: AddonModChoiceViewChoiceWSParams = {
             choiceid: id,
         };
 
-        return CoreCourseLogHelper.logSingle(
+        return CoreCourseLogHelper.log(
             'mod_choice_view_choice',
             params,
-            AddonModChoiceProvider.COMPONENT,
+            ADDON_MOD_CHOICE_COMPONENT,
             id,
-            name,
-            'choice',
-            {},
             siteId,
         );
     }
@@ -395,7 +409,7 @@ export class AddonModChoiceProvider {
      * @param courseId Course ID the choice belongs to.
      * @param responses IDs of selected options.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: true if response was sent to server, false if stored in device.
+     * @returns Promise resolved with boolean: true if response was sent to server, false if stored in device.
      */
     async submitResponse(choiceId: number, name: string, courseId: number, responses: number[], siteId?: string): Promise<boolean> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -407,7 +421,7 @@ export class AddonModChoiceProvider {
             return false;
         };
 
-        if (!CoreApp.isOnline()) {
+        if (!CoreNetwork.isOnline()) {
             // App is offline, store the action.
             return storeOffline();
         }
@@ -436,7 +450,7 @@ export class AddonModChoiceProvider {
      * @param choiceId Choice ID.
      * @param responses IDs of selected options.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when responses are successfully submitted.
+     * @returns Promise resolved when responses are successfully submitted.
      */
     async submitResponseOnline(choiceId: number, responses: number[], siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -486,7 +500,7 @@ export type AddonModChoiceChoice = {
     introformat: number; // Intro format (1 = HTML, 0 = MOODLE, 2 = PLAIN or 4 = MARKDOWN).
     introfiles?: CoreWSExternalFile[];
     publish?: boolean; // If choice is published.
-    showresults?: number; // 0 never, 1 after answer, 2 after close, 3 always.
+    showresults?: AddonModChoiceShowResults; // 0 never, 1 after answer, 2 after close, 3 always.
     display?: number; // Display mode (vertical, horizontal).
     allowupdate?: boolean; // Allow update.
     allowmultiple?: boolean; // Allow multiple choices.
@@ -535,7 +549,7 @@ export type AddonModChoiceOption = {
     id: number; // Option id.
     text: string; // Text of the choice.
     maxanswers: number; // Maximum number of answers.
-    displaylayout: boolean; // True for orizontal, otherwise vertical.
+    displaylayout: boolean; // True for horizontal, otherwise vertical.
     countanswers: number; // Number of answers.
     checked: boolean; // We already answered.
     disabled: boolean; // Option disabled.

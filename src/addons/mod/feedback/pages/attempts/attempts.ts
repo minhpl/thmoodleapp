@@ -18,13 +18,14 @@ import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/
 import { CoreListItemsManager } from '@classes/items-management/list-items-manager';
 import { CorePromisedValue } from '@classes/promised-value';
 import { CoreSplitViewComponent } from '@components/split-view/split-view';
-import { IonRefresher } from '@ionic/angular';
 import { CoreGroupInfo } from '@services/groups';
 import { CoreNavigator } from '@services/navigator';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
 import { AddonModFeedbackAttemptItem, AddonModFeedbackAttemptsSource } from '../../classes/feedback-attempts-source';
 import { AddonModFeedbackWSAnonAttempt, AddonModFeedbackWSAttempt } from '../../services/feedback';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Page that displays feedback attempts.
@@ -39,9 +40,27 @@ export class AddonModFeedbackAttemptsPage implements AfterViewInit, OnDestroy {
 
     promisedAttempts: CorePromisedValue<AddonModFeedbackAttemptsManager>;
     fetchFailed = false;
+    courseId?: number;
+
+    protected logView: () => void;
 
     constructor(protected route: ActivatedRoute) {
         this.promisedAttempts = new CorePromisedValue();
+
+        this.logView = CoreTime.once(() => {
+            const source = this.attempts?.getSource();
+            if (!source || !source.feedback) {
+                return;
+            }
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM_LIST,
+                ws: 'mod_feedback_get_responses_analysis',
+                name: source.feedback.name,
+                data: { feedbackid: source.feedback.id, category: 'feedback' },
+                url: `/mod/feedback/show_entries.php?id=${source.CM_ID}`,
+            });
+        });
     }
 
     get attempts(): AddonModFeedbackAttemptsManager | null {
@@ -86,11 +105,11 @@ export class AddonModFeedbackAttemptsPage implements AfterViewInit, OnDestroy {
      */
     async ngAfterViewInit(): Promise<void> {
         try {
+            this.courseId = CoreNavigator.getRequiredRouteNumberParam('courseId');
             const cmId = CoreNavigator.getRequiredRouteNumberParam('cmId');
-            const courseId = CoreNavigator.getRequiredRouteNumberParam('courseId');
             const source = CoreRoutedItemsManagerSourcesTracker.getOrCreateSource(
                 AddonModFeedbackAttemptsSource,
-                [courseId, cmId],
+                [this.courseId, cmId],
             );
 
             source.selectedGroup = CoreNavigator.getRouteNumberParam('group') || 0;
@@ -111,6 +130,8 @@ export class AddonModFeedbackAttemptsPage implements AfterViewInit, OnDestroy {
 
             await attempts.getSource().loadFeedback();
             await attempts.load();
+
+            this.logView();
         } catch (error) {
             this.fetchFailed = true;
 
@@ -153,7 +174,7 @@ export class AddonModFeedbackAttemptsPage implements AfterViewInit, OnDestroy {
      *
      * @param refresher Refresher.
      */
-    async refreshFeedback(refresher: IonRefresher): Promise<void> {
+    async refreshFeedback(refresher: HTMLIonRefresherElement): Promise<void> {
         const attempts = await this.promisedAttempts;
 
         try {

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { DownloadStatus } from '@/core/constants';
 import { CoreAppSchema } from '@services/app';
 import { CoreSiteSchema } from '@services/sites';
 
@@ -19,8 +20,10 @@ import { CoreSiteSchema } from '@services/sites';
  * Database variables for CoreFilepool service.
  */
 export const QUEUE_TABLE_NAME = 'filepool_files_queue'; // Queue of files to download.
+export const QUEUE_TABLE_PRIMARY_KEYS = ['siteId', 'fileId'] as const;
 export const FILES_TABLE_NAME = 'filepool_files'; // Downloaded files.
 export const LINKS_TABLE_NAME = 'filepool_files_links'; // Links between downloaded files and components.
+export const LINKS_TABLE_PRIMARY_KEYS = ['fileId', 'component', 'componentId'] as const;
 export const PACKAGES_TABLE_NAME = 'filepool_packages'; // Downloaded packages (sets of files).
 export const APP_SCHEMA: CoreAppSchema = {
     name: 'CoreFilepoolProvider',
@@ -74,7 +77,7 @@ export const APP_SCHEMA: CoreAppSchema = {
                     type: 'TEXT',
                 },
             ],
-            primaryKeys: ['siteId', 'fileId'],
+            primaryKeys: [...QUEUE_TABLE_PRIMARY_KEYS],
         },
     ],
 };
@@ -146,7 +149,7 @@ export const SITE_SCHEMA: CoreSiteSchema = {
                     type: 'TEXT',
                 },
             ],
-            primaryKeys: ['fileId', 'component', 'componentId'],
+            primaryKeys: [...LINKS_TABLE_PRIMARY_KEYS],
         },
         {
             name: PACKAGES_TABLE_NAME,
@@ -241,7 +244,7 @@ export type CoreFilepoolFileEntry = CoreFilepoolFileOptions & {
 /**
  * DB data for entry from file's queue.
  */
-export type CoreFilepoolQueueDBEntry = CoreFilepoolFileOptions & {
+export type CoreFilepoolQueueDBRecord = CoreFilepoolFileOptions & {
     /**
      * The site the file belongs to.
      */
@@ -278,10 +281,12 @@ export type CoreFilepoolQueueDBEntry = CoreFilepoolFileOptions & {
     links: string;
 };
 
+export type CoreFilepoolQueueDBPrimaryKeys = typeof QUEUE_TABLE_PRIMARY_KEYS[number];
+
 /**
  * Entry from the file's queue.
  */
-export type CoreFilepoolQueueEntry = CoreFilepoolQueueDBEntry & {
+export type CoreFilepoolQueueEntry = CoreFilepoolQueueDBRecord & {
     /**
      * File links (to link the file to components and componentIds).
      */
@@ -310,12 +315,12 @@ export type CoreFilepoolPackageEntry = {
     /**
      * Package status.
      */
-    status?: string;
+    status?: DownloadStatus;
 
     /**
      * Package previous status.
      */
-    previous?: string;
+    previous?: DownloadStatus;
 
     /**
      * Timestamp when this package was updated.
@@ -356,8 +361,10 @@ export type CoreFilepoolComponentLink = {
 /**
  * Links table record type.
  */
-export type CoreFilepoolLinksRecord = {
+export type CoreFilepoolLinksDBRecord = {
     fileId: string; // File Id.
     component: string; // Component name.
     componentId: number | string; // Component Id.
 };
+
+export type CoreFilepoolLinksDBPrimaryKeys = typeof LINKS_TABLE_PRIMARY_KEYS[number];

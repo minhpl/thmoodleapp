@@ -15,37 +15,57 @@
 import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
+import { CoreCourseHelper } from '@features/course/services/course-helper';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
 import { CoreCronDelegate } from '@services/cron';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { AddonModWorkshopAssessmentStrategyModule } from './assessment/assessment.module';
-import { AddonModWorkshopComponentsModule } from './components/components.module';
-import { AddonWorkshopAssessmentStrategyDelegateService } from './services/assessment-strategy-delegate';
+import { AddonModWorkshopAssessmentStrategyModule } from '@addons/mod/workshop/assessment/assessment.module';
 import { ADDON_MOD_WORKSHOP_OFFLINE_SITE_SCHEMA } from './services/database/workshop';
 import { AddonModWorkshopIndexLinkHandler } from './services/handlers/index-link';
 import { AddonModWorkshopListLinkHandler } from './services/handlers/list-link';
-import { AddonModWorkshopModuleHandler, AddonModWorkshopModuleHandlerService } from './services/handlers/module';
-import { AddonModWorkshopPrefetchHandler } from './services/handlers/prefetch';
-import { AddonModWorkshopSyncCronHandler } from './services/handlers/sync-cron';
-import { AddonModWorkshopProvider } from './services/workshop';
-import { AddonModWorkshopHelperProvider } from './services/workshop-helper';
-import { AddonModWorkshopOfflineProvider } from './services/workshop-offline';
-import { AddonModWorkshopSyncProvider } from './services/workshop-sync';
+import { AddonModWorkshopModuleHandler } from './services/handlers/module';
+import { ADDON_MOD_WORKSHOP_COMPONENT, ADDON_MOD_WORKSHOP_PAGE_NAME } from '@addons/mod/workshop/constants';
+import { getPrefetchHandlerInstance } from '@addons/mod/workshop/services/handlers/prefetch';
+import { getCronHandlerInstance } from '@addons/mod/workshop/services/handlers/sync-cron';
 
-// List of providers (without handlers).
-export const ADDON_MOD_WORKSHOP_SERVICES: Type<unknown>[] = [
-    AddonModWorkshopProvider,
-    AddonModWorkshopOfflineProvider,
-    AddonModWorkshopSyncProvider,
-    AddonModWorkshopHelperProvider,
-    AddonWorkshopAssessmentStrategyDelegateService,
-];
+/**
+ * Get modworkshop services.
+ *
+ * @returns modWorkshop services.
+ */
+export async function getModWorkshopServices(): Promise<Type<unknown>[]> {
+    const { AddonModWorkshopProvider } = await import('@addons/mod/workshop/services/workshop');
+    const { AddonModWorkshopOfflineProvider } = await import('@addons/mod/workshop/services/workshop-offline');
+    const { AddonModWorkshopSyncProvider } = await import('@addons/mod/workshop/services/workshop-sync');
+    const { AddonModWorkshopHelperProvider } = await import('@addons/mod/workshop/services/workshop-helper');
+    const { AddonWorkshopAssessmentStrategyDelegateService } =
+        await import('@addons/mod/workshop/services/assessment-strategy-delegate');
+
+    return [
+        AddonModWorkshopProvider,
+        AddonModWorkshopOfflineProvider,
+        AddonModWorkshopSyncProvider,
+        AddonModWorkshopHelperProvider,
+        AddonWorkshopAssessmentStrategyDelegateService,
+    ];
+}
+
+/**
+ * Get workshop component modules.
+ *
+ * @returns Workshop component modules.
+ */
+export async function getModWorkshopComponentModules(): Promise<unknown[]> {
+    const { AddonModWorkshopComponentsModule } = await import('@addons/mod/workshop/components/components.module');
+
+    return [AddonModWorkshopComponentsModule];
+}
 
 const routes: Routes = [
     {
-        path: AddonModWorkshopModuleHandlerService.PAGE_NAME,
+        path: ADDON_MOD_WORKSHOP_PAGE_NAME,
         loadChildren: () => import('./workshop-lazy.module').then(m => m.AddonModWorkshopLazyModule),
     },
 ];
@@ -53,7 +73,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModWorkshopComponentsModule,
         AddonModWorkshopAssessmentStrategyModule,
     ],
     providers: [
@@ -66,11 +85,14 @@ const routes: Routes = [
             provide: APP_INITIALIZER,
             multi: true,
             useValue: () => {
+                CoreCourseModulePrefetchDelegate.registerHandler(getPrefetchHandlerInstance());
+                CoreCronDelegate.register(getCronHandlerInstance());
+
                 CoreCourseModuleDelegate.registerHandler(AddonModWorkshopModuleHandler.instance);
-                CoreCourseModulePrefetchDelegate.registerHandler(AddonModWorkshopPrefetchHandler.instance);
-                CoreCronDelegate.register(AddonModWorkshopSyncCronHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModWorkshopIndexLinkHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModWorkshopListLinkHandler.instance);
+
+                CoreCourseHelper.registerModuleReminderClick(ADDON_MOD_WORKSHOP_COMPONENT);
             },
         },
     ],

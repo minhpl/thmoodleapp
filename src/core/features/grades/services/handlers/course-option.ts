@@ -13,14 +13,13 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { CoreCourseProvider } from '@features/course/services/course';
 import {
     CoreCourseAccess,
     CoreCourseOptionsHandler,
     CoreCourseOptionsHandlerData,
 } from '@features/course/services/course-options-delegate';
-import { CoreCourses, CoreCourseUserAdminOrNavOptionIndexed } from '@features/courses/services/courses';
-import { CoreEnrolledCourseDataWithExtraInfoAndOptions } from '@features/courses/services/courses-helper';
+import { CoreCourseAnyCourseData, CoreCourses, CoreCourseUserAdminOrNavOptionIndexed } from '@features/courses/services/courses';
+import { CoreGradesHelper, GRADES_PAGE_NAME } from '@features/grades/services/grades-helper';
 import { makeSingleton } from '@singletons';
 import { CoreGrades } from '../grades';
 
@@ -34,52 +33,43 @@ export class CoreGradesCourseOptionHandlerService implements CoreCourseOptionsHa
     priority = 400;
 
     /**
-     * Should invalidate the data to determine if the handler is enabled for a certain course.
-     *
-     * @param courseId The course ID.
-     * @param navOptions Course navigation options for current user. See CoreCoursesProvider.getUserNavigationOptions.
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
-    invalidateEnabledForCourse(courseId: number, navOptions?: CoreCourseUserAdminOrNavOptionIndexed): Promise<void> {
-        if (navOptions && navOptions.grades !== undefined) {
-            // No need to invalidate anything.
-            return Promise.resolve();
+    async invalidateEnabledForCourse(courseId: number, navOptions?: CoreCourseUserAdminOrNavOptionIndexed): Promise<void> {
+        await CoreGrades.invalidateCourseGradesPermissionsData(courseId);
+
+        if (navOptions?.grades !== undefined) {
+            // No need to invalidate user courses.
+            return;
         }
 
-        return CoreCourses.invalidateUserCourses();
+        await CoreCourses.invalidateUserCourses();
     }
 
     /**
-     * Check if the handler is enabled on a site level.
-     *
-     * @return Whether or not the handler is enabled on a site level.
+     * @inheritdoc
      */
     async isEnabled(): Promise<boolean> {
         return true;
     }
 
     /**
-     * Whether or not the handler is enabled for a certain course.
-     *
-     * @param courseId The course ID.
-     * @param accessData Access type and data. Default, guest, ...
-     * @param navOptions Course navigation options for current user. See CoreCoursesProvider.getUserNavigationOptions.
-     * @return True or promise resolved with true if enabled.
+     * @inheritdoc
      */
-    isEnabledForCourse(
+    async isEnabledForCourse(
         courseId: number,
         accessData: CoreCourseAccess,
         navOptions?: CoreCourseUserAdminOrNavOptionIndexed,
-    ): boolean | Promise<boolean> {
-        if (accessData && accessData.type == CoreCourseProvider.ACCESS_GUEST) {
-            return false; // Not enabled for guests.
+    ): Promise<boolean> {
+        const showGradebook = await CoreGradesHelper.showGradebook(courseId, accessData, navOptions);
+
+        if (!showGradebook) {
+            return false;
         }
 
-        if (navOptions && navOptions.grades !== undefined) {
-            return navOptions.grades;
-        }
+        const canViewAllGrades = await CoreGrades.canViewAllGrades(courseId);
 
-        return CoreGrades.isPluginEnabledForCourse(courseId);
+        return !canViewAllGrades;
     }
 
     /**
@@ -89,17 +79,14 @@ export class CoreGradesCourseOptionHandlerService implements CoreCourseOptionsHa
         return {
             title: 'core.grades.grades',
             class: 'core-grades-course-handler',
-            page: 'grades',
+            page: GRADES_PAGE_NAME,
         };
     }
 
     /**
-     * Called when a course is downloaded. It should prefetch all the data to be able to see the addon in offline.
-     *
-     * @param course The course.
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
-    async prefetch(course: CoreEnrolledCourseDataWithExtraInfoAndOptions): Promise<void> {
+    async prefetch(course: CoreCourseAnyCourseData): Promise<void> {
         try {
             await CoreGrades.getCourseGradesTable(course.id, undefined, undefined, true);
         } catch (error) {

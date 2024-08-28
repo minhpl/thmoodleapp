@@ -1,4 +1,4 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
     --tabs-background: var(--core-tabs-background);
@@ -40,16 +40,16 @@
             height: var(--height);
             --border-radius: 0;
             ion-icon {
-                font-size: 16px;
+                font-size: var(--mdl-typography-icon-fontSize-sm);
             }
         }
 
-        ion-slides {
+        swiper-container {
             text-align: center;
             line-height: 1.6rem;
             flex-grow: 1;
 
-            ion-slide {
+            swiper-slide {
                 border-bottom: 2px solid transparent;
                 min-width: 100px;
                 height: var(--height);
@@ -57,16 +57,25 @@
                 overflow: hidden;
 
                 ion-tab-button {
+                    width: 100%;
                     max-width: 100%;
+
                     ion-label {
-                        font-size: 14px;
-                        font-weight: 400;
-                        text-overflow: ellipsis;
-                        white-space: nowrap;
-                        overflow: hidden;
+                        @include ellipsis();
                         word-wrap: break-word;
                         max-width: 100%;
                         line-height: 1.2em;
+                        display: flex;
+                        flex-direction: row;
+                        align-items: center;
+
+                        h2 {
+                            font: var(--mdl-typography-label-font-lg);
+                        }
+
+                        ion-badge {
+                            @include margin-horizontal(4px, 0px);
+                        }
                     }
                 }
 
@@ -76,7 +85,7 @@
                     border-bottom-color: var(--border-color-active);
                     ion-tab-button {
                         color: var(--color-active);
-                        ion-label {
+                        ion-label h2 {
                             font-weight: var(--font-weight-active);
                         }
                     }

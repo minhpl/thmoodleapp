@@ -29,6 +29,8 @@ import { CoreCourseModuleManualCompletionComponent } from './module-manual-compl
 import { CoreCourseModuleNavigationComponent } from './module-navigation/module-navigation';
 import { CoreCourseModuleSummaryComponent } from './module-summary/module-summary';
 import { CoreCourseCourseIndexTourComponent } from './course-index-tour/course-index-tour';
+import { CoreRemindersComponentsModule } from '@features/reminders/components/components.module';
+import { CoreCourseModuleCompletionDetailsComponent } from './module-completion-details/module-completion-details';
 
 @NgModule({
     declarations: [
@@ -36,8 +38,10 @@ import { CoreCourseCourseIndexTourComponent } from './course-index-tour/course-i
         CoreCourseModuleComponent,
         CoreCourseModuleCompletionComponent,
         CoreCourseModuleCompletionLegacyComponent,
+        // eslint-disable-next-line deprecation/deprecation
         CoreCourseModuleDescriptionComponent,
         CoreCourseModuleInfoComponent,
+        // eslint-disable-next-line deprecation/deprecation
         CoreCourseModuleManualCompletionComponent,
         CoreCourseCourseIndexComponent,
         CoreCourseCourseIndexTourComponent,
@@ -45,9 +49,11 @@ import { CoreCourseCourseIndexTourComponent } from './course-index-tour/course-i
         CoreCourseUnsupportedModuleComponent,
         CoreCourseModuleNavigationComponent,
         CoreCourseModuleSummaryComponent,
+        CoreCourseModuleCompletionDetailsComponent,
     ],
     imports: [
         CoreBlockComponentsModule,
+        CoreRemindersComponentsModule,
         CoreSharedModule,
     ],
     exports: [
@@ -55,8 +61,10 @@ import { CoreCourseCourseIndexTourComponent } from './course-index-tour/course-i
         CoreCourseModuleComponent,
         CoreCourseModuleCompletionComponent,
         CoreCourseModuleCompletionLegacyComponent,
+        // eslint-disable-next-line deprecation/deprecation
         CoreCourseModuleDescriptionComponent,
         CoreCourseModuleInfoComponent,
+        // eslint-disable-next-line deprecation/deprecation
         CoreCourseModuleManualCompletionComponent,
         CoreCourseCourseIndexComponent,
         CoreCourseCourseIndexTourComponent,
@@ -64,6 +72,7 @@ import { CoreCourseCourseIndexTourComponent } from './course-index-tour/course-i
         CoreCourseUnsupportedModuleComponent,
         CoreCourseModuleNavigationComponent,
         CoreCourseModuleSummaryComponent,
+        CoreCourseModuleCompletionDetailsComponent,
     ],
 })
 export class CoreCourseComponentsModule {}

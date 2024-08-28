@@ -13,13 +13,12 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { File } from '@ionic-native/file/ngx';
 
 import { CoreFile } from '@services/file';
-import { CoreUtils } from '@services/utils/utils';
+import { File, makeSingleton } from '@singletons';
 import { CoreLogger } from '@singletons/logger';
 import { FileMock } from './file';
-import { FileTransferErrorMock } from './file-transfer';
+import { FileTransferErrorMock, FileTransferMock } from './file-transfer';
 
 /**
  * Helper service for the emulator feature. It also acts as an init handler.
@@ -29,29 +28,28 @@ export class CoreEmulatorHelperProvider {
 
     protected logger: CoreLogger;
 
-    constructor(
-        protected file: File,
-    ) {
+    constructor() {
         this.logger = CoreLogger.getInstance('CoreEmulatorHelper');
     }
 
     /**
      * Load the Mocks that need it.
      *
-     * @return Promise resolved when loaded.
+     * @returns Promise resolved when loaded.
      */
-    load(): Promise<void> {
-        const promises: Promise<unknown>[] = [];
-
+    async load(): Promise<void> {
         window.FileTransferError = FileTransferErrorMock;
+        window.FileTransfer = FileTransferMock;
 
-        promises.push((<FileMock> this.file).load().then((basePath: string) => {
+        const fileService = File.instance;
+
+        if (fileService instanceof FileMock) {
+            const basePath = await fileService.load();
+
             CoreFile.setHTMLBasePath(basePath);
-
-            return;
-        }));
-
-        return CoreUtils.allPromises(promises);
+        }
     }
 
 }
+
+export const CoreEmulatorHelper = makeSingleton(CoreEmulatorHelperProvider);

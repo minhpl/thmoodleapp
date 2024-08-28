@@ -16,8 +16,15 @@ import { NgModule } from '@angular/core';
 import { RouterModule, Routes } from '@angular/router';
 
 import { CoreSharedModule } from '@/core/shared.module';
-import { CoreLoginHasSitesGuard } from './guards/has-sites';
+import { hasSitesGuard } from './guards/has-sites';
 import { CoreLoginComponentsModule } from './components/components.module';
+import { CoreLoginHelper } from './services/login-helper';
+import { CoreLoginForgottenPasswordPage } from '@features/login/pages/forgotten-password/forgotten-password';
+import { CoreUserComponentsModule } from '@features/user/components/components.module';
+import { CoreLoginEmailSignupPage } from '@features/login/pages/email-signup/email-signup';
+import { CoreLoginSitePage } from '@features/login/pages/site/site';
+import { CoreLoginSitesPage } from '@features/login/pages/sites/sites';
+import { CoreLoginChangePasswordPage } from '@features/login/pages/change-password/change-password';
 
 const routes: Routes = [
     {
@@ -27,39 +34,32 @@ const routes: Routes = [
     },
     {
         path: 'site',
-        loadChildren: () => import('./pages/site/site.module').then( m => m.CoreLoginSitePageModule),
+        component: CoreLoginSitePage,
     },
     {
         path: 'credentials',
-        loadChildren: () => import('./pages/credentials/credentials.module').then( m => m.CoreLoginCredentialsPageModule),
+        loadChildren: () => CoreLoginHelper.getCredentialsRouteModule(),
     },
     {
         path: 'sites',
-        loadChildren: () => import('./pages/sites/sites.module').then( m => m.CoreLoginSitesPageModule),
-        canLoad: [CoreLoginHasSitesGuard],
-        canActivate: [CoreLoginHasSitesGuard],
+        component: CoreLoginSitesPage,
+        canActivate: [hasSitesGuard],
     },
     {
         path: 'forgottenpassword',
-        loadChildren: () => import('./pages/forgotten-password/forgotten-password.module')
-            .then( m => m.CoreLoginForgottenPasswordPageModule),
+        component: CoreLoginForgottenPasswordPage,
     },
     {
         path: 'changepassword',
-        loadChildren: () => import('./pages/change-password/change-password.module')
-            .then( m => m.CoreLoginChangePasswordPageModule),
-    },
-    {
-        path: 'sitepolicy',
-        loadChildren: () => import('./pages/site-policy/site-policy.module').then( m => m.CoreLoginSitePolicyPageModule),
+        component: CoreLoginChangePasswordPage,
     },
     {
         path: 'emailsignup',
-        loadChildren: () => import('./pages/email-signup/email-signup.module').then( m => m.CoreLoginEmailSignupPageModule),
+        component: CoreLoginEmailSignupPage,
     },
     {
         path: 'reconnect',
-        loadChildren: () => import('./pages/reconnect/reconnect.module').then( m => m.CoreLoginReconnectPageModule),
+        loadChildren: () => CoreLoginHelper.getReconnectRouteModule(),
     },
 ];
 
@@ -67,7 +67,15 @@ const routes: Routes = [
     imports: [
         CoreSharedModule,
         CoreLoginComponentsModule,
+        CoreUserComponentsModule,
         RouterModule.forChild(routes),
+    ],
+    declarations: [
+        CoreLoginForgottenPasswordPage,
+        CoreLoginSitePage,
+        CoreLoginSitesPage,
+        CoreLoginChangePasswordPage,
+        CoreLoginEmailSignupPage,
     ],
 })
 export class CoreLoginLazyModule {}

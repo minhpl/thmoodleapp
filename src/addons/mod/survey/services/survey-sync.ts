@@ -15,14 +15,15 @@
 import { Injectable } from '@angular/core';
 import { CoreNetworkError } from '@classes/errors/network-error';
 import { CoreCourseActivitySyncBaseProvider } from '@features/course/classes/activity-sync';
+import { CoreSyncResult } from '@services/sync';
 import { CoreCourse } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton } from '@singletons';
 import { CoreEvents } from '@singletons/events';
-import { AddonModSurveyPrefetchHandler } from './handlers/prefetch';
+import { getPrefetchHandlerInstance } from './handlers/prefetch';
 import { AddonModSurvey, AddonModSurveyProvider } from './survey';
 import { AddonModSurveyAnswersDBRecordFormatted, AddonModSurveyOffline } from './survey-offline';
 
@@ -45,7 +46,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
      *
      * @param surveyId Survey ID.
      * @param userId User the answers belong to.
-     * @return Sync ID.
+     * @returns Sync ID.
      * @protected
      */
     getSyncId(surveyId: number, userId: number): string {
@@ -57,10 +58,10 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
      *
      * @param siteId Site ID to sync. If not defined, sync all sites.
      * @param force Wether to force sync not depending on last execution.
-     * @return Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     syncAllSurveys(siteId?: string, force?: boolean): Promise<void> {
-        return this.syncOnSites('all surveys', this.syncAllSurveysFunc.bind(this, !!force), siteId);
+        return this.syncOnSites('all surveys', (siteId) => this.syncAllSurveysFunc(!!force, siteId), siteId);
     }
 
     /**
@@ -68,7 +69,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
      *
      * @param force Wether to force sync not depending on last execution.
      * @param siteId Site ID to sync.
-     * @param Promise resolved if sync is successful, rejected if sync fails.
+     * @returns Promise resolved if sync is successful, rejected if sync fails.
      */
     protected async syncAllSurveysFunc(force: boolean, siteId: string): Promise<void> {
         // Get all survey answers pending to be sent in the site.
@@ -80,7 +81,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
                 ? this.syncSurvey(entry.surveyid, entry.userid, siteId)
                 : this.syncSurveyIfNeeded(entry.surveyid, entry.userid, siteId));
 
-            if (result && result.answersSent) {
+            if (result && result.updated) {
                 // Sync successful, send event.
                 CoreEvents.trigger(AddonModSurveySyncProvider.AUTO_SYNCED, {
                     surveyId: entry.surveyid,
@@ -99,7 +100,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
      * @param surveyId Survey ID.
      * @param userId User the answers belong to.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the survey is synced or if it doesn't need to be synced.
+     * @returns Promise resolved when the survey is synced or if it doesn't need to be synced.
      */
     async syncSurveyIfNeeded(surveyId: number, userId: number, siteId?: string): Promise<AddonModSurveySyncResult | undefined> {
         const syncId = this.getSyncId(surveyId, userId);
@@ -116,7 +117,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
      * @param surveyId Survey ID.
      * @param userId User the answers belong to. If not defined, current user.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     async syncSurvey(surveyId: number, userId?: number, siteId?: string): Promise<AddonModSurveySyncResult> {
         const site = await CoreSites.getSite(siteId);
@@ -145,12 +146,12 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
      * @param surveyId Survey ID.
      * @param userId User the answers belong to. If not defined, current user.
      * @param siteId Site ID.
-     * @return Promise resolved if sync is successful, rejected otherwise.
+     * @returns Promise resolved if sync is successful, rejected otherwise.
      */
     protected async performSyncSurvey(surveyId: number, userId: number, siteId: string): Promise<AddonModSurveySyncResult> {
         const result: AddonModSurveySyncResult = {
             warnings: [],
-            answersSent: false,
+            updated: false,
         };
 
         // Sync offline logs.
@@ -168,7 +169,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
         }
 
         if (answersNumber > 0 && data) {
-            if (!CoreApp.isOnline()) {
+            if (!CoreNetwork.isOnline()) {
                 // Cannot sync in offline.
                 throw new CoreNetworkError();
             }
@@ -179,7 +180,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
             try {
                 await AddonModSurvey.submitAnswersOnline(surveyId, data.answers, siteId);
 
-                result.answersSent = true;
+                result.updated = true;
 
                 // Answers sent, delete them.
                 await AddonModSurveyOffline.deleteSurveyAnswers(surveyId, siteId, userId);
@@ -190,7 +191,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
                 }
 
                 // The WebService has thrown an error, this means that answers cannot be submitted. Delete them.
-                result.answersSent = true;
+                result.updated = true;
 
                 await AddonModSurveyOffline.deleteSurveyAnswers(surveyId, siteId, userId);
 
@@ -205,7 +206,7 @@ export class AddonModSurveySyncProvider extends CoreCourseActivitySyncBaseProvid
                 const module = await CoreCourse.getModuleBasicInfoByInstance(surveyId, 'survey', { siteId });
 
                 CoreUtils.ignoreErrors(
-                    this.prefetchAfterUpdate(AddonModSurveyPrefetchHandler.instance, module, result.courseId, undefined, siteId),
+                    this.prefetchAfterUpdate(getPrefetchHandlerInstance(), module, result.courseId, undefined, siteId),
                 );
             }
         }
@@ -236,9 +237,7 @@ declare module '@singletons/events' {
 /**
  * Data returned by a assign sync.
  */
-export type AddonModSurveySyncResult = {
-    warnings: string[]; // List of warnings.
-    answersSent: boolean; // Whether some data was sent to the server or offline data was updated.
+export type AddonModSurveySyncResult = CoreSyncResult & {
     courseId?: number; // Course the survey belongs to (if known).
 };
 

@@ -11,12 +11,14 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
+
 import { AddonModDataEntryField, AddonModDataProvider } from '@addons/mod/data/services/data';
 import { Component } from '@angular/core';
 import { CoreFileEntry, CoreFileHelper } from '@services/file-helper';
 import { CoreFileSession } from '@services/file-session';
 import { CoreDomUtils } from '@services/utils/dom';
-import { AddonModDataFieldPluginComponent } from '../../../classes/field-plugin-component';
+import { AddonModDataFieldPluginBaseComponent } from '../../../classes/base-field-plugin-component';
+import { CoreFile } from '@services/file';
 
 /**
  * Component to render data picture field.
@@ -25,7 +27,7 @@ import { AddonModDataFieldPluginComponent } from '../../../classes/field-plugin-
     selector: 'addon-mod-data-field-picture',
     templateUrl: 'addon-mod-data-field-picture.html',
 })
-export class AddonModDataFieldPictureComponent extends AddonModDataFieldPluginComponent {
+export class AddonModDataFieldPictureComponent extends AddonModDataFieldPluginBaseComponent {
 
     files: CoreFileEntry[] = [];
     component?: string;
@@ -43,7 +45,7 @@ export class AddonModDataFieldPictureComponent extends AddonModDataFieldPluginCo
      * Get the files from the input value.
      *
      * @param value Input value.
-     * @return List of files.
+     * @returns List of files.
      */
     protected getFiles(value?: Partial<AddonModDataEntryField>): CoreFileEntry[] {
         let files = value?.files || [];
@@ -61,7 +63,7 @@ export class AddonModDataFieldPictureComponent extends AddonModDataFieldPluginCo
      *
      * @param files File list where to search.
      * @param filenameSeek Filename to search.
-     * @return File found or false.
+     * @returns File found or false.
      */
     protected findFile(
         files: CoreFileEntry[],
@@ -128,7 +130,7 @@ export class AddonModDataFieldPictureComponent extends AddonModDataFieldPluginCo
             setTimeout(() => {
                 if (this.image) {
                     this.imageUrl = 'name' in this.image
-                        ? this.image.toURL() // Is Offline.
+                        ? CoreFile.convertFileSrc(CoreFile.getFileEntryURL(this.image)) // Is Offline.
                         : CoreFileHelper.getFileUrl(this.image);
                 }
             }, 1);

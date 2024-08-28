@@ -1,0 +1,22 @@
+:host {
+    .report-title {
+        ion-item {
+            width: 100%;
+        }
+    }
+
+    table {
+        th, td {
+            min-width: 200px;
+        }
+
+    }
+
+    core-empty-box {
+        color: var(--gray-500);
+        p {
+            color: var(--gray-900);
+        }
+    }
+
+}

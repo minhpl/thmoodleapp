@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { SubPartial } from '@/core/utils/types';
 import { CoreError } from '@classes/errors/error';
 import { SQLiteDB, SQLiteDBRecordValue, SQLiteDBRecordValues } from '@classes/sqlitedb';
 
@@ -21,13 +22,15 @@ import { SQLiteDB, SQLiteDBRecordValue, SQLiteDBRecordValues } from '@classes/sq
 export class CoreDatabaseTable<
     DBRecord extends SQLiteDBRecordValues = SQLiteDBRecordValues,
     PrimaryKeyColumn extends keyof DBRecord = 'id',
-    PrimaryKey extends GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn> = GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn>
+    RowIdColumn extends PrimaryKeyColumn = PrimaryKeyColumn,
+    PrimaryKey extends GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn> = GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn>,
 > {
 
     protected config: Partial<CoreDatabaseConfiguration>;
     protected database: SQLiteDB;
     protected tableName: string;
     protected primaryKeyColumns: PrimaryKeyColumn[];
+    protected rowIdColumn: RowIdColumn | null;
     protected listeners: CoreDatabaseTableListener[] = [];
 
     constructor(
@@ -35,15 +38,19 @@ export class CoreDatabaseTable<
         database: SQLiteDB,
         tableName: string,
         primaryKeyColumns?: PrimaryKeyColumn[],
+        rowIdColumn?: RowIdColumn | null,
     ) {
         this.config = config;
         this.database = database;
         this.tableName = tableName;
         this.primaryKeyColumns = primaryKeyColumns ?? ['id'] as PrimaryKeyColumn[];
+        this.rowIdColumn = rowIdColumn === null ? null : (rowIdColumn ?? 'id') as RowIdColumn;
     }
 
     /**
      * Get database configuration.
+     *
+     * @returns The database configuration.
      */
     getConfig(): Partial<CoreDatabaseConfiguration> {
         return this.config;
@@ -123,7 +130,7 @@ export class CoreDatabaseTable<
         }
 
         const sorting = options?.sorting
-            && this.normalizedSorting(options.sorting).map(([column, direction]) => `${column} ${direction}`).join(', ');
+            && this.normalizedSorting(options.sorting).map(([column, direction]) => `${column.toString()} ${direction}`).join(', ');
 
         return this.database.getRecords(this.tableName, conditions, sorting, '*', options?.offset, options?.limit);
     }
@@ -135,6 +142,7 @@ export class CoreDatabaseTable<
      * method should be favored otherwise for better performance.
      *
      * @param conditions Matching conditions in SQL and JavaScript.
+     * @returns Records matching the given conditions.
      */
     getManyWhere(conditions: CoreDatabaseConditions<DBRecord>): Promise<DBRecord[]>  {
         return this.database.getRecordsSelect(this.tableName, conditions.sql, conditions.sqlParams);
@@ -250,9 +258,24 @@ export class CoreDatabaseTable<
      * Insert a new record.
      *
      * @param record Database record.
+     * @returns New record row id.
      */
-    async insert(record: DBRecord): Promise<void> {
-        await this.database.insertRecord(this.tableName, record);
+    async insert(record: SubPartial<DBRecord, RowIdColumn>): Promise<number> {
+        const rowId = await this.database.insertRecord(this.tableName, record);
+
+        return rowId;
+    }
+
+    /**
+     * Insert a new record synchronously.
+     *
+     * @param record Database record.
+     */
+    syncInsert(record: SubPartial<DBRecord, RowIdColumn>): void {
+        // The current database architecture does not support synchronous operations,
+        // so calling this method will mean that errors will be silenced. Because of that,
+        // this should only be called if using the asynchronous alternatives is not possible.
+        this.insert(record);
     }
 
     /**
@@ -287,6 +310,18 @@ export class CoreDatabaseTable<
         conditions
             ? await this.database.deleteRecords(this.tableName, conditions)
             : await this.database.deleteRecords(this.tableName);
+    }
+
+    /**
+     * Delete records matching the given conditions.
+     *
+     * This method should be used when it's necessary to apply complex conditions; the simple `delete`
+     * method should be favored otherwise for better performance.
+     *
+     * @param conditions Matching conditions in SQL and JavaScript.
+     */
+    async deleteWhere(conditions: CoreDatabaseConditions<DBRecord>): Promise<void> {
+        await this.database.deleteRecordsSelect(this.tableName, conditions.sql, conditions.sqlParams);
     }
 
     /**
@@ -345,8 +380,8 @@ export class CoreDatabaseTable<
 
         records.sort((a, b) => {
             for (const [column, direction] of columnsSorting) {
-                const aValue = a[column];
-                const bValue = b[column];
+                const aValue = a[column] ?? 0;
+                const bValue = b[column] ?? 0;
 
                 if (aValue > bValue) {
                     return direction === 'desc' ? -1 : 1;
@@ -408,15 +443,17 @@ export interface CoreDatabaseTableListener {
 export type CoreDatabaseTableConstructor<
     DBRecord extends SQLiteDBRecordValues = SQLiteDBRecordValues,
     PrimaryKeyColumn extends keyof DBRecord = 'id',
-    PrimaryKey extends GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn> = GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn>
+    RowIdColumn extends PrimaryKeyColumn = PrimaryKeyColumn,
+    PrimaryKey extends GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn> = GetDBRecordPrimaryKey<DBRecord, PrimaryKeyColumn>,
 > = {
 
     new (
         config: Partial<CoreDatabaseConfiguration>,
         database: SQLiteDB,
         tableName: string,
-        primaryKeyColumns?: PrimaryKeyColumn[]
-    ): CoreDatabaseTable<DBRecord, PrimaryKeyColumn, PrimaryKey>;
+        primaryKeyColumns?: PrimaryKeyColumn[],
+        rowIdColumn?: RowIdColumn | null,
+    ): CoreDatabaseTable<DBRecord, PrimaryKeyColumn, RowIdColumn, PrimaryKey>;
 
 };
 

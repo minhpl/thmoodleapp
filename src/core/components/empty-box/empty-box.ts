@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, Input } from '@angular/core';
+import { Component, HostBinding, Input } from '@angular/core';
 
 /**
  * Component to show an empty box message. It will show an optional icon or image and a text centered on page.
@@ -25,18 +25,22 @@ import { Component, Input } from '@angular/core';
 @Component({
     selector: 'core-empty-box',
     templateUrl: 'core-empty-box.html',
-    styleUrls: ['empty-box.scss'],
+    styleUrl: 'empty-box.scss',
 })
 export class CoreEmptyBoxComponent {
 
     @Input() message = ''; // Message to display.
+    @Input() dimmed = false; // Wether the box is dimmed or not.
     @Input() icon?: string; // Name of the icon to use.
     @Input() image?: string; // Image source. If an icon is provided, image won't be used.
-    @Input() flipIconRtl = false; // Whether to flip the icon in RTL. Defaults to false.
-
     /**
-     * @deprecated not used anymore.
+     * @deprecated since 4.4. Not used anymore.
      */
-    @Input() inline = false;
+    @Input() flipIconRtl = false;
+
+    @HostBinding('class.dimmed')
+    get isDimmed(): boolean {
+        return this.dimmed;
+    }
 
 }

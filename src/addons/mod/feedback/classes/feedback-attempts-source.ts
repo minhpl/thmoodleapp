@@ -22,6 +22,7 @@ import {
     AddonModFeedbackWSFeedback,
 } from '../services/feedback';
 import { AddonModFeedbackHelper } from '../services/feedback-helper';
+import { Params } from '@angular/router';
 
 /**
  * Feedback attempts.
@@ -37,8 +38,7 @@ export class AddonModFeedbackAttemptsSource extends CoreRoutedItemsManagerSource
     anonymous?: AddonModFeedbackWSAnonAttempt[];
     anonymousTotal?: number;
     groupInfo?: CoreGroupInfo;
-
-    protected feedback?: AddonModFeedbackWSFeedback;
+    feedback?: AddonModFeedbackWSFeedback;
 
     constructor(courseId: number, cmId: number) {
         super();
@@ -57,6 +57,15 @@ export class AddonModFeedbackAttemptsSource extends CoreRoutedItemsManagerSource
     /**
      * @inheritdoc
      */
+    getItemQueryParams(): Params {
+        return {
+            groupId: this.selectedGroup,
+        };
+    }
+
+    /**
+     * @inheritdoc
+     */
     getPagesLoaded(): number {
         if (!this.identifiable || !this.anonymous) {
             return 0;
@@ -70,8 +79,8 @@ export class AddonModFeedbackAttemptsSource extends CoreRoutedItemsManagerSource
     /**
      * Type guard to infer AddonModFeedbackWSAttempt objects.
      *
-     * @param discussion Item to check.
-     * @return Whether the item is an identifieable attempt.
+     * @param attempt Attempt to check.
+     * @returns Whether the item is an identifieable attempt.
      */
     isIdentifiableAttempt(attempt: AddonModFeedbackAttemptItem): attempt is AddonModFeedbackWSAttempt {
         return 'fullname' in attempt;
@@ -80,8 +89,8 @@ export class AddonModFeedbackAttemptsSource extends CoreRoutedItemsManagerSource
     /**
      * Type guard to infer AddonModFeedbackWSAnonAttempt objects.
      *
-     * @param discussion Item to check.
-     * @return Whether the item is an anonymous attempt.
+     * @param attempt Attempt to check.
+     * @returns Whether the item is an anonymous attempt.
      */
     isAnonymousAttempt(attempt: AddonModFeedbackAttemptItem): attempt is AddonModFeedbackWSAnonAttempt {
         return 'number' in attempt;

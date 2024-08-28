@@ -15,7 +15,6 @@
 import {
     Component,
     Input,
-    OnInit,
     OnChanges,
     OnDestroy,
     AfterViewInit,
@@ -23,15 +22,15 @@ import {
     SimpleChange,
 } from '@angular/core';
 import { IonRouterOutlet, IonTabs, ViewDidEnter, ViewDidLeave } from '@ionic/angular';
-import { Subscription } from 'rxjs';
 
 import { CoreUtils } from '@services/utils/utils';
 import { Params } from '@angular/router';
 import { CoreNavBarButtonsComponent } from '../navbar-buttons/navbar-buttons';
-import { StackEvent } from '@ionic/angular/directives/navigation/stack-utils';
+import { StackDidChangeEvent } from '@ionic/angular/common/directives/navigation/stack-utils';
 import { CoreNavigator } from '@services/navigator';
 import { CoreTabBase, CoreTabsBaseComponent } from '@classes/tabs';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
+import { CorePath } from '@singletons/path';
 
 /**
  * This component displays some top scrollable tabs that will autohide on vertical scroll.
@@ -43,8 +42,8 @@ import { CoreComponentsRegistry } from '@singletons/components-registry';
  *
  * Tab contents will only be shown if that tab is selected.
  *
- * @todo: Test RTL and tab history.
- * @todo: This should behave like the split-view in relation to routing (maybe we could reuse some code from
+ * @todo Test RTL and tab history.
+ * @todo This should behave like the split-view in relation to routing (maybe we could reuse some code from
  *  CorePageItemsListManager).
  */
 @Component({
@@ -53,7 +52,7 @@ import { CoreComponentsRegistry } from '@singletons/components-registry';
     styleUrls: ['../tabs/tabs.scss'],
 })
 export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutletTab>
-    implements OnInit, AfterViewInit, OnChanges, OnDestroy {
+    implements AfterViewInit, OnChanges, OnDestroy {
 
     /**
      * Determine tabs layout.
@@ -63,8 +62,6 @@ export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutle
 
     @ViewChild(IonTabs) protected ionTabs!: IonTabs;
 
-    protected stackEventsSubscription?: Subscription;
-    protected outletActivatedSubscription?: Subscription;
     protected lastActiveComponent?: Partial<ViewDidLeave>;
     protected existsInNavigationStack = false;
 
@@ -90,7 +87,7 @@ export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutle
             return;
         }
 
-        this.stackEventsSubscription = this.ionTabs.outlet.stackEvents.subscribe(async (stackEvent: StackEvent) => {
+        this.subscriptions.push(this.ionTabs.outlet.stackDidChange.subscribe(async (stackEvent: StackDidChangeEvent) => {
             if (!this.isCurrentView) {
                 return;
             }
@@ -110,10 +107,10 @@ export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutle
             }
 
             this.showHideNavBarButtons(stackEvent.enteringView.element.tagName);
-        });
-        this.outletActivatedSubscription = this.ionTabs.outlet.activateEvents.subscribe(() => {
+        }));
+        this.subscriptions.push(this.ionTabs.outlet.activateEvents.subscribe(() => {
             this.lastActiveComponent = this.ionTabs.outlet.component;
-        });
+        }));
     }
 
     /**
@@ -147,6 +144,14 @@ export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutle
         // After the view has entered for the first time, we can assume that it'll always be in the navigation stack
         // until it's destroyed.
         this.existsInNavigationStack = true;
+
+        const selectedTab = this.getSelected();
+        const currentPath = CoreNavigator.getCurrentPath();
+        if (selectedTab && CorePath.pathIsAncestor(currentPath, selectedTab.page)) {
+            // Current path is an ancestor of the selected path, this happens when the user changes main menu tab and comes back.
+            // Load the tab again so the right route is loaded. This only changes the current route, it doesn't reload the page.
+            this.loadTab(selectedTab);
+        }
     }
 
     /**
@@ -188,11 +193,12 @@ export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutle
      * Load the tab.
      *
      * @param tabToSelect Tab to load.
-     * @return Promise resolved with true if tab is successfully loaded.
+     * @returns Promise resolved with true if tab is successfully loaded.
      */
     protected async loadTab(tabToSelect: CoreTabsOutletTab): Promise<boolean> {
         return CoreNavigator.navigate(tabToSelect.page, {
             params: tabToSelect.pageParams,
+            animated: false,
         });
     }
 
@@ -206,7 +212,7 @@ export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutle
     protected showHideNavBarButtons(activatedPageName: string): void {
         const elements = this.ionTabs.outlet.nativeEl.querySelectorAll('core-navbar-buttons');
         elements.forEach((element) => {
-            const instance = CoreComponentsRegistry.resolve(element, CoreNavBarButtonsComponent);
+            const instance = CoreDirectivesRegistry.resolve(element, CoreNavBarButtonsComponent);
 
             if (instance) {
                 const pagetagName = element.closest('.ion-page')?.tagName;
@@ -220,8 +226,6 @@ export class CoreTabsOutletComponent extends CoreTabsBaseComponent<CoreTabsOutle
      */
     ngOnDestroy(): void {
         super.ngOnDestroy();
-        this.stackEventsSubscription?.unsubscribe();
-        this.outletActivatedSubscription?.unsubscribe();
         this.existsInNavigationStack = false;
     }
 

@@ -1,0 +1,16 @@
+:host {
+    --heading-text-color: var(--gray-700);
+
+    ion-item.heading {
+        color: var(--heading-text-color);
+
+        ion-label {
+            margin-bottom: 0;
+        }
+
+    }
+}
+
+:host-context(html.dark) {
+    --heading-text-color: var(--gray-400);
+}

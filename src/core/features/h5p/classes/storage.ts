@@ -15,7 +15,7 @@
 import { CoreFile, CoreFileProvider } from '@services/file';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 import { CoreH5PCore, CoreH5PLibraryBasicData } from './core';
 import { CoreH5PFramework } from './framework';
 import { CoreH5PMetadata } from './metadata';
@@ -42,7 +42,7 @@ export class CoreH5PStorage {
      * @param librariesJsonData Data about libraries.
      * @param folderName Name of the folder of the H5P package.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async saveLibraries(librariesJsonData: CoreH5PLibrariesJsonData, folderName: string, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -56,16 +56,16 @@ export class CoreH5PStorage {
         await Promise.all(Object.keys(librariesJsonData).map(async (libString) => {
             const libraryData: CoreH5PLibraryBeingSaved = librariesJsonData[libString];
 
-            // Find local library identifier.
-            const dbData = await CoreUtils.ignoreErrors(this.h5pFramework.getLibraryByData(libraryData));
+            // Find local library with same major + minor.
+            const existingLibrary = await CoreUtils.ignoreErrors(this.h5pFramework.getLibraryByData(libraryData));
 
-            if (dbData) {
+            if (existingLibrary) {
                 // Library already installed.
-                libraryData.libraryId = dbData.id;
+                libraryData.libraryId = existingLibrary.id;
 
-                const isNewPatch = await this.h5pFramework.isPatchedLibrary(libraryData, dbData);
+                const newerPatchVersion = existingLibrary.patchversion < libraryData.patchVersion;
 
-                if (!isNewPatch) {
+                if (!newerPatchVersion) {
                     // Same or older version, no need to save.
                     libraryData.saveDependencies = false;
 
@@ -153,11 +153,12 @@ export class CoreH5PStorage {
     /**
      * Save content data in DB and clear cache.
      *
-     * @param content Content to save.
+     * @param data Content to save.
      * @param folderName The name of the folder that contains the H5P.
      * @param fileUrl The online URL of the package.
+     * @param skipContent Skip content.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the content data.
+     * @returns Promise resolved with the content data.
      */
     async savePackage(
         data: CoreH5PMainJSONFilesData,
@@ -199,8 +200,8 @@ export class CoreH5PStorage {
             await this.h5pCore.saveContent(content, folderName, fileUrl, siteId);
 
             // Save the content files in their right place in FS.
-            const destFolder = CoreText.concatenatePaths(CoreFileProvider.TMPFOLDER, 'h5p/' + folderName);
-            const contentPath = CoreText.concatenatePaths(destFolder, 'content');
+            const destFolder = CorePath.concatenatePaths(CoreFileProvider.TMPFOLDER, 'h5p/' + folderName);
+            const contentPath = CorePath.concatenatePaths(destFolder, 'content');
 
             try {
                 await this.h5pCore.h5pFS.saveContent(contentPath, folderName, siteId);

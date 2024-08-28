@@ -1,8 +1,8 @@
 {
     "app_id": "com.moodle.moodlemobile",
     "appname": "Moodle Mobile",
-    "versioncode": 40200,
-    "versionname": "4.0.2",
+    "versioncode": 44004,
+    "versionname": "4.4.0",
     "cache_update_frequency_usually": 420000,
     "cache_update_frequency_often": 1200000,
     "cache_update_frequency_sometimes": 3600000,
@@ -10,17 +10,18 @@
     "default_lang": "en",
     "languages": {
         "af": "Afrikaans",
-        "ar": "عربي",
+        "ar": "العربية",
+        "az": "Azərbaycanca",
         "bg": "Български",
         "ca": "Català",
         "cs": "Čeština",
         "da": "Dansk",
         "de": "Deutsch",
-        "de-du": "Deutsch - Du",
+        "de-du": "Deutsch (du)",
         "el": "Ελληνικά",
         "en": "English",
-        "en-us": "English - United States",
-        "es": "Español",
+        "en-us": "English (United States)",
+        "es": "Español - Internacional",
         "es-mx": "Español - México",
         "eu": "Euskara",
         "fa": "فارسی",
@@ -30,10 +31,10 @@
         "he": "עברית",
         "hi": "हिंदी",
         "hr": "Hrvatski",
-        "hsb": "Hornjoserbsski",
+        "hsb": "Hornjoserbsce",
         "hu": "magyar",
         "hy": "Հայերեն",
-        "id": "Indonesian",
+        "id": "Bahasa Indonesia",
         "it": "Italiano",
         "ja": "日本語",
         "km": "ខ្មែរ",
@@ -45,16 +46,19 @@
         "mn": "Монгол",
         "mr": "मराठी",
         "nl": "Nederlands",
-        "no": "Norsk - bokmål",
+        "no": "Norsk",
         "pl": "Polski",
+        "ps": "لیسي",
         "pt": "Português - Portugal",
         "pt-br": "Português - Brasil",
         "ro": "Română",
         "ru": "Русский",
         "sl": "Slovenščina",
+        "sq": "Shqip",
         "sr-cr": "Српски",
         "sr-lt": "Srpski",
         "sv": "Svenska",
+        "szl": "Ślōnski",
         "tg": "Тоҷикӣ",
         "tr": "Türkçe",
         "uk": "Українська",
@@ -76,18 +80,17 @@
             "password": "moodle"
         }
     },
+    "defaultZoomLevel": "none",
     "zoomlevels": {
-        "normal": 100,
-        "low": 110,
+        "none": 100,
+        "medium": 110,
         "high": 120
     },
     "customurlscheme": "moodlemobile",
-    "siteurl": "",
-    "sitename": "",
+    "sites": [],
     "multisitesdisplay": "",
     "sitefindersettings": {},
     "onlyallowlistedsites": false,
-    "skipssoconfirmation": false,
     "forcedefaultlanguage": false,
     "privacypolicy": "https://moodle.net/moodle-app-privacy/",
     "notificoncolor": "#f98012",
@@ -102,5 +105,34 @@
     },
     "wsrequestqueuelimit": 10,
     "wsrequestqueuedelay": 100,
-    "calendarreminderdefaultvalue": 3600
+    "calendarreminderdefaultvalue": 3600,
+    "toastDurations": {
+        "short": 2000,
+        "long": 3500,
+        "sticky": 0
+    },
+    "disableTokenFile": false,
+    "iconsPrefixes": {
+        "font-awesome": {
+            "brands": [
+                "fab"
+            ],
+            "regular": [
+                "far"
+            ],
+            "solid": [
+                "fa",
+                "fas"
+            ]
+        },
+        "moodle": {
+            "font-awesome": [
+                "fam"
+            ],
+            "moodle": [
+                "moodle"
+            ]
+        }
+    },
+    "clearIABSessionWhenAutoLogin": "android"
 }

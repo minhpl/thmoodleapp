@@ -15,8 +15,8 @@
 const BuildLangTask = require('./gulp/task-build-lang');
 const BuildBehatPluginTask = require('./gulp/task-build-behat-plugin');
 const BuildEnvTask = require('./gulp/task-build-env');
-const PushTask = require('./gulp/task-push');
-const Utils = require('./gulp/utils');
+const BuildIconsJsonTask = require('./gulp/task-build-icons-json');
+const OverrideLangTask = require('./gulp/task-override-lang');
 const gulp = require('gulp');
 
 const paths = {
@@ -29,16 +29,23 @@ const paths = {
     ],
 };
 
-const args = Utils.getCommandLineArguments();
-
 // Build the language files into a single file per language.
 gulp.task('lang', (done) => {
     new BuildLangTask().run(paths.lang, done);
 });
 
+// Use the English generated lang file (src/assets/lang/en.json) to override strings in features lang.json files.
+gulp.task('lang-override', (done) => {
+    new OverrideLangTask().run(done);
+});
+
 // Build an env file depending on the current environment.
 gulp.task('env', (done) => {
     new BuildEnvTask().run(done);
+});
+
+gulp.task('icons', (done) => {
+    new BuildIconsJsonTask().run(done);
 });
 
 // Build a Moodle plugin to run Behat tests.
@@ -48,15 +55,12 @@ if (BuildBehatPluginTask.isBehatConfigured()) {
     });
 }
 
-gulp.task('push', (done) => {
-    new PushTask().run(args, done);
-});
-
 gulp.task(
     'default',
     gulp.parallel([
         'lang',
         'env',
+        'icons',
         ...(BuildBehatPluginTask.isBehatConfigured() ? ['behat'] : [])
     ]),
 );
@@ -71,5 +75,14 @@ gulp.task('watch', () => {
 });
 
 gulp.task('watch-behat', () => {
-    gulp.watch(['./tests/behat'], { interval: 500 }, gulp.parallel('behat'));
+    gulp.watch(
+        [
+            './src/**/*.feature',
+            './src/**/tests/behat/fixtures/**',
+            './src/**/tests/behat/snapshots/**',
+            './local_moodleappbehat',
+        ],
+        { interval: 500 },
+        gulp.parallel('behat')
+    );
 });

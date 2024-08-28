@@ -13,13 +13,13 @@
 // limitations under the License.
 
 import { Component, OnInit } from '@angular/core';
+import { CoreAccountsList, CoreLoginHelper } from '@features/login/services/login-helper';
 import { CoreSharedFilesHelper } from '@features/sharedfiles/services/sharedfiles-helper';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 import { CoreFile } from '@services/file';
 import { CoreNavigator } from '@services/navigator';
-import { CoreSiteBasicInfo, CoreSites } from '@services/sites';
+import { CoreSiteBasicInfo } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
-import { CoreUtils } from '@services/utils/utils';
 
 /**
  * Page to display the list of sites to choose one to store a shared file.
@@ -31,8 +31,12 @@ import { CoreUtils } from '@services/utils/utils';
 export class CoreSharedFilesChooseSitePage implements OnInit {
 
     fileName?: string;
-    sites?: CoreSiteBasicInfo[];
     loaded = false;
+    accountsList: CoreAccountsList = {
+        sameSite: [],
+        otherSites: [],
+        count: 0,
+    };
 
     protected filePath?: string;
     protected fileEntry?: FileEntry;
@@ -42,19 +46,20 @@ export class CoreSharedFilesChooseSitePage implements OnInit {
      * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
-        this.filePath = CoreNavigator.getRouteParam('filePath');
-        this.isInbox = !!CoreNavigator.getRouteBooleanParam('isInbox');
-
-        if (!this.filePath) {
-            CoreDomUtils.showErrorModal('Error reading file.');
-            await CoreUtils.nextTick();
+        try {
+            this.filePath = CoreNavigator.getRequiredRouteParam('filePath');
+            this.isInbox = !!CoreNavigator.getRouteBooleanParam('isInbox');
+        } catch (error) {
+            CoreDomUtils.showErrorModalDefault(error, 'Error reading file.');
             CoreNavigator.back();
 
             return;
         }
 
-        const fileAndDir = CoreFile.getFileAndDirectoryFromPath(this.filePath);
-        this.fileName = fileAndDir.name;
+        if (this.filePath) {
+            const fileAndDir = CoreFile.getFileAndDirectoryFromPath(this.filePath);
+            this.fileName = fileAndDir.name;
+        }
 
         try {
             await Promise.all([
@@ -72,32 +77,40 @@ export class CoreSharedFilesChooseSitePage implements OnInit {
     /**
      * Load the file data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadFile(): Promise<void> {
-        this.fileEntry = await CoreFile.getExternalFile(this.filePath!);
+        if (!this.filePath) {
+            return;
+        }
+
+        this.fileEntry = await CoreFile.getExternalFile(this.filePath);
         this.fileName = this.fileEntry.name;
     }
 
     /**
      * Load sites.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadSites(): Promise<void> {
-        this.sites = await CoreSites.getSites();
+        this.accountsList = await CoreLoginHelper.getAccountsList();
     }
 
     /**
      * Store the file in a certain site.
      *
-     * @param siteId Site ID.
+     * @param site Site.
      */
-    async storeInSite(siteId: string): Promise<void> {
+    async storeInSite(site: CoreSiteBasicInfo): Promise<void> {
+        if (!this.fileEntry) {
+            return;
+        }
+
         this.loaded = false;
 
         try {
-            await CoreSharedFilesHelper.storeSharedFileInSite(this.fileEntry!, siteId, this.isInbox);
+            await CoreSharedFilesHelper.storeSharedFileInSite(this.fileEntry, site.id, this.isInbox);
 
             CoreNavigator.back();
         } finally {

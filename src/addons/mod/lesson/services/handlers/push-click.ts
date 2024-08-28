@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { isSafeNumber } from '@/core/utils/types';
 import { Injectable } from '@angular/core';
 
 import { CoreGrades } from '@features/grades/services/grades';
@@ -35,11 +36,15 @@ export class AddonModLessonPushClickHandlerService implements CorePushNotificati
      * Check if a notification click is handled by this handler.
      *
      * @param notification The notification to check.
-     * @return Whether the notification click is handled by this handler.
+     * @returns Whether the notification click is handled by this handler.
      */
     async handles(notification: NotificationData): Promise<boolean> {
-        if (CoreUtils.isTrueOrOne(notification.notif) && notification.moodlecomponent == 'mod_lesson' &&
-                notification.name == 'graded_essay') {
+        if (
+            CoreUtils.isTrueOrOne(notification.notif) &&
+            notification.moodlecomponent == 'mod_lesson' &&
+            notification.name == 'graded_essay' &&
+            notification.customdata?.cmid
+        ) {
 
             return CoreGrades.isPluginEnabledForCourse(Number(notification.courseid), notification.site);
         }
@@ -51,12 +56,16 @@ export class AddonModLessonPushClickHandlerService implements CorePushNotificati
      * Handle the notification click.
      *
      * @param notification The notification to check.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    handleClick(notification: NotificationData): Promise<void> {
+    async handleClick(notification: NotificationData): Promise<void> {
         const data = notification.customdata || {};
         const courseId = Number(notification.courseid);
         const moduleId = Number(data.cmid);
+
+        if (!isSafeNumber(moduleId)) {
+            return;
+        }
 
         return CoreGradesHelper.goToGrades(courseId, undefined, moduleId, notification.site);
     }

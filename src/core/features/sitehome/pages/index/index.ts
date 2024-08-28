@@ -13,10 +13,9 @@
 // limitations under the License.
 
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
-import { Params } from '@angular/router';
+import { ActivatedRoute } from '@angular/router';
 
-import { CoreSite, CoreSiteConfig } from '@classes/site';
+import { CoreSite, CoreSiteConfig } from '@classes/sites/site';
 import { CoreCourse, CoreCourseWSSection } from '@features/course/services/course';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreSites } from '@services/sites';
@@ -29,6 +28,10 @@ import { CoreCourseModulePrefetchDelegate } from '@features/course/services/modu
 import { CoreNavigationOptions, CoreNavigator } from '@services/navigator';
 import { CoreBlockHelper } from '@features/block/services/block-helper';
 import { CoreUtils } from '@services/utils/utils';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreBlockSideBlocksComponent } from '@features/block/components/side-blocks/side-blocks';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Page that displays site home index.
@@ -54,13 +57,25 @@ export class CoreSiteHomeIndexPage implements OnInit, OnDestroy {
     newsForumModule?: CoreCourseModuleData;
 
     protected updateSiteObserver: CoreEventObserver;
-    protected fetchSuccess = false;
+    protected logView: () => void;
 
-    constructor() {
+    constructor(protected route: ActivatedRoute) {
         // Refresh the enabled flags if site is updated.
         this.updateSiteObserver = CoreEvents.on(CoreEvents.SITE_UPDATED, () => {
             this.searchEnabled = !CoreCourses.isSearchCoursesDisabledInSite();
         }, CoreSites.getCurrentSiteId());
+
+        this.logView = CoreTime.once(async () => {
+            await CoreUtils.ignoreErrors(CoreCourse.logView(this.siteHomeId));
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: 'core_course_view_course',
+                name: this.currentSite.getInfo()?.sitename ?? '',
+                data: { id: this.siteHomeId, category: 'course' },
+                url: '/?redirect=0',
+            });
+        });
     }
 
     /**
@@ -74,26 +89,23 @@ export class CoreSiteHomeIndexPage implements OnInit, OnDestroy {
 
         const module = CoreNavigator.getRouteParam<CoreCourseModuleData>('module');
         if (module) {
-            let modNavOptions = CoreNavigator.getRouteParam<CoreNavigationOptions>('modNavOptions');
-            if (!modNavOptions) {
-                // Fallback to old way of passing params. @deprecated since 4.0.
-                const modParams = CoreNavigator.getRouteParam<Params>('modParams');
-                if (modParams) {
-                    modNavOptions = { params: modParams };
-                }
-            }
+            const modNavOptions = CoreNavigator.getRouteParam<CoreNavigationOptions>('modNavOptions');
             CoreCourseHelper.openModule(module, this.siteHomeId, { modNavOptions });
         }
 
         this.loadContent().finally(() => {
             this.dataLoaded = true;
         });
+
+        this.openFocusedInstance();
+
+        this.route.queryParams.subscribe(() => this.openFocusedInstance());
     }
 
     /**
      * Convenience function to fetch the data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadContent(): Promise<void> {
         this.hasContent = false;
@@ -138,15 +150,7 @@ export class CoreSiteHomeIndexPage implements OnInit, OnDestroy {
                 this.hasContent = result.hasContent || this.hasContent;
             }
 
-            if (!this.fetchSuccess) {
-                this.fetchSuccess = true;
-                CoreUtils.ignoreErrors(CoreCourse.logView(
-                    this.siteHomeId,
-                    undefined,
-                    undefined,
-                    this.currentSite.getInfo()?.sitename,
-                ));
-            }
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'core.course.couldnotloadsectioncontent', true);
         }
@@ -159,7 +163,7 @@ export class CoreSiteHomeIndexPage implements OnInit, OnDestroy {
      *
      * @param refresher Refresher.
      */
-    doRefresh(refresher?: IonRefresher): void {
+    doRefresh(refresher?: HTMLIonRefresherElement): void {
         const promises: Promise<unknown>[] = [];
 
         promises.push(CoreCourse.invalidateSections(this.siteHomeId));
@@ -214,10 +218,28 @@ export class CoreSiteHomeIndexPage implements OnInit, OnDestroy {
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.updateSiteObserver.off();
+    }
+
+    /**
+     * Check whether there is a focused instance in the page parameters and open it.
+     */
+    private openFocusedInstance() {
+        const blockInstanceId = CoreNavigator.getRouteNumberParam('blockInstanceId');
+
+        if (blockInstanceId) {
+            CoreDomUtils.openSideModal({
+                component: CoreBlockSideBlocksComponent,
+                componentProps: {
+                    contextLevel: ContextLevel.COURSE,
+                    instanceId: this.siteHomeId,
+                    initialBlockInstanceId: blockInstanceId,
+                },
+            });
+        }
     }
 
 }

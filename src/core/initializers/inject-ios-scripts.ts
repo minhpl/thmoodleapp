@@ -12,14 +12,27 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreApp } from '@services/app';
+import { CorePlatform } from '@services/platform';
 import { CoreIframeUtils } from '@services/utils/iframe';
-import { Platform } from '@singletons';
+import { WKUserScriptWindow } from 'cordova-plugin-wkuserscript';
 
+/**
+ * Check Whether the window object has WKUserScript set.
+ *
+ * @param window Window object.
+ * @returns Whether the window object has WKUserScript set.
+ */
+function isWKUserScriptWindow(window: object): window is WKUserScriptWindow {
+    return CorePlatform.isIOS() && 'WKUserScript' in window;
+}
+
+/**
+ * Inject some scripts for iOS iframes.
+ */
 export default async function(): Promise<void> {
-    await Platform.ready();
+    await CorePlatform.ready();
 
-    if (!CoreApp.isIOS() || !('WKUserScript' in window)) {
+    if (!isWKUserScriptWindow(window)) {
         return;
     }
 

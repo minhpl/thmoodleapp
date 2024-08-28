@@ -41,6 +41,8 @@ import { AddonBlockSiteMainMenuModule } from './sitemainmenu/sitemainmenu.module
 import { AddonBlockStarredCoursesModule } from './starredcourses/starredcourses.module';
 import { AddonBlockTagsModule } from './tags/tags.module';
 import { AddonBlockTimelineModule } from './timeline/timeline.module';
+import { AddonBlockGlobalSearchModule } from '@addons/block/globalsearch/globalsearch.module';
+import { AddonBlockSearchForumsModule } from '@addons/block/searchforums/searchforums.module';
 
 @NgModule({
     imports: [
@@ -55,6 +57,7 @@ import { AddonBlockTimelineModule } from './timeline/timeline.module';
         AddonBlockCommentsModule,
         AddonBlockCompletionStatusModule,
         AddonBlockCourseListModule,
+        AddonBlockGlobalSearchModule,
         AddonBlockGlossaryRandomModule,
         AddonBlockHtmlModule,
         AddonBlockLearningPlansModule,
@@ -66,6 +69,7 @@ import { AddonBlockTimelineModule } from './timeline/timeline.module';
         AddonBlockRecentlyAccessedCoursesModule,
         AddonBlockRecentlyAccessedItemsModule,
         AddonBlockRssClientModule,
+        AddonBlockSearchForumsModule,
         AddonBlockSelfCompletionModule,
         AddonBlockSiteMainMenuModule,
         AddonBlockStarredCoursesModule,
@@ -73,4 +77,4 @@ import { AddonBlockTimelineModule } from './timeline/timeline.module';
         AddonBlockTimelineModule,
     ],
 })
-export class AddonBlockModule { }
+export class AddonBlockModule {}

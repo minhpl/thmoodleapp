@@ -14,7 +14,7 @@
 
 import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
-import { CoreSitePublicConfigResponse } from '@classes/site';
+import { CoreSitePublicConfigResponse } from '@classes/sites/unauthenticated-site';
 import { CoreApp } from '@services/app';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
@@ -43,7 +43,7 @@ export interface CoreStyleHandler {
      *
      * @param siteId Site Id.
      * @param config Site public config for temp sites.
-     * @return Wether the handler should be enabled for the site.
+     * @returns Wether the handler should be enabled for the site.
      */
     isEnabled(siteId: string, config?: CoreSitePublicConfigResponse): boolean | Promise<boolean>;
 
@@ -52,7 +52,7 @@ export interface CoreStyleHandler {
      *
      * @param siteId Site Id.
      * @param config Site public config for temp sites.
-     * @return CSS to apply.
+     * @returns CSS to apply.
      */
     getStyle(siteId?: string, config?: CoreSitePublicConfigResponse): string | Promise<string>;
 }
@@ -101,7 +101,7 @@ export class CoreStylesService {
         this.styleHandlers.push(styleHandler);
 
         // Sort them by priority, greatest go last because style loaded last it's more important.
-        this.styleHandlers = this.styleHandlers.sort((a, b) => a.priority! >= b.priority! ? 1 : -1);
+        this.styleHandlers = this.styleHandlers.sort((a, b) => a.priority >= b.priority ? 1 : -1);
     }
 
     /**
@@ -203,7 +203,7 @@ export class CoreStylesService {
      * @param handler Style handler.
      * @param disabled Whether the element should be disabled.
      * @param config Site public config.
-     * @return New element.
+     * @returns New element.
      */
     protected async setStyle(
         siteId: string,
@@ -218,10 +218,10 @@ export class CoreStylesService {
             contents = (await handler.getStyle(siteId, config)).trim();
         }
 
-        const hash = <string>Md5.hashAsciiStr(contents);
+        const hash = Md5.hashAsciiStr(contents);
 
         // Update the styles only if they have changed.
-        if (this.stylesEls[siteId!][handler.name] === hash) {
+        if (this.stylesEls[siteId][handler.name] === hash) {
             return;
         }
 
@@ -246,7 +246,7 @@ export class CoreStylesService {
      * Add a style element for a site and load the styles for that element. The style will be disabled.
      *
      * @param siteId Site ID.
-     * @return Promise resolved when added and loaded.
+     * @returns Promise resolved when added and loaded.
      */
     protected async addSite(siteId?: string): Promise<void> {
         if (!siteId || this.stylesEls[siteId]) {
@@ -278,8 +278,7 @@ export class CoreStylesService {
             this.disableStyleElement(style, true);
         });
 
-        // Set StatusBar properties.
-        CoreApp.setStatusBarColor();
+        CoreApp.setSystemUIColors();
     }
 
     /**
@@ -287,7 +286,7 @@ export class CoreStylesService {
      *
      * @param siteId Site Id.
      * @param sourceName Source or handler name.
-     * @return Element Id.
+     * @returns Element Id.
      */
     protected getStyleId(siteId: string, sourceName: string): string {
         return `${sourceName}-${siteId}`;
@@ -341,7 +340,7 @@ export class CoreStylesService {
                 this.disableStyleElementByName(siteId, sourceName, false);
             }
 
-            CoreApp.setStatusBarColor();
+            CoreApp.setSystemUIColors();
         }
     }
 
@@ -350,29 +349,28 @@ export class CoreStylesService {
      *
      * @param siteId Site ID. If not defined, current site.
      * @param disabled Whether loaded styles should be disabled.
-     * @return Promise resolved when styles are loaded.
+     * @returns Promise resolved when styles are loaded.
      */
     protected async load(siteId?: string, disabled = false): Promise<void> {
-        siteId = siteId || CoreSites.getCurrentSiteId();
+        const siteIdentifier = siteId || CoreSites.getCurrentSiteId();
 
-        if (!siteId || !this.stylesEls[siteId]) {
+        if (!siteIdentifier || !this.stylesEls[siteIdentifier]) {
             throw new CoreError('Cannot load styles, site not found: ${siteId}');
         }
 
-        this.logger.debug('Load site', siteId, disabled);
+        this.logger.debug('Load site', siteIdentifier, disabled);
 
         // Enable or disable the styles.
-        for (const sourceName in this.stylesEls[siteId]) {
-            this.disableStyleElementByName(siteId, sourceName, disabled);
+        for (const sourceName in this.stylesEls[siteIdentifier]) {
+            this.disableStyleElementByName(siteIdentifier, sourceName, disabled);
         }
 
         await CoreUtils.allPromises(this.styleHandlers.map(async (handler) => {
-            await this.setStyle(siteId!, handler, !!disabled);
+            await this.setStyle(siteIdentifier, handler, disabled);
         }));
 
         if (!disabled) {
-            // Set StatusBar properties.
-            CoreApp.setStatusBarColor();
+            CoreApp.setSystemUIColors();
         }
     }
 
@@ -380,7 +378,7 @@ export class CoreStylesService {
      * Load styles for a temporary site, given its public config. These styles aren't prefetched.
      *
      * @param config Site public config.
-     * @return Promise resolved when loaded.
+     * @returns Promise resolved when loaded.
      */
     protected async loadTmpStyles(config: CoreSitePublicConfigResponse): Promise<void> {
         // Create the style and add it to the header.
@@ -390,13 +388,13 @@ export class CoreStylesService {
             await this.setStyle(CoreStylesService.TMP_SITE_ID, handler, false, config);
         }));
 
-        CoreApp.setStatusBarColor();
+        CoreApp.setSystemUIColors();
     }
 
     /**
      * Preload the styles of the current site (stored in DB).
      *
-     * @return Promise resolved when loaded.
+     * @returns Promise resolved when loaded.
      */
     protected async preloadCurrentSite(): Promise<void> {
         const siteId = await CoreUtils.ignoreErrors(CoreSites.getStoredCurrentSiteId());
@@ -412,7 +410,7 @@ export class CoreStylesService {
     /**
      * Preload the styles of all the stored sites.
      *
-     * @return Promise resolved when loaded.
+     * @returns Promise resolved when loaded.
      */
     protected async preloadSites(): Promise<void> {
         const ids = await CoreSites.getSitesIds();
@@ -438,7 +436,7 @@ export class CoreStylesService {
             }
             delete this.stylesEls[siteId];
 
-            CoreApp.setStatusBarColor();
+            CoreApp.setSystemUIColors();
         }
     }
 
@@ -446,7 +444,7 @@ export class CoreStylesService {
      * Unload styles for a temporary site.
      */
     protected unloadTmpStyles(): void {
-        return this.removeSite(CoreStylesService.TMP_SITE_ID);
+        this.removeSite(CoreStylesService.TMP_SITE_ID);
     }
 
 }

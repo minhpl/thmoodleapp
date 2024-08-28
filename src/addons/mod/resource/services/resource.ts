@@ -14,7 +14,8 @@
 
 import { Injectable } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreCourse } from '@features/course/services/course';
 import { CoreCourseLogHelper } from '@features/course/services/log-helper';
 import { CoreFilepool } from '@services/filepool';
@@ -37,7 +38,7 @@ export class AddonModResourceProvider {
      * Get cache key for resource data WS calls.
      *
      * @param courseId Course ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getResourceCacheKey(courseId: number): string {
         return ROOT_CACHE_KEY + 'resource:' + courseId;
@@ -50,7 +51,7 @@ export class AddonModResourceProvider {
      * @param key Name of the property to check.
      * @param value Value to search.
      * @param options Other options.
-     * @return Promise resolved when the resource is retrieved.
+     * @returns Promise resolved when the resource is retrieved.
      */
     protected async getResourceDataByKey(
         courseId: number,
@@ -91,7 +92,7 @@ export class AddonModResourceProvider {
      * @param courseId Course ID.
      * @param cmId Course module ID.
      * @param options Other options.
-     * @return Promise resolved when the resource is retrieved.
+     * @returns Promise resolved when the resource is retrieved.
      */
     getResourceData(courseId: number, cmId: number, options: CoreSitesCommonWSOptions = {}): Promise<AddonModResourceResource> {
         return this.getResourceDataByKey(courseId, 'coursemodule', cmId, options);
@@ -103,7 +104,7 @@ export class AddonModResourceProvider {
      * @param moduleId The module ID.
      * @param courseId Course ID of the module.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateContent(moduleId: number, courseId: number, siteId?: string): Promise<void> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -120,9 +121,9 @@ export class AddonModResourceProvider {
     /**
      * Invalidates resource data.
      *
-     * @param courseid Course ID.
+     * @param courseId Course ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the data is invalidated.
+     * @returns Promise resolved when the data is invalidated.
      */
     async invalidateResourceData(courseId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -134,7 +135,7 @@ export class AddonModResourceProvider {
      * Return whether or not the plugin is enabled.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
+     * @returns Promise resolved with true if plugin is enabled, rejected or resolved with false otherwise.
      */
     async isPluginEnabled(siteId?: string): Promise<boolean> {
         const site = await CoreSites.getSite(siteId);
@@ -146,23 +147,19 @@ export class AddonModResourceProvider {
      * Report the resource as being viewed.
      *
      * @param id Module ID.
-     * @param name Name of the resource.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the WS call is successful.
+     * @returns Promise resolved when the WS call is successful.
      */
-    async logView(id: number, name?: string, siteId?: string): Promise<void> {
+    async logView(id: number, siteId?: string): Promise<void> {
         const params: AddonModResourceViewResourceWSParams = {
             resourceid: id,
         };
 
-        await CoreCourseLogHelper.logSingle(
+        await CoreCourseLogHelper.log(
             'mod_resource_view_resource',
             params,
             AddonModResourceProvider.COMPONENT,
             id,
-            name,
-            'resource',
-            {},
             siteId,
         );
     }
@@ -204,12 +201,20 @@ export type AddonModResourceResource = {
 };
 
 export type AddonModResourceCustomData = {
-    showsize?: boolean;
     filedetails?: {
-        size: number;
-        modifieddate: number;
-        uploadeddate: number;
+        isref?: boolean; // If file is a reference the 'size' or 'date' attribute can not be cached.
+        // If showsize is true.
+        size?: number; // Size in bytes.
+        // If showtype is true.
+        type?: string; // Mimetype description (already translated).
+        mimetype?: string; // @since LMS 3.7
+        extension?: string; // @since LMS 4.3
+        // If showdate is true.
+        modifieddate?: number; // Only if file has been modified.
+        uploadeddate?: number; // Only if file has NOT been modified.
+
     };
+    showsize?: boolean;
     showtype?: boolean;
     showdate?: boolean;
     printintro?: boolean;

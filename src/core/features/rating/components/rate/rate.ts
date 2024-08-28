@@ -23,7 +23,7 @@ import {
 } from '@features/rating/services/rating';
 import { CoreRatingOffline } from '@features/rating/services/rating-offline';
 import { CoreSites } from '@services/sites';
-import { CoreDomUtils } from '@services/utils/dom';
+import { CoreDomUtils, ToastDuration } from '@services/utils/dom';
 import { Translate } from '@singletons';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
 
@@ -69,7 +69,7 @@ export class CoreRatingRateComponent implements OnChanges, OnDestroy {
     }
 
     /**
-     * Detect changes on input properties.
+     * @inheritdoc
      */
     async ngOnChanges(): Promise<void> {
         this.item = (this.ratingInfo.ratings || []).find((rating) => rating.itemid == this.itemId);
@@ -125,6 +125,10 @@ export class CoreRatingRateComponent implements OnChanges, OnDestroy {
      * Send or save the user rating when changed.
      */
     async userRatingChanged(): Promise<void> {
+        if (this.rating === undefined) {
+            return;
+        }
+
         const modal = await CoreDomUtils.showModalLoading('core.sending', true);
 
         try {
@@ -137,13 +141,13 @@ export class CoreRatingRateComponent implements OnChanges, OnDestroy {
                 this.itemSetId,
                 this.courseId,
                 this.scaleId,
-                this.rating!,
+                this.rating,
                 this.userId,
                 this.aggregateMethod,
             );
 
             if (response === undefined) {
-                CoreDomUtils.showToast('core.datastoredoffline', true, 3000);
+                CoreDomUtils.showToast('core.datastoredoffline', true, ToastDuration.LONG);
             } else {
                 this.onUpdate.emit();
             }
@@ -155,7 +159,7 @@ export class CoreRatingRateComponent implements OnChanges, OnDestroy {
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         this.updateSiteObserver.off();

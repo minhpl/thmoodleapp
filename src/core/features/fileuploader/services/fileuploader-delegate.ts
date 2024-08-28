@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 
 import { CoreDelegate, CoreDelegateHandler } from '@classes/delegate';
 import { CoreEvents } from '@singletons/events';
@@ -33,14 +33,14 @@ export interface CoreFileUploaderHandler extends CoreDelegateHandler {
      * Given a list of mimetypes, return the ones that are supported by the handler.
      *
      * @param mimetypes List of mimetypes.
-     * @return Supported mimetypes.
+     * @returns Supported mimetypes.
      */
     getSupportedMimetypes(mimetypes: string[]): string[];
 
     /**
      * Get the data to display the handler.
      *
-     * @return Data.
+     * @returns Data.
      */
     getData(): CoreFileUploaderHandlerData;
 }
@@ -71,7 +71,7 @@ export interface CoreFileUploaderHandlerData {
      * @param upload Whether the file should be uploaded.
      * @param allowOffline True to allow selecting in offline, false to require connection.
      * @param mimetypes List of supported mimetypes. If undefined, all mimetypes supported.
-     * @return Promise resolved with the result of picking/uploading the file.
+     * @returns Promise resolved with the result of picking/uploading the file.
      */
     action?(
         maxSize?: number,
@@ -143,9 +143,9 @@ export interface CoreFileUploaderHandlerDataToReturn extends CoreFileUploaderHan
 export class CoreFileUploaderDelegateService extends CoreDelegate<CoreFileUploaderHandler> {
 
     constructor() {
-        super('CoreFileUploaderDelegate', true);
+        super('CoreFileUploaderDelegate');
 
-        CoreEvents.on(CoreEvents.LOGOUT, this.clearSiteHandlers.bind(this));
+        CoreEvents.on(CoreEvents.LOGOUT, () => this.clearSiteHandlers());
     }
 
     /**
@@ -159,7 +159,7 @@ export class CoreFileUploaderDelegateService extends CoreDelegate<CoreFileUpload
      * Get the handlers for the current site.
      *
      * @param mimetypes List of supported mimetypes. If undefined, all mimetypes supported.
-     * @return List of handlers data.
+     * @returns List of handlers data.
      */
     getHandlers(mimetypes?: string[]): CoreFileUploaderHandlerDataToReturn[] {
         const handlers: CoreFileUploaderHandlerDataToReturn[] = [];
@@ -189,7 +189,7 @@ export class CoreFileUploaderDelegateService extends CoreDelegate<CoreFileUpload
         }
 
         // Sort them by priority.
-        handlers.sort((a, b) => a.priority! <= b.priority! ? 1 : -1);
+        handlers.sort((a, b) => (a.priority || 0) <= (b.priority || 0) ? 1 : -1);
 
         return handlers;
     }

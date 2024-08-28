@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { Component, OnInit } from '@angular/core';
-import { IonRefresher } from '@ionic/angular';
 
 import { CoreUser, CoreUserProfile } from '@features/user/services/user';
 import { CoreNavigator } from '@services/navigator';
@@ -26,6 +25,8 @@ import {
     AddonModH5PActivityData,
     AddonModH5PActivityUserAttempts,
 } from '../../services/h5pactivity';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
 
 /**
  * Page that displays user attempts of a certain user.
@@ -46,7 +47,28 @@ export class AddonModH5PActivityUserAttemptsPage implements OnInit {
     isCurrentUser = false;
 
     protected userId!: number;
-    protected fetchSuccess = false;
+    protected logView: () => void;
+
+    constructor() {
+        this.logView = CoreTime.once(async () => {
+            if (!this.h5pActivity) {
+                return;
+            }
+
+            await CoreUtils.ignoreErrors(AddonModH5PActivity.logViewReport(
+                this.h5pActivity.id,
+                { userId: this.userId },
+            ));
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: 'mod_h5pactivity_log_report_viewed',
+                name: this.h5pActivity.name,
+                data: { id: this.h5pActivity.id, userid: this.userId, category: 'h5pactivity' },
+                url: `/mod/h5pactivity/report.php?a=${this.h5pActivity.id}&userid=${this.userId}`,
+            });
+        });
+    }
 
     /**
      * @inheritdoc
@@ -74,7 +96,7 @@ export class AddonModH5PActivityUserAttemptsPage implements OnInit {
      *
      * @param refresher Refresher.
      */
-    doRefresh(refresher: IonRefresher): void {
+    doRefresh(refresher: HTMLIonRefresherElement): void {
         this.refreshData().finally(() => {
             refresher.complete();
         });
@@ -83,7 +105,7 @@ export class AddonModH5PActivityUserAttemptsPage implements OnInit {
     /**
      * Get quiz data and attempt data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchData(): Promise<void> {
         try {
@@ -94,14 +116,7 @@ export class AddonModH5PActivityUserAttemptsPage implements OnInit {
                 this.fetchUserProfile(),
             ]);
 
-            if (!this.fetchSuccess) {
-                this.fetchSuccess = true;
-                CoreUtils.ignoreErrors(AddonModH5PActivity.logViewReport(
-                    this.h5pActivity.id,
-                    this.h5pActivity.name,
-                    { userId: this.userId },
-                ));
-            }
+            this.logView();
         } catch (error) {
             CoreDomUtils.showErrorModalDefault(error, 'Error loading attempts.');
         } finally {
@@ -112,7 +127,7 @@ export class AddonModH5PActivityUserAttemptsPage implements OnInit {
     /**
      * Get attempts.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchAttempts(): Promise<void> {
         if (!this.h5pActivity) {
@@ -128,12 +143,12 @@ export class AddonModH5PActivityUserAttemptsPage implements OnInit {
     /**
      * Get user profile.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchUserProfile(): Promise<void> {
         try {
             this.user = await CoreUser.getProfile(this.userId, this.courseId, true);
-        } catch (error) {
+        } catch {
             // Ignore errors.
         }
     }
@@ -141,7 +156,7 @@ export class AddonModH5PActivityUserAttemptsPage implements OnInit {
     /**
      * Refresh the data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshData(): Promise<void> {
         const promises = [

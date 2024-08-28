@@ -13,9 +13,9 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { ActivatedRoute, ActivatedRouteSnapshot, Params } from '@angular/router';
+import { ActivatedRoute, ActivatedRouteSnapshot, Data, NavigationEnd, Params, UrlSegment } from '@angular/router';
 
-import { NavigationOptions } from '@ionic/angular/providers/nav-controller';
+import { NavigationOptions } from '@ionic/angular/common/providers/nav-controller';
 
 import { CoreConstants } from '@/core/constants';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -27,9 +27,12 @@ import { CoreUrlUtils } from '@services/utils/url';
 import { CoreTextUtils } from '@services/utils/text';
 import { makeSingleton, NavController, Router } from '@singletons';
 import { CoreScreen } from './screen';
-import { CoreApp } from './app';
 import { CoreError } from '@classes/errors/error';
 import { CoreMainMenuDelegate } from '@features/mainmenu/services/mainmenu-delegate';
+import { CorePlatform } from '@services/platform';
+import { filter } from 'rxjs/operators';
+import { CorePromisedValue } from '@classes/promised-value';
+import { BehaviorSubject } from 'rxjs';
 
 /**
  * Redirect payload.
@@ -79,7 +82,7 @@ export class CoreNavigatorService {
      * Check whether the active route is using the given path.
      *
      * @param path Path, can be a glob pattern.
-     * @return Whether the active route is using the given path.
+     * @returns Whether the active route is using the given path.
      */
     isCurrent(path: string): boolean {
         return CoreTextUtils.matchesGlob(this.getCurrentPath(), path);
@@ -88,7 +91,7 @@ export class CoreNavigatorService {
     /**
      * Get current main menu tab.
      *
-     * @return Current main menu tab or null if the current route is not using the main menu.
+     * @returns Current main menu tab or null if the current route is not using the main menu.
      */
     getCurrentMainMenuTab(): string | null {
         return this.getMainMenuTabFromPath(this.getCurrentPath());
@@ -98,7 +101,7 @@ export class CoreNavigatorService {
      * Get main menu tab from a path.
      *
      * @param path The path to check.
-     * @return Path's main menu tab or null if the path is not using the main menu.
+     * @returns Path's main menu tab or null if the path is not using the main menu.
      */
     getMainMenuTabFromPath(path: string): string | null {
         const matches = /^\/main\/([^/]+).*$/.exec(path);
@@ -110,7 +113,7 @@ export class CoreNavigatorService {
      * Returns if a section is loaded on the split view (tablet mode).
      *
      * @param path Path, can be a glob pattern.
-     * @return Whether the active route is using the given path.
+     * @returns Whether the active route is using the given path.
      */
     isCurrentPathInTablet(path: string): boolean {
         if (CoreScreen.isMobile) {
@@ -126,7 +129,7 @@ export class CoreNavigatorService {
      *
      * @param path Path to navigate to.
      * @param options Navigation options.
-     * @return Whether navigation suceeded.
+     * @returns Whether navigation suceeded.
      */
     async navigate(path: string, options: CoreNavigationOptions = {}): Promise<boolean> {
         const url: string[] = [/^[./]/.test(path) ? path : `./${path}`];
@@ -134,7 +137,7 @@ export class CoreNavigatorService {
             animated: options.animated,
             animation: options.animation,
             animationDirection: options.animationDirection,
-            queryParams: CoreObject.isEmpty(options.params ?? {}) ? null : CoreObject.withoutEmpty(options.params),
+            queryParams: CoreObject.isEmpty(options.params ?? {}) ? null : CoreObject.withoutEmpty(options.params ?? {}),
             relativeTo: path.startsWith('/') ? null : this.getCurrentRoute(),
             replaceUrl: options.replace,
         });
@@ -161,7 +164,7 @@ export class CoreNavigatorService {
      * Navigate to the login credentials route.
      *
      * @param params Page params.
-     * @return Whether navigation suceeded.
+     * @returns Whether navigation suceeded.
      */
     async navigateToLoginCredentials(params: Params = {}): Promise<boolean> {
         // If necessary, open the previous path to keep the navigation history.
@@ -179,7 +182,7 @@ export class CoreNavigatorService {
      * Navigate to the home route of the current site.
      *
      * @param options Navigation options.
-     * @return Whether navigation suceeded.
+     * @returns Whether navigation suceeded.
      */
     async navigateToSiteHome(options: Omit<CoreNavigationOptions, 'reset'> & { siteId?: string } = {}): Promise<boolean> {
         const siteId = options.siteId ?? CoreSites.getCurrentSiteId();
@@ -198,7 +201,7 @@ export class CoreNavigatorService {
      *
      * @param path Site path to visit.
      * @param options Navigation and site options.
-     * @return Whether navigation suceeded.
+     * @returns Whether navigation suceeded.
      */
     async navigateToSitePath(
         path: string,
@@ -256,7 +259,7 @@ export class CoreNavigatorService {
     /**
      * Get the active route path.
      *
-     * @return Current path.
+     * @returns Current path.
      */
     getCurrentPath(): string {
         return CoreUrlUtils.removeUrlParams(Router.url);
@@ -267,7 +270,7 @@ export class CoreNavigatorService {
      *
      * @param name Name of the parameter.
      * @param route Current route.
-     * @return Value of the parameter, undefined if not found.
+     * @returns Value of the parameter, undefined if not found.
      */
     protected getRouteSnapshotParam<T = unknown>(name: string, route?: ActivatedRoute): T | undefined {
         if (!route) {
@@ -292,7 +295,7 @@ export class CoreNavigatorService {
      *
      * @param name Name of the parameter.
      * @param routeOptions Optional routeOptions to get the params or route value from. If missing, it will autodetect.
-     * @return Value of the parameter, undefined if not found.
+     * @returns Value of the parameter, undefined if not found.
      */
     getRouteParam<T = string>(name: string, routeOptions: CoreNavigatorCurrentRouteOptions = {}): T | undefined {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -318,7 +321,7 @@ export class CoreNavigatorService {
         // Remove the parameter from our map if it's in there.
         delete this.storedParams[value];
 
-        if (!CoreApp.isMobile() && !storedParam) {
+        if (!CorePlatform.isMobile() && !storedParam) {
             // Try to retrieve the param from local storage in browser.
             const storageParam = localStorage.getItem(value);
             if (storageParam) {
@@ -335,7 +338,7 @@ export class CoreNavigatorService {
      *
      * @param name Name of the parameter.
      * @param routeOptions Optional routeOptions to get the params or route value from. If missing, it will autodetect.
-     * @return Value of the parameter, undefined if not found.
+     * @returns Value of the parameter, undefined if not found.
      */
     getRouteNumberParam(name: string, routeOptions: CoreNavigatorCurrentRouteOptions = {}): number | undefined {
         const value = this.getRouteParam<string>(name, routeOptions);
@@ -349,7 +352,7 @@ export class CoreNavigatorService {
      *
      * @param name Name of the parameter.
      * @param routeOptions Optional routeOptions to get the params or route value from. If missing, it will autodetect.
-     * @return Value of the parameter, undefined if not found.
+     * @returns Value of the parameter, undefined if not found.
      */
     getRouteBooleanParam(name: string, routeOptions: CoreNavigatorCurrentRouteOptions = {}): boolean | undefined {
         const value = this.getRouteParam<string>(name, routeOptions);
@@ -378,7 +381,7 @@ export class CoreNavigatorService {
      *
      * @param name Name of the parameter.
      * @param routeOptions Optional routeOptions to get the params or route value from. If missing, it will autodetect.
-     * @return Value of the parameter, undefined if not found.
+     * @returns Value of the parameter, undefined if not found.
      */
     getRequiredRouteParam<T = unknown>(name: string, routeOptions: CoreNavigatorCurrentRouteOptions = {}): T {
         const value = this.getRouteParam<T>(name, routeOptions);
@@ -398,7 +401,7 @@ export class CoreNavigatorService {
      *
      * @param name Name of the parameter.
      * @param routeOptions Optional routeOptions to get the params or route value from. If missing, it will autodetect.
-     * @return Value of the parameter, undefined if not found.
+     * @returns Value of the parameter, undefined if not found.
      */
     getRequiredRouteNumberParam(name: string, routeOptions: CoreNavigatorCurrentRouteOptions = {}): number {
         const value = this.getRouteNumberParam(name, routeOptions);
@@ -418,7 +421,7 @@ export class CoreNavigatorService {
      *
      * @param name Name of the parameter.
      * @param routeOptions Optional routeOptions to get the params or route value from. If missing, it will autodetect.
-     * @return Value of the parameter, undefined if not found.
+     * @returns Value of the parameter, undefined if not found.
      */
     getRequiredRouteBooleanParam(name: string, routeOptions: CoreNavigatorCurrentRouteOptions = {}): boolean {
         const value = this.getRouteBooleanParam(name, routeOptions);
@@ -433,10 +436,10 @@ export class CoreNavigatorService {
     /**
      * Navigate back.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    back(): Promise<void> {
-        return NavController.pop();
+    async back(): Promise<void> {
+        await NavController.pop();
     }
 
     /**
@@ -446,7 +449,7 @@ export class CoreNavigatorService {
      *     - route: Parent route, if this isn't provided the current active route will be used.
      *     - pageComponent: Page component of the route to find, if this isn't provided the deepest route in the hierarchy
      *                      will be returned.
-     * @return Current activated route.
+     * @returns Current activated route.
      */
     getCurrentRoute(): ActivatedRoute;
     getCurrentRoute(options: CoreNavigatorCurrentRouteOptions): ActivatedRoute | null;
@@ -457,7 +460,7 @@ export class CoreNavigatorService {
             return route;
         }
 
-        if (routeData && CoreUtils.basicLeftCompare(routeData, route.snapshot.data, 3)) {
+        if (routeData && CoreUtils.basicLeftCompare(routeData, this.getRouteData(route), 3)) {
             return route;
         }
 
@@ -472,14 +475,14 @@ export class CoreNavigatorService {
      * Check whether a route is active within the current stack.
      *
      * @param route Route to check.
-     * @return Whether the route is active or not.
+     * @returns Whether the route is active or not.
      */
     isRouteActive(route: ActivatedRoute): boolean {
-        const routePath = this.getRouteFullPath(route.snapshot);
+        const routePath = this.getRouteFullPath(route);
         let activeRoute: ActivatedRoute | null = Router.routerState.root;
 
         while (activeRoute) {
-            if (this.getRouteFullPath(activeRoute.snapshot) === routePath) {
+            if (this.getRouteFullPath(activeRoute) === routePath) {
                 return true;
             }
 
@@ -515,7 +518,7 @@ export class CoreNavigatorService {
      * Get the number of times a route is repeated on the navigation stack.
      *
      * @param path Absolute route path.
-     * @return Route depth.
+     * @returns Route depth.
      */
     getRouteDepth(path: string): number {
         return this.routesDepth[path] ?? 0;
@@ -528,7 +531,7 @@ export class CoreNavigatorService {
      *
      * @param path Main menu path.
      * @param options Navigation options.
-     * @return Whether navigation suceeded.
+     * @returns Whether navigation suceeded.
      */
     protected async navigateToMainMenuPath(path: string, options: CoreNavigationOptions = {}): Promise<boolean> {
         options = {
@@ -562,6 +565,13 @@ export class CoreNavigatorService {
             return this.navigate(`/main/${path}`, options);
         }
 
+        if (this.isCurrent('/main')) {
+            // Main menu is loaded, but no tab selected yet. Wait for a tab to be loaded.
+            await this.waitForMainMenuTab();
+
+            return this.navigate(`/main/${this.getCurrentMainMenuTab()}/${path}`, options);
+        }
+
         // Open the path within in main menu.
         return this.navigate('/main', {
             ...options,
@@ -575,7 +585,7 @@ export class CoreNavigatorService {
     /**
      * Get the first page path using priority.
      *
-     * @return Landing page path.
+     * @returns Landing page path.
      */
     protected getLandingTabPage(): string {
         if (!CoreMainMenuDelegate.areHandlersLoaded()) {
@@ -604,7 +614,7 @@ export class CoreNavigatorService {
             this.storedParams[id] = value;
             queryParams[name] = id;
 
-            if (!CoreApp.isMobile()) {
+            if (!CorePlatform.isMobile()) {
                 // In browser, save the param in local storage to be able to retrieve it if the app is refreshed.
                 localStorage.setItem(id, JSON.stringify(value));
             }
@@ -613,6 +623,8 @@ export class CoreNavigatorService {
 
     /**
      * Get an ID for a new parameter.
+     *
+     * @returns New param Id.
      */
     protected getNewParamId(): string {
         return 'param-' + (++this.lastParamId);
@@ -637,15 +649,15 @@ export class CoreNavigatorService {
      * Get the full path of a certain route, including parent routes paths.
      *
      * @param route Route snapshot.
-     * @return Path.
+     * @returns Path.
      */
-    getRouteFullPath(route: ActivatedRouteSnapshot | null): string {
+    getRouteFullPath(route: ActivatedRouteSnapshot | ActivatedRoute | null): string {
         if (!route) {
             return '';
         }
 
-        const parentPath = this.getRouteFullPath(route.parent);
-        const routePath = route.url.join('/');
+        const parentPath = this.getRouteFullPath(this.getRouteParent(route));
+        const routePath = this.getRouteUrl(route).join('/');
 
         if (!parentPath && !routePath) {
             return '';
@@ -659,12 +671,139 @@ export class CoreNavigatorService {
     }
 
     /**
+     * Given a route, get url segments.
+     *
+     * @param route Route.
+     * @returns Url segments.
+     */
+    getRouteUrl(route: ActivatedRouteSnapshot | ActivatedRoute): UrlSegment[] {
+        return this.getRouteProperty(route, 'url', []);
+    }
+
+    /**
+     * Given a route, get its parent.
+     *
+     * @param route Route.
+     * @returns Parent.
+     */
+    getRouteParent(route: ActivatedRouteSnapshot | ActivatedRoute): ActivatedRouteSnapshot | ActivatedRoute | null {
+        return this.getRouteProperty(route, 'parent', null);
+    }
+
+    /**
+     * Given a route, get its data.
+     *
+     * @param route Route.
+     * @returns Data.
+     */
+    getRouteData(route: ActivatedRouteSnapshot | ActivatedRoute): Data {
+        return this.getRouteProperty(route, 'data', {});
+    }
+
+    /**
+     * Given a route, get its params.
+     *
+     * @param route Route.
+     * @returns Params.
+     */
+    getRouteParams(route: ActivatedRouteSnapshot | ActivatedRoute): Params {
+        return this.getRouteProperty(route, 'params', {});
+    }
+
+    /**
+     * Given a route, get its query params.
+     *
+     * @param route Route.
+     * @returns Query params.
+     */
+    getRouteQueryParams(route: ActivatedRouteSnapshot | ActivatedRoute): Params {
+        return this.getRouteProperty(route, 'queryParams', {});
+    }
+
+    /**
      * Check if the current route page can block leaving the route.
      *
-     * @return Whether the current route page can block leaving the route.
+     * @returns Whether the current route page can block leaving the route.
      */
     currentRouteCanBlockLeave(): boolean {
-        return !!this.getCurrentRoute().snapshot.routeConfig?.canDeactivate?.length;
+        return !!this.getCurrentRoute().snapshot?.routeConfig?.canDeactivate?.length;
+    }
+
+    /**
+     * Wait for a main menu tab route to be loaded.
+     *
+     * @returns Promise resolved when the route is loaded.
+     */
+    protected waitForMainMenuTab(): Promise<void> {
+        if (this.getCurrentMainMenuTab()) {
+            return Promise.resolve();
+        }
+
+        const promise = new CorePromisedValue<void>();
+
+        const navSubscription = Router.events
+            .pipe(filter(event => event instanceof NavigationEnd))
+            .subscribe(() => {
+                if (this.getCurrentMainMenuTab()) {
+                    navSubscription?.unsubscribe();
+                    promise.resolve();
+                }
+            });
+
+        return promise;
+    }
+
+    /**
+     * Get the relative path to a parent path.
+     * E.g. if parent path is '/foo' and current path is '/foo/bar/baz' it will return '../../'.
+     *
+     * @param parentPath Parent path.
+     * @returns Relative path to the parent, empty if same path or parent path not found.
+     * @todo If messaging is refactored to use list managers, this function might not be needed anymore.
+     */
+    getRelativePathToParent(parentPath: string): string {
+        // Add an ending slash to avoid collisions with other routes (e.g. /foo and /foobar).
+        parentPath = CoreTextUtils.addEndingSlash(parentPath);
+
+        const path = this.getCurrentPath();
+        const parentRouteIndex = path.indexOf(parentPath);
+        if (parentRouteIndex === -1) {
+            return '';
+        }
+
+        const depth = (path.substring(parentRouteIndex + parentPath.length - 1).match(/\//g) ?? []).length;
+
+        return '../'.repeat(depth);
+    }
+
+    /**
+     * Given a route, get one of its properties.
+     *
+     * @param route Route.
+     * @param property Route property.
+     * @param defaultValue Fallback value if the property is not set.
+     * @returns Property value.
+     */
+    private getRouteProperty<T extends keyof ActivatedRouteSnapshot>(
+        route: ActivatedRouteSnapshot | ActivatedRoute,
+        property: T,
+        defaultValue: ActivatedRouteSnapshot[T],
+    ): ActivatedRouteSnapshot[T]  {
+        if (route instanceof ActivatedRouteSnapshot) {
+            return route[property];
+        }
+
+        if (route.snapshot instanceof ActivatedRouteSnapshot) {
+            return route.snapshot[property];
+        }
+
+        const propertyObservable = route[property];
+
+        if (propertyObservable instanceof BehaviorSubject) {
+            return propertyObservable.value;
+        }
+
+        return defaultValue;
     }
 
 }

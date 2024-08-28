@@ -15,7 +15,7 @@
 import { Directive, Input, OnInit, ElementRef, Optional } from '@angular/core';
 import { Md5 } from 'ts-md5';
 
-import { CoreSiteWSPreSets } from '@classes/site';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
 import { CoreNavigator } from '@services/navigator';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreSitePluginsPluginContentComponent } from '../components/plugin-content/plugin-content';
@@ -70,7 +70,7 @@ export class CoreSitePluginsNewContentDirective implements OnInit {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
         this.element.addEventListener('click', (ev: Event): void => {
@@ -98,7 +98,7 @@ export class CoreSitePluginsNewContentDirective implements OnInit {
             } else {
                 const component = this.component || this.parentContent?.component;
                 const method = this.method || this.parentContent?.method;
-                const hash = <string> Md5.hashAsciiStr(JSON.stringify(args));
+                const hash = Md5.hashAsciiStr(JSON.stringify(args));
 
                 CoreNavigator.navigateToSitePath(`siteplugins/content/${component}/${method}/${hash}`, {
                     params: {

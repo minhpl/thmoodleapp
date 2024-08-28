@@ -18,6 +18,8 @@ import { CoreDelegate, CoreDelegateHandler } from '@classes/delegate';
 import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton } from '@singletons';
 import { AddonModQuizAttemptWSData, AddonModQuizQuizWSData } from './quiz';
+import { CoreSites } from '@services/sites';
+import { ADDON_MOD_QUIZ_FEATURE_NAME } from '../constants';
 
 /**
  * Interface that all access rules handlers must implement.
@@ -36,7 +38,7 @@ export interface AddonModQuizAccessRuleHandler extends CoreDelegateHandler {
      * @param attempt The attempt started/continued. If not supplied, user is starting a new attempt.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Whether the rule requires a preflight check.
+     * @returns Whether the rule requires a preflight check.
      */
     isPreflightCheckRequired(
         quiz: AddonModQuizQuizWSData,
@@ -53,7 +55,7 @@ export interface AddonModQuizAccessRuleHandler extends CoreDelegateHandler {
      * @param attempt The attempt started/continued. If not supplied, user is starting a new attempt.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done if async, void if it's synchronous.
+     * @returns Promise resolved when done if async, void if it's synchronous.
      */
     getFixedPreflightData?(
         quiz: AddonModQuizQuizWSData,
@@ -68,7 +70,7 @@ export interface AddonModQuizAccessRuleHandler extends CoreDelegateHandler {
      * Implement this if your access rule requires a preflight check with user interaction.
      * It's recommended to return the class of the component, but you can also return an instance of the component.
      *
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @returns The component (or promise resolved with component) to use, undefined if not found.
      */
     getPreflightComponent?(): undefined | Type<unknown> | Promise<Type<unknown>>;
 
@@ -80,7 +82,7 @@ export interface AddonModQuizAccessRuleHandler extends CoreDelegateHandler {
      * @param preflightData Preflight data gathered.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done if async, void if it's synchronous.
+     * @returns Promise resolved when done if async, void if it's synchronous.
      */
     notifyPreflightCheckPassed?(
         quiz: AddonModQuizQuizWSData,
@@ -98,7 +100,7 @@ export interface AddonModQuizAccessRuleHandler extends CoreDelegateHandler {
      * @param preflightData Preflight data gathered.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done if async, void if it's synchronous.
+     * @returns Promise resolved when done if async, void if it's synchronous.
      */
     notifyPreflightCheckFailed?(
         quiz: AddonModQuizQuizWSData,
@@ -114,7 +116,7 @@ export interface AddonModQuizAccessRuleHandler extends CoreDelegateHandler {
      * @param attempt The attempt.
      * @param endTime The attempt end time (in seconds).
      * @param timeNow The current time in seconds.
-     * @return Whether it should be displayed.
+     * @returns Whether it should be displayed.
      */
     shouldShowTimeLeft?(attempt: AddonModQuizAttemptWSData, endTime: number, timeNow: number): boolean;
 }
@@ -128,14 +130,21 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
     protected handlerNameProperty = 'ruleName';
 
     constructor() {
-        super('AddonModQuizAccessRulesDelegate', true);
+        super('AddonModQuizAccessRulesDelegate');
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async isEnabled(): Promise<boolean> {
+        return !(await CoreSites.isFeatureDisabled(ADDON_MOD_QUIZ_FEATURE_NAME));
     }
 
     /**
      * Get the handler for a certain rule.
      *
      * @param ruleName Name of the access rule.
-     * @return Handler. Undefined if no handler found for the rule.
+     * @returns Handler. Undefined if no handler found for the rule.
      */
     getAccessRuleHandler(ruleName: string): AddonModQuizAccessRuleHandler {
         return this.getHandler(ruleName, true);
@@ -150,7 +159,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * @param attempt The attempt started/continued. If not supplied, user is starting a new attempt.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when all the data has been gathered.
+     * @returns Promise resolved when all the data has been gathered.
      */
     async getFixedPreflightData(
         rules: string[],
@@ -171,7 +180,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * Get the Component to use to display the access rule preflight.
      *
      * @param rule Rule.
-     * @return Promise resolved with the component to use, undefined if not found.
+     * @returns Promise resolved with the component to use, undefined if not found.
      */
     getPreflightComponent(rule: string): Promise<Type<unknown> | undefined> {
         return Promise.resolve(this.executeFunctionOnEnabled(rule, 'getPreflightComponent', []));
@@ -181,7 +190,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * Check if an access rule is supported.
      *
      * @param ruleName Name of the rule.
-     * @return Whether it's supported.
+     * @returns Whether it's supported.
      */
     isAccessRuleSupported(ruleName: string): boolean {
         return this.hasHandler(ruleName, true);
@@ -195,7 +204,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * @param attempt The attempt started/continued. If not supplied, user is starting a new attempt.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: whether it's required.
+     * @returns Promise resolved with boolean: whether it's required.
      */
     async isPreflightCheckRequired(
         rules: string[],
@@ -224,7 +233,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * @param attempt The attempt started/continued. If not supplied, user is starting a new attempt.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with boolean: whether it's required.
+     * @returns Promise resolved with boolean: whether it's required.
      */
     async isPreflightCheckRequiredForRule(
         rule: string,
@@ -247,7 +256,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * @param preflightData Preflight data gathered.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async notifyPreflightCheckPassed(
         rules: string[],
@@ -277,7 +286,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * @param preflightData Preflight data gathered.
      * @param prefetch Whether the user is prefetching the quiz.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async notifyPreflightCheckFailed(
         rules: string[],
@@ -305,7 +314,7 @@ export class AddonModQuizAccessRuleDelegateService extends CoreDelegate<AddonMod
      * @param attempt The attempt.
      * @param endTime The attempt end time (in seconds).
      * @param timeNow The current time in seconds.
-     * @return Whether it should be displayed.
+     * @returns Whether it should be displayed.
      */
     shouldShowTimeLeft(rules: string[], attempt: AddonModQuizAttemptWSData, endTime: number, timeNow: number): boolean {
         rules = rules || [];

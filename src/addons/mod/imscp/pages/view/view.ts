@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { Component, OnInit } from '@angular/core';
 import { CoreError } from '@classes/errors/error';
 import { CoreNavigationBarItem } from '@components/navigation-bar/navigation-bar';
@@ -20,8 +20,7 @@ import { CoreCourseResourceDownloadResult } from '@features/course/classes/main-
 import { CoreCourse } from '@features/course/services/course';
 import { CoreCourseModuleData } from '@features/course/services/course-helper';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
-import { IonRefresher } from '@ionic/angular';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { CoreNavigator } from '@services/navigator';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreTextUtils } from '@services/utils/text';
@@ -76,7 +75,7 @@ export class AddonModImscpViewPage implements OnInit {
      * Download IMSCP contents and load the current item.
      *
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchContent(refresh = false): Promise<void> {
         try {
@@ -140,7 +139,7 @@ export class AddonModImscpViewPage implements OnInit {
     /**
      * Load IMSCP data from WS.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async loadImscpData(): Promise<{ module: CoreCourseModuleData; imscp: AddonModImscpImscp }> {
         this.module = await CoreCourse.getModule(this.cmId, this.courseId);
@@ -157,8 +156,9 @@ export class AddonModImscpViewPage implements OnInit {
      * If the download call fails the promise won't be rejected, but the error will be included in the returned object.
      * If module.contents cannot be loaded then the Promise will be rejected.
      *
+     * @param module Module data.
      * @param refresh Whether we're refreshing data.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async downloadResourceIfNeeded(
         module: CoreCourseModuleData,
@@ -173,7 +173,7 @@ export class AddonModImscpViewPage implements OnInit {
         // Get module status to determine if it needs to be downloaded.
         const status = await CoreCourseModulePrefetchDelegate.getModuleStatus(module, this.courseId, undefined, refresh);
 
-        if (status !== CoreConstants.DOWNLOADED) {
+        if (status !== DownloadStatus.DOWNLOADED) {
             // Download content. This function also loads module contents if needed.
             try {
                 await CoreCourseModulePrefetchDelegate.downloadModule(module, this.courseId);
@@ -189,7 +189,7 @@ export class AddonModImscpViewPage implements OnInit {
 
         if (!module.contents?.length || (refresh && !contentsAlreadyLoaded)) {
             // Try to load the contents.
-            const ignoreCache = refresh && CoreApp.isOnline();
+            const ignoreCache = refresh && CoreNetwork.isOnline();
 
             try {
                 await CoreCourse.loadModuleContents(module, undefined, undefined, false, ignoreCache);
@@ -211,9 +211,9 @@ export class AddonModImscpViewPage implements OnInit {
      * Refresh the data.
      *
      * @param refresher Refresher.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    async doRefresh(refresher?: IonRefresher): Promise<void> {
+    async doRefresh(refresher?: HTMLIonRefresherElement): Promise<void> {
         await CoreUtils.ignoreErrors(Promise.all([
             AddonModImscp.invalidateContent(this.cmId, this.courseId),
             CoreCourseModulePrefetchDelegate.invalidateCourseUpdates(this.courseId), // To detect if IMSCP was updated.
@@ -228,7 +228,7 @@ export class AddonModImscpViewPage implements OnInit {
      * Loads an item.
      *
      * @param itemHref Item Href.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async loadItemHref(itemHref: string): Promise<void> {
         if (!this.module) {

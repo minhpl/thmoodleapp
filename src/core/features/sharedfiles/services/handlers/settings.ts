@@ -15,7 +15,7 @@
 import { Injectable } from '@angular/core';
 import { CoreSettingsHandler, CoreSettingsHandlerData } from '@features/settings/services/settings-delegate';
 import { SHAREDFILES_PAGE_NAME } from '@features/sharedfiles/sharedfiles.module';
-import { CoreApp } from '@services/app';
+import { CorePlatform } from '@services/platform';
 import { makeSingleton } from '@singletons';
 
 /**
@@ -30,16 +30,16 @@ export class CoreSharedFilesSettingsHandlerService implements CoreSettingsHandle
     /**
      * Check if the handler is enabled on a site level.
      *
-     * @return Whether or not the handler is enabled on a site level.
+     * @returns Whether or not the handler is enabled on a site level.
      */
     async isEnabled(): Promise<boolean> {
-        return CoreApp.isIOS();
+        return CorePlatform.isIOS();
     }
 
     /**
      * Returns the data needed to render the handler.
      *
-     * @return Data needed to render the handler.
+     * @returns Data needed to render the handler.
      */
     getDisplayData(): CoreSettingsHandlerData {
         return {

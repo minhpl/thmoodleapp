@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { ContextLevel } from '@/core/constants';
 import { Component, Input, OnDestroy, OnInit, ElementRef, OnChanges, ViewChild, SimpleChange } from '@angular/core';
 import { CoreFilter } from '@features/filter/services/filter';
 import { CoreFilterHelper } from '@features/filter/services/filter-helper';
 import { CoreUtils } from '@services/utils/utils';
-import { Chart, ChartLegendLabelItem, ChartLegendOptions } from 'chart.js';
+import { ChartLegendLabelItem, ChartLegendOptions } from 'chart.js';
 
 /**
  * This component shows a chart using chart.js.
@@ -50,7 +51,7 @@ export class CoreChartComponent implements OnDestroy, OnInit, OnChanges {
     @Input() legend?: ChartLegendOptions; // Legend options.
     @Input() height = 300; // Height of the chart element.
     @Input() filter?: boolean | string; // Whether to filter labels. If not defined, true if contextLevel and instanceId are set.
-    @Input() contextLevel?: string; // The context level of the text.
+    @Input() contextLevel?: ContextLevel; // The context level of the text.
     @Input() contextInstanceId?: number; // The instance ID related to the context.
     @Input() courseId?: number; // Course ID the text belongs to. It can be used to improve performance with filters.
     @Input() wsNotFiltered?: boolean | string; // If true it means the WS didn't filter the labels for some reason.
@@ -71,11 +72,11 @@ export class CoreChartComponent implements OnDestroy, OnInit, OnChanges {
                     generateLabels: (chart: Chart): ChartLegendLabelItem[] => {
                         const data = chart.data;
                         if (data.labels?.length) {
-                            const datasets = data.datasets![0];
+                            const datasets = data.datasets?.[0];
 
-                            return data.labels.map((label, i) => ({
-                                text: label + ': ' + datasets.data![i],
-                                fillStyle: datasets.backgroundColor![i],
+                            return data.labels.map<ChartLegendLabelItem>((label, i) => ({
+                                text: label + ': ' + datasets?.data?.[i],
+                                fillStyle: datasets?.backgroundColor?.[i],
                             }));
                         }
 
@@ -87,14 +88,20 @@ export class CoreChartComponent implements OnDestroy, OnInit, OnChanges {
             legend = Object.assign({}, this.legend);
         }
 
-        if (this.type == 'bar' && this.data.length >= 5) {
+        if (this.type === 'bar' && this.data.length >= 5) {
             this.type = 'horizontalBar';
         }
 
         // Format labels if needed.
         await this.formatLabels();
 
-        const context = this.canvas!.nativeElement.getContext('2d')!;
+        const context = this.canvas?.nativeElement.getContext('2d');
+        if (!context) {
+            return;
+        }
+
+        const { Chart } = await import('./chart.lazy');
+
         this.chart = new Chart(context, {
             type: this.type,
             data: {
@@ -123,7 +130,11 @@ export class CoreChartComponent implements OnDestroy, OnInit, OnChanges {
             await this.formatLabels();
         }
 
-        this.chart.data.datasets![0] = {
+        if (!this.chart.data.datasets) {
+            this.chart.data.datasets = [];
+        }
+
+        this.chart.data.datasets[0] = {
             data: this.data,
             backgroundColor: this.getRandomColors(this.data.length),
         };
@@ -136,7 +147,7 @@ export class CoreChartComponent implements OnDestroy, OnInit, OnChanges {
     /**
      * Format labels if needed.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async formatLabels(): Promise<void> {
         if (!this.contextLevel || !this.contextInstanceId || this.filter === false) {
@@ -161,7 +172,7 @@ export class CoreChartComponent implements OnDestroy, OnInit, OnChanges {
      * Generate random colors if needed.
      *
      * @param n Number of colors needed.
-     * @return Array with the number of background colors requested.
+     * @returns Array with the number of background colors requested.
      */
     protected getRandomColors(n: number): string[] {
         while (CoreChartComponent.backgroundColors.length < n) {

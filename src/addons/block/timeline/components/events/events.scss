@@ -1,16 +1,11 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 h3 {
-    font-weight: bold;
-    font-size: 18px;
+    font: var(--mdl-typography-heading5-font);
 }
 
 h4 {
-    font-size: 15px;
-}
-
-h4.core-bold {
-    font-weight: bold;
+    font: var(--mdl-typography-heading6-font);
 }
 
 .addon-block-timeline-activity {
@@ -23,9 +18,19 @@ h4.core-bold {
     }
 
     core-mod-icon {
-        padding: 8px;
+        --module-legacy-icon-padding: 8px;
         --margin-end: 0.5rem;
         --margin-vertical: 0;
+    }
+
+    ion-label {
+        display: flex;
+        flex-direction: column;
+
+        .addon-block-timeline-activity-action {
+            display: flex;
+            justify-content: flex-end;
+        }
     }
 }
 
@@ -33,49 +38,18 @@ h4.core-bold {
     flex-grow: 0;
 }
 
-.addon-block-timeline-activity-action {
-    display: flex;
-    justify-content: flex-end;
-}
-
-.addon-block-timeline-activity-name-with-status {
-    display: flex;
-    flex-wrap: wrap;
-    span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-}
-
-.addon-block-timeline-activity-course-activity {
-    display: flex;
-    flex-wrap: wrap;
-    span {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    span::after {
-        content: "·";
-        display: inline;
-        padding-left: .3rem;
-        padding-right: .3rem;
-    }
-
-    span:last-child::after {
-        display: none;
-    }
-}
-
-.addon-block-timeline-activity-main,
-.addon-block-timeline-activity-name {
-    flex-grow: 1;
-    p {
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-}
-
 .addon-block-timeline-activity-name {
     flex-grow: 1;
     overflow: hidden;
+
+    & > p {
+        display: flex;
+        flex-wrap: wrap;
+
+        & > span {
+            @include ellipsis();
+        }
+
+    }
+
 }

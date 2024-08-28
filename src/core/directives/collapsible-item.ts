@@ -19,7 +19,7 @@ import { CoreSettingsHelper } from '@features/settings/services/settings-helper'
 import { CoreUtils } from '@services/utils/utils';
 import { Translate } from '@singletons';
 import { CoreColors } from '@singletons/colors';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 import { CoreDom } from '@singletons/dom';
 import { CoreEventObserver } from '@singletons/events';
 import { Subscription } from 'rxjs';
@@ -64,7 +64,7 @@ export class CoreCollapsibleItemDirective implements OnInit, OnDestroy {
     constructor(el: ElementRef<HTMLElement>) {
         this.element = el.nativeElement;
 
-        this.element.addEventListener('click', this.elementClicked.bind(this));
+        this.element.addEventListener('click', (event) => this.elementClicked(event));
         this.uniqueId = 'collapsible-item-' + CoreUtils.getUniqueId('CoreCollapsibleItemDirective');
         this.element.id = this.uniqueId;
     }
@@ -116,7 +116,7 @@ export class CoreCollapsibleItemDirective implements OnInit, OnDestroy {
     /**
      * Wait until all <core-loading> children inside the page.
      *
-     * @return Promise resolved when loadings are done.
+     * @returns Promise resolved when loadings are done.
      */
     protected async waitLoadingsDone(): Promise<void> {
         this.domPromise = CoreDom.waitToBeInDOM(this.element);
@@ -128,14 +128,14 @@ export class CoreCollapsibleItemDirective implements OnInit, OnDestroy {
             return;
         }
 
-        await CoreComponentsRegistry.waitComponentsReady(this.page, 'core-loading', CoreLoadingComponent);
+        await CoreDirectivesRegistry.waitDirectivesReady(this.page, 'core-loading', CoreLoadingComponent);
     }
 
     /**
      * Wait until all <core-format-text> children inside the element are done rendering.
      */
     protected async waitFormatTextsRendered(): Promise<void> {
-        await CoreComponentsRegistry.waitComponentsReady(this.element, 'core-format-text', CoreFormatTextDirective);
+        await CoreDirectivesRegistry.waitDirectivesReady(this.element, 'core-format-text', CoreFormatTextDirective);
     }
 
     /**

@@ -1,22 +1,7 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
     --list-item-max-width: 600px;
-}
-
-.item-input:last-child {
-    margin-bottom: 20px;
-}
-
-.item {
-    &.core-login-need-help {
-        margin-top: 16px;
-    }
-    &.core-login-site-qrcode {
-        .item-inner {
-            border-bottom: 0;
-        }
-    }
 }
 
 .core-login-site-connect {
@@ -46,7 +31,7 @@
     }
     ion-icon {
         margin: 0 auto;
-        font-size: 35px;
+        font-size: #{dynamic-font(35px)};
         height: 50px;
     }
 }
@@ -95,7 +80,7 @@
     display: flex;
     align-content: center;
     align-items: center;
-    background-color: rgba(255, 255, 255, 0.5);
+    background-color: rgb(255 255 255 / 50%);
     z-index: 1;
     ion-spinner {
         margin: 0 auto;

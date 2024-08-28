@@ -17,7 +17,7 @@ import { Component } from '@angular/core';
 import { CoreConstants } from '@/core/constants';
 import { CoreSites } from '@services/sites';
 import { CoreNavigator } from '@services/navigator';
-import { CoreSite } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 
 /**
  * App settings about menu page.
@@ -36,6 +36,7 @@ export class CoreSettingsAboutPage {
     a11yStatement = CoreConstants.CONFIG.a11yStatement ?? 'https://apps.moodle.com/admin/tool/policy/view.php?versionid=5';
     currentSite?: CoreSite;
     showSurvey: boolean | undefined = false;
+    legalDisclaimer = CoreConstants.CONFIG.legalDisclaimer;
 
     constructor() {
         this.currentSite = CoreSites.getCurrentSite();

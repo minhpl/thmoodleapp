@@ -13,33 +13,50 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { Coordinates } from '@ionic-native/geolocation';
+import { Coordinates } from '@awesome-cordova-plugins/geolocation';
 
 import { CoreApp } from '@services/app';
 import { CoreAnyError, CoreError } from '@classes/errors/error';
-import { Geolocation, Diagnostic, makeSingleton } from '@singletons';
+import { Geolocation, makeSingleton } from '@singletons';
 import { CoreUtils } from './utils/utils';
+import { CorePlatform } from './platform';
+import { CoreSilentError } from '@classes/errors/silenterror';
+import { CoreSubscriptions } from '@singletons/subscriptions';
+import { CoreLogger } from '@singletons/logger';
+import { CoreNative } from '@features/native/services/native';
 
 @Injectable({ providedIn: 'root' })
 export class CoreGeolocationProvider {
+
+    protected logger: CoreLogger;
+
+    constructor() {
+        this.logger = CoreLogger.getInstance('CoreGeolocationProvider');
+    }
 
     /**
      * Get current user coordinates.
      *
      * @throws {CoreGeolocationError}
+     * @returns Promise resolved with the geolocation coordinates.
      */
     async getCoordinates(): Promise<Coordinates> {
         try {
+            this.logger.log('Getting coordinates.');
             await this.authorizeLocation();
             await this.enableLocation();
+            this.logger.log('Getting coordinates: authorized and enabled.');
 
             const result = await Geolocation.getCurrentPosition({
                 enableHighAccuracy: true,
                 timeout: 30000,
             });
+            this.logger.log('Coordinates retrieved');
 
             return result.coords;
         } catch (error) {
+            this.logger.log('Error getting coordinates.', error);
+
             if (this.isCordovaPermissionDeniedError(error)) {
                 throw new CoreGeolocationError(CoreGeolocationErrorReason.PERMISSION_DENIED);
             }
@@ -63,18 +80,24 @@ export class CoreGeolocationProvider {
      * @throws {CoreGeolocationError}
      */
     async enableLocation(): Promise<void> {
-        let locationEnabled = await Diagnostic.isLocationEnabled();
+        const diagnostic = CoreNative.plugin('diagnostic');
+
+        if (!diagnostic) {
+            return;
+        }
+
+        let locationEnabled = await diagnostic.isLocationEnabled();
 
         if (locationEnabled) {
             // Location is enabled.
             return;
         }
 
-        if (!CoreApp.isIOS()) {
-            Diagnostic.switchToLocationSettings();
+        if (!CorePlatform.isIOS()) {
+            diagnostic.switchToLocationSettings();
             await CoreApp.waitForResume(30000);
 
-            locationEnabled = await Diagnostic.isLocationEnabled();
+            locationEnabled = await diagnostic.isLocationEnabled();
         }
 
         if (!locationEnabled) {
@@ -89,22 +112,34 @@ export class CoreGeolocationProvider {
      * @throws {CoreGeolocationError}
      */
     protected async doAuthorizeLocation(failOnDeniedOnce: boolean = false): Promise<void> {
-        const authorizationStatus = await Diagnostic.getLocationAuthorizationStatus();
+        const diagnostic = await CoreNative.plugin('diagnostic')?.getInstance();
+
+        if (!diagnostic) {
+            return;
+        }
+
+        const authorizationStatus = await diagnostic.getLocationAuthorizationStatus();
+        this.logger.log(`Authorize location: status ${authorizationStatus}`);
+
         switch (authorizationStatus) {
-            case Diagnostic.permissionStatus.DENIED_ONCE:
+            case diagnostic.permissionStatus.granted:
+            case diagnostic.permissionStatus.grantedWhenInUse:
+                // Location is authorized.
+                return;
+
+            case diagnostic.permissionStatus.deniedOnce:
                 if (failOnDeniedOnce) {
                     throw new CoreGeolocationError(CoreGeolocationErrorReason.PERMISSION_DENIED);
                 }
+
             // Fall through.
-            case Diagnostic.permissionStatus.NOT_REQUESTED:
-                await Diagnostic.requestLocationAuthorization();
+            case diagnostic.permissionStatus.notRequested:
+                this.logger.log('Request location authorization.');
+                await this.requestLocationAuthorization();
+                this.logger.log('Location authorization granted.');
                 await CoreApp.waitForResume(500);
                 await this.doAuthorizeLocation(true);
 
-                return;
-            case Diagnostic.permissionStatus.GRANTED:
-            case Diagnostic.permissionStatus.GRANTED_WHEN_IN_USE:
-                // Location is authorized.
                 return;
             default:
                 throw new CoreGeolocationError(CoreGeolocationErrorReason.PERMISSION_DENIED);
@@ -115,6 +150,7 @@ export class CoreGeolocationProvider {
      * Check whether an error was caused by a PERMISSION_DENIED from the cordova plugin.
      *
      * @param error Error.
+     * @returns If error is a permission denied error.
      */
     protected isCordovaPermissionDeniedError(error?: CoreAnyError | GeolocationPositionError): boolean {
         return !!error &&
@@ -127,10 +163,35 @@ export class CoreGeolocationProvider {
     /**
      * Prechecks if it can request location services.
      *
-     * @return If location can be requested.
+     * @returns If location can be requested.
      */
     async canRequest(): Promise<boolean> {
-        return CoreUtils.promiseWorks(Diagnostic.getLocationAuthorizationStatus());
+        const diagnostic = CoreNative.plugin('diagnostic');
+
+        if (diagnostic) {
+            return CoreUtils.promiseWorks(diagnostic.getLocationAuthorizationStatus());
+        }
+
+        return false;
+    }
+
+    /**
+     * Request and return the location authorization status for the application.
+     */
+    protected async requestLocationAuthorization(): Promise<void> {
+        if (!CorePlatform.isIOS()) {
+            await CoreNative.plugin('diagnostic')?.requestLocationAuthorization();
+
+            return;
+        }
+
+        // In iOS, the modal disappears when the screen is locked and the promise never ends. Treat that case.
+        return new Promise((resolve, reject) => {
+            // Don't display an error if app is sent to the background, just finish the process.
+            const unsubscribe = CoreSubscriptions.once(CorePlatform.pause, () => reject(new CoreSilentError()));
+            CoreNative.plugin('diagnostic')?.requestLocationAuthorization()
+                .then(() => resolve(), reject).finally(() => unsubscribe());
+        });
     }
 
 }
@@ -164,4 +225,4 @@ interface GeolocationPositionError {
     PERMISSION_DENIED: number; // eslint-disable-line @typescript-eslint/naming-convention
     POSITION_UNAVAILABLE: number; // eslint-disable-line @typescript-eslint/naming-convention
     TIMEOUT: number; // eslint-disable-line @typescript-eslint/naming-convention
-};
+}

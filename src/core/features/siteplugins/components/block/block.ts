@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, OnChanges, ViewChild } from '@angular/core';
+import { Component, HostBinding, OnChanges, ViewChild } from '@angular/core';
 
 import { CoreBlockBaseComponent } from '@features/block/classes/base-block-component';
 import { CoreBlockDelegate } from '@features/block/services/block-delegate';
@@ -31,9 +31,10 @@ export class CoreSitePluginsBlockComponent extends CoreBlockBaseComponent implem
 
     @ViewChild(CoreSitePluginsPluginContentComponent) content?: CoreSitePluginsPluginContentComponent;
 
-    component?: string;
+    @HostBinding('class') component?: string;
     method?: string;
     args?: Record<string, unknown>;
+    jsData?: Record<string, unknown>; // Data to pass to the component.
     initResult?: CoreSitePluginsContent | null;
 
     constructor() {
@@ -62,15 +63,18 @@ export class CoreSitePluginsBlockComponent extends CoreBlockBaseComponent implem
             instanceid: this.instanceId,
             blockid: this.block.instanceid,
         };
+        this.jsData = {
+            block: this.block,
+        };
         this.initResult = handler.initResult;
     }
 
     /**
      * Invalidate block data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
-    protected async invalidateContent(): Promise<void> {
+    async invalidateContent(): Promise<void> {
         if (!this.component || !this.method) {
             return;
         }

@@ -18,6 +18,7 @@ import { CoreFormFields } from '@singletons/form';
 import { makeSingleton, Translate } from '@singletons';
 import { AddonModDataFieldTextHandlerService } from '../../text/services/handler';
 import { AddonModDataFieldNumberComponent } from '../component/number';
+import type { AddonModDataFieldPluginBaseComponent } from '@addons/mod/data/classes/base-field-plugin-component';
 
 /**
  * Handler for number data field plugin.
@@ -31,7 +32,7 @@ export class AddonModDataFieldNumberHandlerService extends AddonModDataFieldText
     /**
      * @inheritdoc
      */
-    getComponent(): Type<unknown>{
+    getComponent(): Type<AddonModDataFieldPluginBaseComponent> {
         return AddonModDataFieldNumberComponent;
     }
 
@@ -44,17 +45,17 @@ export class AddonModDataFieldNumberHandlerService extends AddonModDataFieldText
         originalFieldData: AddonModDataEntryField,
     ): boolean {
         const fieldName = 'f_' + field.id;
-        const input = inputData[fieldName] || '';
-        const content = originalFieldData?.content || '';
+        const input = inputData[fieldName] ?? '';
+        const content = originalFieldData?.content ?? '';
 
-        return input != content;
+        return input !== content;
     }
 
     /**
      * @inheritdoc
      */
     getFieldsNotifications(field: AddonModDataField, inputData: AddonModDataSubfieldData[]): string | undefined {
-        if (field.required && (!inputData || !inputData.length || inputData[0].value == '')) {
+        if (field.required && (!inputData || !inputData.length || inputData[0].value === '')) {
             return Translate.instant('addon.mod_data.errormustsupplyvalue');
         }
     }

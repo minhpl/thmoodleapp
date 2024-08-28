@@ -1,4 +1,4 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 :host {
     .core-horizontal-scroll div.core-horizontal-scroll-item {
@@ -9,9 +9,7 @@
 
         .ion-text-wrap ion-label {
             .item-heading, h2, p {
-                white-space: nowrap;
-                overflow: hidden;
-                text-overflow: ellipsis;
+                @include ellipsis();
             }
         }
     }

@@ -22,6 +22,7 @@ import { CoreSitesReadingStrategy } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { makeSingleton } from '@singletons';
 import { AddonModDataModuleHandlerService } from './module';
+import { ADDON_MOD_DATA_FEATURE_NAME } from '../../constants';
 
 /**
  * Content links handler for database show entry.
@@ -31,14 +32,14 @@ import { AddonModDataModuleHandlerService } from './module';
 export class AddonModDataShowLinkHandlerService extends CoreContentLinksHandlerBase {
 
     name = 'AddonModDataShowLinkHandler';
-    featureName = 'CoreCourseModuleDelegate_AddonModData';
+    featureName = ADDON_MOD_DATA_FEATURE_NAME;
     pattern = /\/mod\/data\/view\.php.*([?&](d|rid|page|group|mode)=\d+)/;
     priority = 50; // Higher priority than the default link handler for view.php.
 
     /**
      * @inheritdoc
      */
-    getActions(siteIds: string[], url: string, params: Params): CoreContentLinksAction[] {
+    getActions(siteIds: string[], url: string, params: Record<string, string>): CoreContentLinksAction[] {
         return [{
             action: async (siteId): Promise<void> => {
                 const modal = await CoreDomUtils.showModalLoading();
@@ -65,7 +66,7 @@ export class AddonModDataShowLinkHandlerService extends CoreContentLinksHandlerB
                         pageParams.offset = page || 0;
                     }
 
-                    CoreNavigator.navigateToSitePath(
+                    await CoreNavigator.navigateToSitePath(
                         `${AddonModDataModuleHandlerService.PAGE_NAME}/${module.course}/${module.id}/${rId}`,
                         { siteId, params: pageParams },
                     );
@@ -80,7 +81,7 @@ export class AddonModDataShowLinkHandlerService extends CoreContentLinksHandlerB
     /**
      * @inheritdoc
      */
-    async isEnabled(siteId: string, url: string, params: Params): Promise<boolean> {
+    async isEnabled(siteId: string, url: string, params: Record<string, string>): Promise<boolean> {
         if (params.d === undefined) {
             // Id not defined. Cannot treat the URL.
             return false;

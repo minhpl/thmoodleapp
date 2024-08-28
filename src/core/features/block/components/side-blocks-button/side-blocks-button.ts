@@ -20,6 +20,7 @@ import { CoreDomUtils } from '@services/utils/dom';
 import { CoreDom } from '@singletons/dom';
 import { CoreBlockSideBlocksTourComponent } from '../side-blocks-tour/side-blocks-tour';
 import { CoreBlockSideBlocksComponent } from '../side-blocks/side-blocks';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Component that displays a button to open blocks.
@@ -31,7 +32,7 @@ import { CoreBlockSideBlocksComponent } from '../side-blocks/side-blocks';
 })
 export class CoreBlockSideBlocksButtonComponent implements OnInit, OnDestroy {
 
-    @Input() contextLevel!: string;
+    @Input() contextLevel!: ContextLevel;
     @Input() instanceId!: number;
     @Input() myDashboardPage?: string;
 
@@ -40,6 +41,8 @@ export class CoreBlockSideBlocksButtonComponent implements OnInit, OnDestroy {
         component: CoreBlockSideBlocksTourComponent,
         side: CoreUserToursSide.Start,
         alignment: CoreUserToursAlignment.Center,
+        after: 'user-menu',
+        afterTimeout: 1000,
         getFocusedElement: nativeButton => {
             const innerButton = Array.from(nativeButton.shadowRoot?.children ?? []).find(child => child.tagName === 'BUTTON');
 

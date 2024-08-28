@@ -1,4 +1,4 @@
-@import '~theme/globals.scss';
+@use "theme/globals" as *;
 
 :host {
     display: block;
@@ -8,24 +8,29 @@
 
     @include padding-horizontal(var(--ion-safe-area-left), var(--ion-safe-area-right));
 
-    .core-modulename {
-        text-transform: uppercase;
-    }
-
     core-mod-icon {
         align-self: flex-start;
+        @include margin-horizontal(null, 8px);
+
+        --module-icon-padding: 0px;
+        --module-legacy-icon-padding: 4px;
+    }
+
+    ion-label.core-module-info-activity-title {
+        margin-top: 12px;
+        margin-bottom: 12px;
+        line-height: 32px;
     }
 
     h1 ion-icon {
         color: var(--medium);
         @include margin-horizontal(8px, null);
         font-size: 80%;
-
     }
 
     .core-module-info-box {
         background: var(--light);
-        border-radius: var(--small-radius);
+        border-radius: var(--mdl-shape-borderRadius-xs);
         margin: 8px;
         padding: 8px;
 
@@ -48,12 +53,6 @@
             padding-top: 8px;
         }
 
-        .core-module-dates ion-icon {
-            margin-left: 4px;
-            margin-right: 4px;
-        }
-
-        .core-module-dates,
         .core-module-availabilityinfo {
             font-size: 90%;
             ion-icon {
@@ -69,25 +68,9 @@
         }
     }
 
-    core-course-module-completion ::ng-deep ion-button {
-        min-height: 28px;
-        margin: 0;
-        font-size: 12px;
-        text-transform: none;
-        font-weight: normal;
-
-        ion-icon {
-            font-size: 16px;
-            min-width: 16px;
-            @include margin(0, 8px, 0, 0);
-        }
-
-        ion-label {
-            white-space: normal !important;
-        }
+    core-course-module-completion  {
+        --margin: 0px;
     }
-
-
 }
 
 :host-context(.core-iframe-fullscreen) {

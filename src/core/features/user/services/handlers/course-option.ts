@@ -13,14 +13,13 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { CoreCourseProvider } from '@features/course/services/course';
+import { CoreCourseAccessDataType } from '@features/course/services/course';
 import {
     CoreCourseAccess,
     CoreCourseOptionsHandler,
     CoreCourseOptionsHandlerData,
 } from '@features/course/services/course-options-delegate';
-import { CoreCourseUserAdminOrNavOptionIndexed } from '@features/courses/services/courses';
-import { CoreEnrolledCourseDataWithExtraInfoAndOptions } from '@features/courses/services/courses-helper';
+import { CoreCourseAnyCourseData, CoreCourseUserAdminOrNavOptionIndexed } from '@features/courses/services/courses';
 import { PARTICIPANTS_PAGE_NAME } from '@features/user/user.module';
 import { makeSingleton } from '@singletons';
 import { CoreUser } from '../user';
@@ -35,14 +34,10 @@ export class CoreUserCourseOptionHandlerService implements CoreCourseOptionsHand
     priority = 600;
 
     /**
-     * Should invalidate the data to determine if the handler is enabled for a certain course.
-     *
-     * @param courseId The course ID.
-     * @param navOptions Course navigation options for current user. See CoreCoursesProvider.getUserNavigationOptions.
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
     invalidateEnabledForCourse(courseId: number, navOptions?: CoreCourseUserAdminOrNavOptionIndexed): Promise<void> {
-        if (navOptions && navOptions.participants !== undefined) {
+        if (navOptions?.participants !== undefined) {
             // No need to invalidate anything.
             return Promise.resolve();
         }
@@ -51,32 +46,25 @@ export class CoreUserCourseOptionHandlerService implements CoreCourseOptionsHand
     }
 
     /**
-     * Check if the handler is enabled on a site level.
-     *
-     * @return Whether or not the handler is enabled on a site level.
+     * @inheritdoc
      */
     isEnabled(): Promise<boolean> {
         return Promise.resolve(true);
     }
 
     /**
-     * Whether or not the handler is enabled for a certain course.
-     *
-     * @param courseId The course ID.
-     * @param accessData Access type and data. Default, guest, ...
-     * @param navOptions Course navigation options for current user. See CoreCoursesProvider.getUserNavigationOptions.
-     * @return True or promise resolved with true if enabled.
+     * @inheritdoc
      */
     isEnabledForCourse(
         courseId: number,
         accessData: CoreCourseAccess,
         navOptions?: CoreCourseUserAdminOrNavOptionIndexed,
     ): boolean | Promise<boolean> {
-        if (accessData && accessData.type == CoreCourseProvider.ACCESS_GUEST) {
+        if (accessData && accessData.type === CoreCourseAccessDataType.ACCESS_GUEST) {
             return false; // Not enabled for guests.
         }
 
-        if (navOptions && navOptions.participants !== undefined) {
+        if (navOptions?.participants !== undefined) {
             return navOptions.participants;
         }
 
@@ -95,12 +83,9 @@ export class CoreUserCourseOptionHandlerService implements CoreCourseOptionsHand
     }
 
     /**
-     * Called when a course is downloaded. It should prefetch all the data to be able to see the addon in offline.
-     *
-     * @param course The course.
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
-    async prefetch(course: CoreEnrolledCourseDataWithExtraInfoAndOptions): Promise<void> {
+    async prefetch(course: CoreCourseAnyCourseData): Promise<void> {
         let offset = 0;
         let canLoadMore = true;
 

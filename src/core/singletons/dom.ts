@@ -22,6 +22,8 @@ import { CoreEventObserver } from '@singletons/events';
  */
 export class CoreDom {
 
+    static fontSizeZoom: number | null = null;
+
     // Avoid creating singleton instances.
     private constructor() {
         // Nothing to do.
@@ -32,7 +34,7 @@ export class CoreDom {
      *
      * @param node DOM Element.
      * @param selector Selector to search.
-     * @return Closest ancestor or null if not found.
+     * @returns Closest ancestor or null if not found.
      */
     static closest<T = HTMLElement>(node: HTMLElement | Node | null, selector: string): T | null {
         if (!node) {
@@ -55,11 +57,28 @@ export class CoreDom {
     }
 
     /**
+     * Check if an element has some text or embedded content inside.
+     *
+     * @param element Element or document to check.
+     * @returns Whether has content.
+     */
+    static elementHasContent(element: Element | DocumentFragment): boolean {
+        const textContent = (element.textContent ?? '').trim().replace(/(\r\n|\n|\r)/g, '');
+        if (textContent.length > 0) {
+            return true;
+        }
+
+        return element.querySelectorAll(
+            'img, audio, video, object, iframe, canvas, svg, input, select, textarea, frame, embed',
+        ).length > 0;
+    }
+
+    /**
      * Retrieve the position of a element relative to another element.
      *
      * @param element Element to get the position.
      * @param parent Parent element to get relative position.
-     * @return X and Y position.
+     * @returns X and Y position.
      */
     static getRelativeElementPosition(element: HTMLElement, parent: HTMLElement): CoreCoordinates {
         // Get the top, left coordinates of two elements
@@ -77,7 +96,7 @@ export class CoreDom {
      * Check whether an element has been added to the DOM.
      *
      * @param element Element.
-     * @return True if element has been added to the DOM, false otherwise.
+     * @returns True if element has been added to the DOM, false otherwise.
      */
     static isElementInDom(element: HTMLElement): boolean {
         return element.getRootNode({ composed: true }) === document;
@@ -86,23 +105,25 @@ export class CoreDom {
     /**
      * Check whether an element is intersecting the intersectionRatio in viewport.
      *
-     * @param element
+     * @param element Element to check.
      * @param intersectionRatio Intersection ratio (From 0 to 1).
-     * @return True if in viewport.
+     * @param container Container where element is located
+     * @returns True if in viewport.
      */
-    static isElementInViewport(element: HTMLElement, intersectionRatio = 1): boolean {
+    static isElementInViewport(element: HTMLElement, intersectionRatio = 1, container: HTMLElement | null = null): boolean {
         const elementRectangle = element.getBoundingClientRect();
-
+        const containerRectangle = container?.getBoundingClientRect();
         const elementArea = elementRectangle.width * elementRectangle.height;
+
         if (elementArea == 0) {
             return false;
         }
 
         const intersectionRectangle = {
-            top: Math.max(0, elementRectangle.top),
-            left: Math.max(0, elementRectangle.left),
-            bottom: Math.min(window.innerHeight, elementRectangle.bottom),
-            right: Math.min(window.innerWidth, elementRectangle.right),
+            top: Math.max(containerRectangle?.top ?? 0, elementRectangle.top),
+            left: Math.max(containerRectangle?.left ?? 0, elementRectangle.left),
+            bottom: Math.min(containerRectangle?.bottom ?? window.innerHeight, elementRectangle.bottom),
+            right: Math.min(containerRectangle?.right ?? window.innerWidth, elementRectangle.right),
         };
 
         const intersectionArea = (intersectionRectangle.right - intersectionRectangle.left) *
@@ -116,11 +137,15 @@ export class CoreDom {
      *
      * @param element Element.
      * @param checkSize Wether to check size to check for visibility.
-     * @return True if element is visible inside the DOM.
+     * @returns True if element is visible inside the DOM.
      */
     static isElementVisible(element: HTMLElement, checkSize = true): boolean {
-        if (checkSize && (element.clientWidth === 0 || element.clientHeight === 0)) {
-            return false;
+        if (checkSize) {
+            const dimensions = element.getBoundingClientRect();
+
+            if (dimensions.width === 0 || dimensions.height === 0) {
+                return false;
+            }
         }
 
         const style = getComputedStyle(element);
@@ -175,7 +200,7 @@ export class CoreDom {
             slot.removeEventListener('slotchange', slotListener);
         };
 
-        slot.addEventListener('slotchange', slotListener);;
+        slot.addEventListener('slotchange', slotListener);
     }
 
     /**
@@ -184,7 +209,7 @@ export class CoreDom {
      *
      * @param resizeFunction Function to execute on resize.
      * @param debounceDelay Debounce time in ms.
-     * @return Event observer to call off when finished.
+     * @returns Event observer to call off when finished.
      */
     static onWindowResize(resizeFunction: (ev?: Event) => void, debounceDelay = 20): CoreEventObserver {
         const resizeListener = CoreUtils.debounce(async (ev?: Event) => {
@@ -208,7 +233,7 @@ export class CoreDom {
      * @param element The element to scroll to.
      * @param selector Selector to find the element to scroll to inside the defined element.
      * @param scrollOptions Scroll Options.
-     * @return Wether the scroll suceeded.
+     * @returns Wether the scroll suceeded.
      */
     static async scrollToElement(element: HTMLElement, selector?: string, scrollOptions: CoreScrollOptions = {}): Promise<boolean> {
         if (selector) {
@@ -253,7 +278,7 @@ export class CoreDom {
      * Search for an input with error (core-input-error directive) and scrolls to it if found.
      *
      * @param container The element that contains the element that must be scrolled.
-     * @return True if the element is found, false otherwise.
+     * @returns True if the element is found, false otherwise.
      */
     static async scrollToInputError(container: HTMLElement): Promise<boolean> {
         return CoreDom.scrollToElement(container, '.core-input-error');
@@ -264,7 +289,7 @@ export class CoreDom {
      *
      * @param scrollElement Scroll Element.
      * @param marginError Error margin when calculating.
-     * @return Wether the scroll reached the bottom.
+     * @returns Wether the scroll reached the bottom.
      */
     static scrollIsBottom(scrollElement?: HTMLElement, marginError = 0): boolean {
         if (!scrollElement) {
@@ -279,7 +304,7 @@ export class CoreDom {
      *
      * @param element HTML Element.
      * @param slot Slot name.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     static slotOnContent(element: HTMLElement, slot = 'fixed'): CoreCancellablePromise<void> {
         element.setAttribute('slot', slot);
@@ -310,7 +335,7 @@ export class CoreDom {
      * Wait an element to be added to the root DOM.
      *
      * @param element Element to wait.
-     * @return Cancellable promise.
+     * @returns Cancellable promise.
      */
     static waitToBeInDOM(element: HTMLElement): CoreCancellablePromise<void> {
         const root = element.getRootNode({ composed: true });
@@ -347,7 +372,7 @@ export class CoreDom {
      * Wait an element to be in dom of another element using a selector
      *
      * @param container Element to wait.
-     * @return Cancellable promise.
+     * @returns Cancellable promise.
      */
     static async waitToBeInsideElement(container: HTMLElement, selector: string): Promise<CoreCancellablePromise<HTMLElement>> {
         await CoreDom.waitToBeInDOM(container);
@@ -387,7 +412,7 @@ export class CoreDom {
      * @param element Element to watch.
      * @param intersectionRatio Intersection ratio (From 0 to 1).
      * @param callback Callback when visibility changes.
-     * @return Function to stop watching.
+     * @returns Function to stop watching.
      */
     static watchElementInViewport(
         element: HTMLElement,
@@ -400,7 +425,7 @@ export class CoreDom {
      *
      * @param element Element to watch.
      * @param callback Callback when visibility changes.
-     * @return Function to stop watching.
+     * @returns Function to stop watching.
      */
     static watchElementInViewport(element: HTMLElement, callback: (visible: boolean) => void): () => void;
 
@@ -442,7 +467,7 @@ export class CoreDom {
      *
      * @param element Element to wait.
      * @param intersectionRatio Intersection ratio (From 0 to 1).
-     * @return Cancellable promise.
+     * @returns Cancellable promise.
      */
     static waitToBeInViewport(element: HTMLElement, intersectionRatio = 1): CoreCancellablePromise<void> {
         let unsubscribe: (() => void) | undefined;
@@ -477,7 +502,7 @@ export class CoreDom {
      *
      * @param element Element to wait.
      * @param checkSize Wether to check size to check for visibility.
-     * @return Cancellable promise.
+     * @returns Cancellable promise.
      */
     static waitToBeVisible(element: HTMLElement, checkSize = true): CoreCancellablePromise<void> {
         const domPromise = CoreDom.waitToBeInDOM(element);
@@ -514,22 +539,149 @@ export class CoreDom {
      *
      * @param element Element to listen to events.
      * @param callback Callback to call when clicked or the key is pressed.
+     * @deprecated since 4.1.1: Use initializeClickableElementA11y instead.
      */
-    static onActivate(element: HTMLElement, callback: (event: MouseEvent | KeyboardEvent) => void): void {
-        element.addEventListener('click', (event) => callback(event));
+    static onActivate(
+        element: HTMLElement & {disabled?: boolean},
+        callback: (event: MouseEvent | KeyboardEvent) => void,
+    ): void {
+        this.initializeClickableElementA11y(element, callback);
+    }
+
+    /**
+     * Initializes a clickable element a11y calling the click action when pressed enter or space
+     * and adding tabindex and role if needed.
+     *
+     * @param element Element to listen to events.
+     * @param callback Callback to call when clicked or the key is pressed.
+     * @param setTabIndex Whether to set tabindex and role.
+     */
+    static initializeClickableElementA11y(
+        element: HTMLElement & {disabled?: boolean},
+        callback: (event: MouseEvent | KeyboardEvent) => void,
+        setTabIndex = true,
+    ): void {
+        const enabled = () => !CoreUtils.isTrueOrOne(element.dataset.disabledA11yClicks ?? 'false');
+
+        element.addEventListener('click', (event) => enabled() && callback(event));
 
         element.addEventListener('keydown', (event) => {
-            if ((event.key == ' ' || event.key == 'Enter')) {
+            if (!enabled()) {
+                return;
+            }
+
+            if (event.key === ' ' || event.key === 'Enter') {
                 event.preventDefault();
                 event.stopPropagation();
             }
         });
 
         element.addEventListener('keyup', (event) => {
-            if ((event.key == ' ' || event.key == 'Enter')) {
+            if (!enabled()) {
+                return;
+            }
+
+            if (event.key === ' ' || event.key === 'Enter') {
                 callback(event);
+
+                event.preventDefault();
+                event.stopPropagation();
             }
         });
+
+        if (setTabIndex && element.tagName !== 'BUTTON' && element.tagName !== 'A') {
+            // Set tabindex if not previously set.
+            if (element.getAttribute('tabindex') === null) {
+                element.setAttribute('tabindex', element.disabled ? '-1' : '0');
+            }
+
+            // Set role if not previously set.
+            if (!element.getAttribute('role')) {
+                element.setAttribute('role', 'button');
+            }
+
+            element.classList.add('clickable');
+        }
+    }
+
+    /**
+     * Get CSS property value from computed styles.
+     *
+     * @param styles Computed styles.
+     * @param property Property name.
+     * @returns Property CSS value (may not be the same as the computed value).
+     */
+    static getCSSPropertyValue(styles: CSSStyleDeclaration, property: string): string {
+        const value = styles.getPropertyValue(property);
+
+        if (property === 'font-size') {
+            if (this.fontSizeZoom === null) {
+                const baseFontSize = 20;
+                const span = document.createElement('span');
+                span.style.opacity = '0';
+                span.style.fontSize = `${baseFontSize}px`;
+
+                document.body.append(span);
+
+                this.fontSizeZoom = baseFontSize / Number(getComputedStyle(span).fontSize.slice(0, -2));
+
+                span.remove();
+            }
+
+            if (this.fontSizeZoom !== 1) {
+                return `calc(${this.fontSizeZoom} * ${value})`;
+            }
+        }
+
+        return value;
+    }
+
+    /**
+     * Replace tags on HTMLElement.
+     *
+     * @param element HTML Element where to replace the tags.
+     * @param originTags Origin tag to be replaced.
+     * @param destinationTags Destination tag to replace.
+     * @returns Element with tags replaced.
+     */
+    static replaceTags<T extends HTMLElement = HTMLElement>(
+        element: T,
+        originTags: string | string[],
+        destinationTags: string | string[],
+    ): T {
+        if (typeof originTags === 'string') {
+            originTags = [originTags];
+        }
+
+        if (typeof destinationTags === 'string') {
+            destinationTags = [destinationTags];
+        }
+
+        if (originTags.length !== destinationTags.length) {
+            // Do nothing, incorrect input.
+            return element;
+        }
+
+        originTags.forEach((originTag, index) => {
+            const destinationTag = destinationTags[index];
+            const elems = Array.from(element.getElementsByTagName(originTag));
+
+            elems.forEach((elem) => {
+                const newElem = document.createElement(destinationTag);
+                newElem.innerHTML = elem.innerHTML;
+
+                if (elem.hasAttributes()) {
+                    const attrs = Array.from(elem.attributes);
+                    attrs.forEach((attr) => {
+                        newElem.setAttribute(attr.name, attr.value);
+                    });
+                }
+
+                elem.parentNode?.replaceChild(newElem, elem);
+            });
+        });
+
+        return element;
     }
 
 }
@@ -549,4 +701,12 @@ export type CoreScrollOptions = {
     duration?: number;
     addYAxis?: number;
     addXAxis?: number;
+};
+
+/**
+ * Source of a media element.
+ */
+export type CoreMediaSource = {
+    src: string;
+    type?: string;
 };

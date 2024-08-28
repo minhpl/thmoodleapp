@@ -1,0 +1,22 @@
+@use "theme/globals" as *;
+
+:host {
+    h2 {
+        margin-top: 0px;
+        margin-bottom: 8px;
+        font: var(--mdl-typography-heading6-font);
+    }
+    ion-list {
+        font: var(--mdl-typography-body-font-lg);
+        line-height: 200%;
+    }
+
+    ion-icon {
+        width: 24px;
+        vertical-align: middle;
+    }
+
+    ion-icon.completion_dot {
+        font-size: #{dynamic-font(4px)};
+    }
+}

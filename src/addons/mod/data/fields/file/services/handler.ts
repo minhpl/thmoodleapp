@@ -22,12 +22,13 @@ import {
 import { AddonModDataFieldHandler } from '@addons/mod/data/services/data-fields-delegate';
 import { Injectable, Type } from '@angular/core';
 import { CoreFileUploader, CoreFileUploaderStoreFilesResult } from '@features/fileuploader/services/fileuploader';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 import { CoreFileSession } from '@services/file-session';
 import { CoreFormFields } from '@singletons/form';
 import { makeSingleton, Translate } from '@singletons';
 import { AddonModDataFieldFileComponent } from '../component/file';
 import { CoreFileEntry } from '@services/file-helper';
+import type { AddonModDataFieldPluginBaseComponent } from '@addons/mod/data/classes/base-field-plugin-component';
 
 /**
  * Handler for file data field plugin.
@@ -41,7 +42,7 @@ export class AddonModDataFieldFileHandlerService implements AddonModDataFieldHan
     /**
      * @inheritdoc
      */
-    getComponent(): Type<unknown>{
+    getComponent(): Type<AddonModDataFieldPluginBaseComponent> {
         return AddonModDataFieldFileComponent;
     }
 

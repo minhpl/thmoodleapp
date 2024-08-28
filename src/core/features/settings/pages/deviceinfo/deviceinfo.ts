@@ -12,11 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreApp } from '@services/app';
 import { Component, OnDestroy } from '@angular/core';
 import { CoreConstants } from '@/core/constants';
 import { CoreLocalNotifications } from '@services/local-notifications';
-import { Device, Platform, Translate, Network, NgZone } from '@singletons';
+import { Device, Translate, NgZone } from '@singletons';
 import { CoreLang } from '@services/lang';
 import { CoreFile } from '@services/file';
 import { CoreSites } from '@services/sites';
@@ -26,6 +25,10 @@ import { CorePushNotifications } from '@features/pushnotifications/services/push
 import { CoreConfig } from '@services/config';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreNavigator } from '@services/navigator';
+import { CorePlatform } from '@services/platform';
+import { CoreNetwork } from '@services/network';
+import { CoreLoginHelper } from '@features/login/services/login-helper';
+import { CoreSitesFactory } from '@services/sites-factory';
 
 /**
  * Device Info to be shown and copied to clipboard.
@@ -56,6 +59,7 @@ interface CoreSettingsDeviceInfo {
     uuid?: string;
     pushId?: string;
     localNotifAvailable: string;
+    encryptedPushSupported?: boolean;
 }
 
 /**
@@ -73,6 +77,7 @@ export class CoreSettingsDeviceInfoPage implements OnDestroy {
     currentLangName?: string;
     fsClickable = false;
     showDevOptions = false;
+    displaySiteUrl = false;
     protected devOptionsClickCounter = 0;
     protected devOptionsForced = false;
     protected devOptionsClickTimeout?: number;
@@ -80,7 +85,6 @@ export class CoreSettingsDeviceInfoPage implements OnDestroy {
     protected onlineObserver?: Subscription;
 
     constructor() {
-        const appProvider = CoreApp.instance;
         const sitesProvider = CoreSites.instance;
         const device = Device.instance;
         const translate = Translate.instance;
@@ -91,9 +95,9 @@ export class CoreSettingsDeviceInfoPage implements OnDestroy {
             versionCode: CoreConstants.CONFIG.versioncode,
             compilationTime: CoreConstants.BUILD.compilationTime || 0,
             lastCommit: CoreConstants.BUILD.lastCommitHash || '',
-            networkStatus: appProvider.isOnline() ? 'online' : 'offline',
-            wifiConnection: appProvider.isWifi() ? 'yes' : 'no',
-            localNotifAvailable: CoreLocalNotifications.isAvailable() ? 'yes' : 'no',
+            networkStatus: CoreNetwork.isOnline() ? 'online' : 'offline',
+            wifiConnection: CoreNetwork.isWifi() ? 'yes' : 'no',
+            localNotifAvailable: CoreLocalNotifications.isPluginAvailable() ? 'yes' : 'no',
             pushId: CorePushNotifications.getPushId(),
             deviceType: '',
         };
@@ -108,12 +112,12 @@ export class CoreSettingsDeviceInfoPage implements OnDestroy {
                 ' (' + window.screen.width + 'x' + window.screen.height + ')';
         }
 
-        if (appProvider.isMobile()) {
-            this.deviceInfo.deviceType = Platform.is('tablet') ? 'tablet' : 'phone';
-            if (appProvider.isAndroid()) {
+        if (CorePlatform.isMobile()) {
+            this.deviceInfo.deviceType = CorePlatform.is('tablet') ? 'tablet' : 'phone';
+            if (CorePlatform.isAndroid()) {
                 this.deviceInfo.deviceOs = 'android';
                 this.deviceOsTranslated = 'Android';
-            } else if (appProvider.isIOS()) {
+            } else if (CorePlatform.isIOS()) {
                 this.deviceInfo.deviceOs = 'ios';
                 this.deviceOsTranslated = 'iOS';
             } else {
@@ -167,18 +171,14 @@ export class CoreSettingsDeviceInfoPage implements OnDestroy {
         }
 
         const currentSite = sitesProvider.getCurrentSite();
-
-        this.deviceInfo.siteUrl = (currentSite?.getURL()) ||
-            (typeof CoreConstants.CONFIG.siteurl == 'string' && CoreConstants.CONFIG.siteurl) || undefined;
-        this.deviceInfo.isPrefixedUrl = !!CoreConstants.CONFIG.siteurl;
         this.deviceInfo.siteId = currentSite?.getId();
         this.deviceInfo.siteVersion = currentSite?.getInfo()?.release;
 
         // Refresh online status when changes.
-        this.onlineObserver = Network.onChange().subscribe(() => {
+        this.onlineObserver = CoreNetwork.onChange().subscribe(() => {
             // Execute the callback in the Angular zone, so change detection doesn't stop working.
             NgZone.run(() => {
-                this.deviceInfo.networkStatus = appProvider.isOnline() ? 'online' : 'offline';
+                this.deviceInfo.networkStatus = CoreNetwork.isOnline() ? 'online' : 'offline';
             });
         });
 
@@ -189,11 +189,22 @@ export class CoreSettingsDeviceInfoPage implements OnDestroy {
      * Async part of the constructor.
      */
     protected async asyncInit(): Promise<void> {
+        const sitesProvider = CoreSites.instance;
         const fileProvider = CoreFile.instance;
 
         const lang = await CoreLang.getCurrentLanguage();
         this.deviceInfo.currentLanguage = lang;
         this.currentLangName = CoreConstants.CONFIG.languages[lang];
+
+        const currentSite = sitesProvider.getCurrentSite();
+        const isSingleFixedSite = await CoreLoginHelper.isSingleFixedSite();
+        const sites = await CoreLoginHelper.getAvailableSites();
+        const firstUrl = isSingleFixedSite && sites[0].url;
+
+        this.deviceInfo.siteUrl = currentSite?.getURL() || firstUrl || undefined;
+        this.deviceInfo.isPrefixedUrl = !!sites.length;
+        this.displaySiteUrl = !!this.deviceInfo.siteUrl &&
+            (currentSite ?? CoreSitesFactory.makeUnauthenticatedSite(this.deviceInfo.siteUrl)).shouldDisplayInformativeLinks();
 
         if (fileProvider.isAvailable()) {
             const basepath = await fileProvider.getBasePath();
@@ -202,8 +213,13 @@ export class CoreSettingsDeviceInfoPage implements OnDestroy {
         }
 
         const showDevOptionsOnConfig = await CoreConfig.get('showDevOptions', 0);
-        this.devOptionsForced = CoreConstants.BUILD.isDevelopment || CoreConstants.BUILD.isTesting;
+        this.devOptionsForced = CoreConstants.enableDevTools();
         this.showDevOptions = this.devOptionsForced || showDevOptionsOnConfig == 1;
+
+        const publicKey = this.deviceInfo.pushId ?
+            await CoreUtils.ignoreErrors(CorePushNotifications.getPublicKey()) :
+            undefined;
+        this.deviceInfo.encryptedPushSupported = publicKey !== undefined;
     }
 
     /**

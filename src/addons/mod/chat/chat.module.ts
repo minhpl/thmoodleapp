@@ -12,28 +12,22 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
+import { CoreCourseHelper } from '@features/course/services/course-helper';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
-import { AddonModChatComponentsModule } from './components/components.module';
-import { AddonModChatProvider } from './services/chat';
-import { AddonModChatHelperProvider } from './services/chat-helper';
 import { AddonModChatIndexLinkHandler } from './services/handlers/index-link';
 import { AddonModChatListLinkHandler } from './services/handlers/list-link';
-import { AddonModChatModuleHandler, AddonModChatModuleHandlerService } from './services/handlers/module';
-import { AddonModChatPrefetchHandler } from './services/handlers/prefetch';
-
-export const ADDON_MOD_CHAT_SERVICES: Type<unknown>[] = [
-    AddonModChatProvider,
-    AddonModChatHelperProvider,
-];
+import { AddonModChatModuleHandler } from './services/handlers/module';
+import { getPrefetchHandlerInstance } from './services/handlers/prefetch';
+import { ADDON_MOD_CHAT_COMPONENT, ADDON_MOD_CHAT_PAGE_NAME } from './constants';
 
 const routes: Routes = [
     {
-        path: AddonModChatModuleHandlerService.PAGE_NAME,
+        path: ADDON_MOD_CHAT_PAGE_NAME,
         loadChildren: () => import('./chat-lazy.module').then(m => m.AddonModChatLazyModule),
     },
 ];
@@ -41,17 +35,19 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModChatComponentsModule,
     ],
     providers: [
         {
             provide: APP_INITIALIZER,
             multi: true,
             useValue: () => {
+                CoreCourseModulePrefetchDelegate.registerHandler(getPrefetchHandlerInstance());
+
                 CoreCourseModuleDelegate.registerHandler(AddonModChatModuleHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModChatIndexLinkHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModChatListLinkHandler.instance);
-                CoreCourseModulePrefetchDelegate.registerHandler(AddonModChatPrefetchHandler.instance);
+
+                CoreCourseHelper.registerModuleReminderClick(ADDON_MOD_CHAT_COMPONENT);
             },
         },
     ],

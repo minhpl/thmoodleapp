@@ -14,7 +14,7 @@
 
 import { Component, Input, OnInit } from '@angular/core';
 import { CoreSites, CoreSitesReadingStrategy } from '@services/sites';
-import { CoreApp } from '@services/app';
+import { CoreNetwork } from '@services/network';
 import { AddonModForum, AddonModForumPost } from '@addons/mod/forum/services/forum';
 import { PopoverController } from '@singletons';
 import { CoreDomUtils } from '@services/utils/dom';
@@ -86,6 +86,10 @@ export class AddonModForumPostOptionsMenuComponent implements OnInit {
      */
     protected setOpenInBrowserUrl(): void {
         const site = CoreSites.getRequiredCurrentSite();
+        if (!site.shouldDisplayInformativeLinks()) {
+            return;
+        }
+
         this.url = site.createSiteUrl('/mod/forum/discuss.php', { d: this.post.discussionid.toString() }, 'p' + this.post.id);
     }
 
@@ -101,7 +105,7 @@ export class AddonModForumPostOptionsMenuComponent implements OnInit {
      */
     deletePost(): void {
         if (!this.offlinePost) {
-            if (!CoreApp.isOnline()) {
+            if (!CoreNetwork.isOnline()) {
                 CoreDomUtils.showErrorModal(new CoreNetworkError());
 
                 return;
@@ -117,7 +121,7 @@ export class AddonModForumPostOptionsMenuComponent implements OnInit {
      * Edit a post.
      */
     editPost(): void {
-        if (!this.offlinePost && !CoreApp.isOnline()) {
+        if (!this.offlinePost && !CoreNetwork.isOnline()) {
             CoreDomUtils.showErrorModal(new CoreNetworkError());
 
             return;

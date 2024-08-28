@@ -1,0 +1,68 @@
+@use "theme/globals" as *;
+
+:host {
+    .entry {
+        border-bottom: 1px solid var(--stroke);
+
+        &-visibility-permission {
+            display: flex;
+            align-items: center;
+            font: var(-mdl-typography-label-font-lg);
+
+            ion-icon {
+                @include margin-horizontal(null, .3rem);
+            }
+        }
+
+        &-draft {
+            @include margin-horizontal(.3rem, null);
+
+            position: relative;
+            top: 4px;
+        }
+
+        &-subject {
+            core-format-text {
+                font: var(--mdl-typography-heading4-font);
+            }
+        }
+
+        &-creation-info {
+            .entry-avatar {
+                @include margin(.6rem, .6rem, .6rem, 0px);
+            }
+
+            core-user-avatar {
+                --core-avatar-size: 24px;
+            }
+        }
+
+        &-last-modification {
+            --padding-end: 0px;
+            --padding-start: 0px;
+            --padding-top: 0px;
+            --padding-bottom: 0px;
+
+            ion-note {
+                padding-top: 0.9rem;
+                font: var(-mdl-typography-label-font-lg);
+            }
+
+            ion-icon {
+                @include margin-horizontal(null, .3rem);
+            }
+        }
+    }
+
+    ion-button.entry-options {
+        --padding-end: 0px;
+        --padding-start: 0px;
+        --padding-top: 0px;
+        --padding-bottom: 0px;
+    }
+
+    core-comments ::ng-deep ion-item {
+        --inner-border-width: 1px 0px 0px 0px;
+        --padding-start: 0px;
+    }
+}

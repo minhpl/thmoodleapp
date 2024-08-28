@@ -14,10 +14,10 @@
 
 import { Component, Input, OnInit } from '@angular/core';
 
-import { CoreLang } from '@services/lang';
+import { CoreLang, CoreLangFormat } from '@services/lang';
 import { CoreSites } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 
 /**
  * Component that allows answering a recaptcha.
@@ -28,10 +28,11 @@ import { CoreText } from '@singletons/text';
 })
 export class CoreRecaptchaComponent implements OnInit {
 
-    @Input() model?: Record<string, string>; // The model where to store the recaptcha response.
+    @Input() model: Record<string, string> = {}; // The model where to store the recaptcha response.
     @Input() publicKey?: string; // The site public key.
     @Input() modelValueName = 'recaptcharesponse'; // Name of the model property where to store the response.
-    @Input() siteUrl?: string; // The site URL. If not defined, current site.
+    @Input() siteUrl = ''; // The site URL. If not defined, current site.
+    @Input() showRequiredError = false; // Whether to display the required error if recaptcha hasn't been answered.
 
     expired = false;
 
@@ -42,17 +43,17 @@ export class CoreRecaptchaComponent implements OnInit {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     ngOnInit(): void {
-        this.siteUrl = this.siteUrl || CoreSites.getCurrentSite()?.getURL();
+        this.siteUrl = this.siteUrl || CoreSites.getRequiredCurrentSite().getURL();
     }
 
     /**
      * Initialize the lang property.
      */
     protected async initLang(): Promise<void> {
-        this.lang = await CoreLang.getCurrentLanguage();
+        this.lang = await CoreLang.getCurrentLanguage(CoreLangFormat.LMS);
     }
 
     /**
@@ -62,7 +63,7 @@ export class CoreRecaptchaComponent implements OnInit {
         // Open the recaptcha challenge in an InAppBrowser.
         // The app used to use an iframe for this, but the app can no longer access the iframe to create the required callbacks.
         // The app cannot render the recaptcha directly because it has problems with the local protocols and domains.
-        const src = CoreText.concatenatePaths(this.siteUrl!, 'webservice/recaptcha.php?lang=' + this.lang);
+        const src = CorePath.concatenatePaths(this.siteUrl, 'webservice/recaptcha.php?lang=' + this.lang);
 
         const inAppBrowserWindow = CoreUtils.openInApp(src);
         if (!inAppBrowserWindow) {
@@ -90,7 +91,7 @@ export class CoreRecaptchaComponent implements OnInit {
                 this.expireRecaptchaAnswer();
             } else if (event.data.action == 'callback') {
                 this.expired = false;
-                this.model![this.modelValueName] = event.data.value;
+                this.model[this.modelValueName] = event.data.value;
 
                 // Close the InAppBrowser now.
                 inAppBrowserWindow.close();
@@ -105,7 +106,7 @@ export class CoreRecaptchaComponent implements OnInit {
      */
     expireRecaptchaAnswer(): void {
         this.expired = true;
-        this.model![this.modelValueName] = '';
+        this.model[this.modelValueName] = '';
     }
 
 }

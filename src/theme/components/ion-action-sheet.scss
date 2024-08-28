@@ -1,0 +1,49 @@
+ion-action-sheet {
+    --button-color: var(--ion-text-color);
+    --button-color-selected: var(--ion-text-color);
+
+    .action-sheet-title {
+        --color: var(--ion-text-color);
+        font-weight: bold;
+    }
+
+    @media (min-height: 500px) {
+        --max-height: 50%;
+        --height: 100%;
+    }
+
+    .action-sheet-cancel {
+        --button-color: var(--danger);
+    }
+
+    &.md {
+        .action-sheet-title {
+            @include padding(4px, null, 4px, 16px);
+            font: var(--mdl-typography-body-font-sm);
+            min-height: auto;
+            color: var(--medium);
+            line-height: 2em;
+        }
+
+        .action-sheet-group:first-child {
+            border-radius: var(--mdl-shape-borderRadius-lg) var(--mdl-shape-borderRadius-lg) 0 0;
+        }
+
+        .action-sheet-group-cancel {
+            box-shadow: var(--drop-shadow-top, none);
+        }
+    }
+}
+
+// File uploader.
+.action-sheet-button input.core-fileuploader-file-handler-input {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    min-width: 100%;
+    opacity: 0;
+    z-index: 100;
+    cursor: pointer;
+}

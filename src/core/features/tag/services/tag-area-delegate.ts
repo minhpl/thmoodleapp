@@ -15,6 +15,7 @@
 import { Injectable, Type } from '@angular/core';
 import { CoreDelegate, CoreDelegateHandler } from '@classes/delegate';
 import { makeSingleton } from '@singletons';
+import { CoreTag } from './tag';
 
 /**
  * Interface that all tag area handlers must implement.
@@ -29,14 +30,14 @@ export interface CoreTagAreaHandler extends CoreDelegateHandler {
      * Parses the rendered content of a tag index and returns the items.
      *
      * @param content Rendered content.
-     * @return Area items (or promise resolved with the items).
+     * @returns Area items (or promise resolved with the items).
      */
     parseContent(content: string): unknown[] | Promise<unknown[]>;
 
     /**
      * Get the component to use to display items.
      *
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @returns The component (or promise resolved with component) to use, undefined if not found.
      */
     getComponent(): Type<unknown> | Promise<Type<unknown>>;
 }
@@ -50,7 +51,14 @@ export class CoreTagAreaDelegateService extends CoreDelegate<CoreTagAreaHandler>
     protected handlerNameProperty = 'type';
 
     constructor() {
-        super('CoreTagAreaDelegate', true);
+        super('CoreTagAreaDelegate');
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async isEnabled(): Promise<boolean> {
+        return CoreTag.areTagsAvailable();
     }
 
     /**
@@ -58,10 +66,10 @@ export class CoreTagAreaDelegateService extends CoreDelegate<CoreTagAreaHandler>
      *
      * @param component Component name.
      * @param itemType Item type.
-     * @return String key.
+     * @returns String key.
      */
     getDisplayNameKey(component: string, itemType: string): string {
-        return (component == 'core' ? 'core.tag' : 'addon.' + component) + '.tagarea_' + itemType;
+        return (component === 'core' || component.startsWith('core_') ? 'core.tag' : 'addon.' + component) + '.tagarea_' + itemType;
     }
 
     /**
@@ -70,12 +78,12 @@ export class CoreTagAreaDelegateService extends CoreDelegate<CoreTagAreaHandler>
      * @param component Component name.
      * @param itemType Item type.
      * @param content Rendered content.
-     * @return Promise resolved with the area items, or undefined if not found.
+     * @returns Promise resolved with the area items, or undefined if not found.
      */
     async parseContent(component: string, itemType: string, content: string): Promise<unknown[] | undefined> {
         const type = component + '/' + itemType;
 
-        return await this.executeFunctionOnEnabled(type, 'parseContent', [content]);
+        return this.executeFunctionOnEnabled(type, 'parseContent', [content]);
     }
 
     /**
@@ -83,12 +91,12 @@ export class CoreTagAreaDelegateService extends CoreDelegate<CoreTagAreaHandler>
      *
      * @param component Component name.
      * @param itemType Item type.
-     * @return The component (or promise resolved with component) to use, undefined if not found.
+     * @returns The component (or promise resolved with component) to use, undefined if not found.
      */
     async getComponent(component: string, itemType: string): Promise<Type<unknown> | undefined> {
         const type = component + '/' + itemType;
 
-        return await this.executeFunctionOnEnabled(type, 'getComponent');
+        return this.executeFunctionOnEnabled(type, 'getComponent');
     }
 
 }

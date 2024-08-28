@@ -13,10 +13,10 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { CoreSite, CoreSiteWSPreSets } from '@classes/site';
-import { CorePushNotifications } from '@features/pushnotifications/services/pushnotifications';
+import { CoreSiteWSPreSets } from '@classes/sites/authenticated-site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreTagItem } from '@features/tag/services/tag';
-import { CoreSites } from '@services/sites';
+import { CoreSites, CoreSitesCommonWSOptions } from '@services/sites';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreStatusWithWarningsWSResponse, CoreWSExternalFile, CoreWSExternalWarning } from '@services/ws';
 import { makeSingleton } from '@singletons';
@@ -39,7 +39,7 @@ export class AddonBlogProvider {
      * check, we should not be calling WS from here.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with true if enabled, resolved with false or rejected otherwise.
+     * @returns Promise resolved with true if enabled, resolved with false or rejected otherwise.
      * @since 3.6
      */
     async isPluginEnabled(siteId?: string): Promise<boolean> {
@@ -52,7 +52,7 @@ export class AddonBlogProvider {
      * Get the cache key for the blog entries.
      *
      * @param filter Filter to apply on search.
-     * @return Cache key.
+     * @returns Cache key.
      */
     getEntriesCacheKey(filter: AddonBlogFilter = {}): string {
         return ROOT_CACHE_KEY + CoreUtils.sortAndStringify(filter);
@@ -62,25 +62,82 @@ export class AddonBlogProvider {
      * Get blog entries.
      *
      * @param filter Filter to apply on search.
-     * @param page Page of the blog entries to fetch.
-     * @param siteId Site ID. If not defined, current site.
-     * @return Promise to be resolved when the entries are retrieved.
+     * @param options WS Options.
+     * @returns Promise to be resolved when the entries are retrieved.
      */
-    async getEntries(filter: AddonBlogFilter = {}, page: number = 0, siteId?: string): Promise<CoreBlogGetEntriesWSResponse> {
-        const site = await CoreSites.getSite(siteId);
+    async getEntries(filter: AddonBlogFilter = {}, options?: AddonBlogGetEntriesOptions): Promise<CoreBlogGetEntriesWSResponse> {
+        const site = await CoreSites.getSite(options?.siteId);
 
         const data: CoreBlogGetEntriesWSParams = {
             filters: CoreUtils.objectToArrayOfObjects(filter, 'name', 'value'),
-            page: page,
+            page: options?.page ?? 0,
             perpage: AddonBlogProvider.ENTRIES_PER_PAGE,
         };
 
         const preSets: CoreSiteWSPreSets = {
             cacheKey: this.getEntriesCacheKey(filter),
             updateFrequency: CoreSite.FREQUENCY_SOMETIMES,
+            ...CoreSites.getReadingStrategyPreSets(options?.readingStrategy),
         };
 
         return site.read('core_blog_get_entries', data, preSets);
+    }
+
+    /**
+     * Create a new entry.
+     *
+     * @param params WS Params.
+     * @param siteId Site ID where the entry should be created.
+     * @returns Entry id.
+     * @since 4.4
+     */
+    async addEntry(params: AddonBlogAddEntryWSParams, siteId?: string): Promise<number> {
+        const site = await CoreSites.getSite(siteId);
+
+        return await site.write<number>('core_blog_add_entry', params);
+    }
+
+    /**
+     * Update an entry.
+     *
+     * @param params WS Params.
+     * @param siteId Site ID of the entry.
+     * @since 4.4
+     */
+    async updateEntry(params: AddonBlogUpdateEntryWSParams, siteId?: string): Promise<void> {
+        const site = await CoreSites.getSite(siteId);
+        await site.write('core_blog_update_entry', params);
+    }
+
+    /**
+     * Prepare entry for edition by entry id.
+     *
+     * @param params WS Params.
+     * @param siteId Site ID of the entry.
+     * @returns WS Response
+     * @since 4.4
+     */
+    async prepareEntryForEdition(
+        params: AddonBlogPrepareEntryForEditionWSParams,
+        siteId?: string,
+    ): Promise<AddonBlogPrepareEntryForEditionWSResponse> {
+        const site = await CoreSites.getSite(siteId);
+
+        return await site.write<AddonBlogPrepareEntryForEditionWSResponse>('core_blog_prepare_entry_for_edition', params);
+    }
+
+    /**
+     * Delete entry by id.
+     *
+     * @param params WS params.
+     * @param siteId Site ID of the entry.
+     * @returns Entry deleted successfully or not.
+     * @since 4.4
+     */
+    async deleteEntry(params: AddonBlogDeleteEntryWSParams, siteId?: string): Promise<AddonBlogDeleteEntryWSResponse> {
+        const site = await CoreSites.getSite(siteId);
+
+        return await site.write('core_blog_delete_entry', params);
     }
 
     /**
@@ -88,7 +145,7 @@ export class AddonBlogProvider {
      *
      * @param filter Filter to apply on search
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when data is invalidated.
+     * @returns Promise resolved when data is invalidated.
      */
     async invalidateEntries(filter: AddonBlogFilter = {}, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -97,15 +154,26 @@ export class AddonBlogProvider {
     }
 
     /**
+     * Is editing blog entry enabled.
+     *
+     * @param siteId Site ID.
+     * @returns is enabled or not.
+     * @since 4.4
+     */
+    async isEditingEnabled(siteId?: string): Promise<boolean> {
+        const site = await CoreSites.getSite(siteId);
+
+        return site.wsAvailable('core_blog_update_entry');
+    }
+
+    /**
      * Trigger the blog_entries_viewed event.
      *
      * @param filter Filter to apply on search.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise to be resolved when done.
+     * @returns Promise to be resolved when done.
      */
     async logView(filter: AddonBlogFilter = {}, siteId?: string): Promise<CoreStatusWithWarningsWSResponse> {
-        CorePushNotifications.logViewListEvent('blog', 'core_blog_view_entries', filter, siteId);
-
         const site = await CoreSites.getSite(siteId);
 
         const data: AddonBlogViewEntriesWSParams = {
@@ -166,7 +234,7 @@ export type AddonBlogPost = {
     rating: number; // Post rating.
     format: number; // Post content format.
     attachment: string; // Post atachment.
-    publishstate: string; // Post publish state.
+    publishstate: AddonBlogPublishState; // Post publish state.
     lastmodified: number; // When it was last modified.
     created: number; // When it was created.
     usermodified: number; // User that updated the post.
@@ -203,3 +271,70 @@ export type AddonBlogFilter = {
     courseid?: number; // Course id
     search?: string;   // Search term.
 };
+
+/**
+ * core_blog_add_entry & core_blog_update_entry ws params.
+ */
+export type AddonBlogAddEntryWSParams = {
+    subject: string;
+    summary: string;
+    summaryformat: number;
+    options: AddonBlogAddEntryOption[];
+};
+
+export type AddonBlogUpdateEntryWSParams = AddonBlogAddEntryWSParams & { entryid: number };
+
+/**
+ * Add entry options.
+ */
+export type AddonBlogAddEntryOption = {
+    name: 'inlineattachmentsid' | 'attachmentsid' | 'publishstate' | 'courseassoc' | 'modassoc' | 'tags';
+    value: string | number;
+};
+
+/**
+ * core_blog_prepare_entry_for_edition ws params.
+ */
+export type AddonBlogPrepareEntryForEditionWSResponse = {
+    inlineattachmentsid: number;
+    attachmentsid: number;
+    areas: AddonBlogPrepareEntryForEditionArea[];
+    warnings: string[];
+};
+
+export type AddonBlogPrepareEntryForEditionWSParams = {
+    entryid: number;
+};
+
+/**
+ * core_blog_prepare_entry_for_edition Area object.
+ */
+export type AddonBlogPrepareEntryForEditionArea = {
+    area: string;
+    options: AddonBlogPrepareEntryForEditionOption[];
+};
+
+/**
+ * core_blog_prepare_entry_for_edition Option object.
+ */
+export type AddonBlogPrepareEntryForEditionOption = {
+    name: string;
+    value: unknown;
+};
+
+export type AddonBlogDeleteEntryWSParams = {
+    entryid: number;
+};
+
+export type AddonBlogDeleteEntryWSResponse = {
+    status: boolean; // Status: true only if we set the policyagreed to 1 for the user.
+    warnings?: CoreWSExternalWarning[];
+};
+
+export type AddonBlogGetEntriesOptions = CoreSitesCommonWSOptions & {
+    page?: number;
+};
+
+export const AddonBlogPublishState = { draft: 'draft', site: 'site', public: 'public' } as const;
+// eslint-disable-next-line @typescript-eslint/no-redeclare
+export type AddonBlogPublishState = typeof AddonBlogPublishState[keyof typeof AddonBlogPublishState];

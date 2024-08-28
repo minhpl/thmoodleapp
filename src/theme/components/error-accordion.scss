@@ -1,0 +1,148 @@
+.core-error-accordion {
+    --toggle-icon-animation-duration: 300ms;
+    --toggle-icon-animation-function: ease-in;
+    --background-color: var(--gray-300);
+    --toggle-icon-size: 16px;
+
+    --text-color-secondary: var(--gray-800);
+
+    --state-color-hover: rgb(40 40 40, 4%); // --gray-900 4%
+    --state-color-pressed: rgb(40 40 40, 12%); // --gray-900 12%
+
+    background: var(--background-color);
+    border-radius: var(--mdl-shape-borderRadius-xs);
+
+    .core-error-accordion--code {
+        margin: 0;
+        text-align: start;
+        color: var(--text-color);
+        font: var(--mdl-typography-subtitle-font-md);
+        padding-top: var(--mdl-spacing-2);
+        padding-bottom: var(--mdl-spacing-2);
+        padding-inline-start: var(--mdl-spacing-3);
+        padding-inline-end: var(--mdl-spacing-3);
+    }
+
+    .core-error-accordion--details {
+        opacity: 0;
+        display: flex;
+        overflow: hidden;
+        flex-direction: column;
+        justify-content: center;
+        transition-property: opacity, height;
+        transition-duration: var(--toggle-icon-animation-duration);
+        transition-timing-function: var(--toggle-icon-animation-function);
+
+        p {
+            margin: 0;
+            padding-top: var(--mdl-spacing-2);
+            padding-bottom: var(--mdl-spacing-2);
+            padding-inline-start: var(--mdl-spacing-3);
+            padding-inline-end: var(--mdl-spacing-3);
+            text-align: start;
+            font: var(--mdl-typography-body-font-md);
+            color: var(--text-color-secondary);
+        }
+
+    }
+
+    .core-error-accordion--toggle {
+        display: flex;
+        width: 100%;
+        align-items: center;
+        background: transparent;
+        justify-content: space-between;
+        color: var(--text-color-secondary);
+        font: var(--mdl-typography-label-font-lg);
+        padding-top: var(--mdl-spacing-2);
+        padding-bottom: var(--mdl-spacing-2);
+        padding-inline-start: var(--mdl-spacing-3);
+        padding-inline-end: var(--mdl-spacing-3);
+
+        .core-error-accordion--toggle-text {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .core-error-accordion--show-details,
+        .core-error-accordion--hide-details {
+            text-align: start;
+            transition: opacity var(--toggle-icon-animation-duration) var(--toggle-icon-animation-function);
+        }
+
+        ion-icon {
+            width: var(--toggle-icon-size);
+            margin-inline-start: var(--mdl-spacing-4);
+            transition: transform var(--toggle-icon-animation-duration) var(--toggle-icon-animation-function);
+            transform: rotate(0);
+        }
+
+        @include core-focus-background();
+
+        &:hover {
+            background: var(--state-color-hover);
+        }
+
+        &:active {
+            background: var(--state-color-pressed);
+        }
+
+    }
+
+    &.hydrated {
+        width: var(--width);
+
+        .core-error-accordion--details {
+            height: 0;
+        }
+
+        .core-error-accordion--toggle {
+
+            .core-error-accordion--toggle-text {
+                flex-grow: 1;
+                position: relative;
+            }
+
+            .core-error-accordion--hide-details {
+                position: absolute;
+                opacity: 0;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                right: 0;
+            }
+
+        }
+
+    }
+
+    &.expanded {
+
+        .core-error-accordion--details {
+            opacity: 1;
+            height: var(--description-height);
+        }
+
+        .core-error-accordion--toggle {
+
+            .core-error-accordion--hide-details {
+                opacity: 1;
+            }
+
+            .core-error-accordion--show-details {
+                opacity: 0;
+            }
+
+            ion-icon {
+                transform: rotate(180deg);
+            }
+
+        }
+
+    }
+
+}
+
+html.dark .core-error-accordion {
+    --background-color: var(--gray-700);
+}

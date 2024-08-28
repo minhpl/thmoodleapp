@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { ContextLevel } from '@/core/constants';
 import { Component, Input, Output, OnInit, EventEmitter, ChangeDetectorRef, Type, ElementRef } from '@angular/core';
-import { AsyncComponent } from '@classes/async-component';
+import { AsyncDirective } from '@classes/async-directive';
 import { CorePromisedValue } from '@classes/promised-value';
 import { CoreQuestionBehaviourDelegate } from '@features/question/services/behaviour-delegate';
 import { CoreQuestionDelegate } from '@features/question/services/question-delegate';
@@ -22,7 +23,7 @@ import { CoreQuestionBehaviourButton, CoreQuestionHelper, CoreQuestionQuestion }
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
 import { Translate } from '@singletons';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 import { CoreLogger } from '@singletons/logger';
 
 /**
@@ -33,7 +34,7 @@ import { CoreLogger } from '@singletons/logger';
     templateUrl: 'core-question.html',
     styleUrls: ['../../question.scss'],
 })
-export class CoreQuestionComponent implements OnInit, AsyncComponent {
+export class CoreQuestionComponent implements OnInit, AsyncDirective {
 
     @Input() question?: CoreQuestionQuestion; // The question to render.
     @Input() component?: string; // The component the question belongs to.
@@ -41,7 +42,7 @@ export class CoreQuestionComponent implements OnInit, AsyncComponent {
     @Input() attemptId?: number; // Attempt ID.
     @Input() usageId?: number; // Usage ID.
     @Input() offlineEnabled?: boolean | string; // Whether the question can be answered in offline.
-    @Input() contextLevel?: string; // The context level.
+    @Input() contextLevel?: ContextLevel; // The context level.
     @Input() contextInstanceId?: number; // The instance ID related to the context.
     @Input() courseId?: number; // Course ID the question belongs to (if any). It can be used to improve performance with filters.
     @Input() review?: boolean; // Whether the user is in review mode.
@@ -66,7 +67,7 @@ export class CoreQuestionComponent implements OnInit, AsyncComponent {
     constructor(protected changeDetector: ChangeDetectorRef, private element: ElementRef) {
         this.logger = CoreLogger.getInstance('CoreQuestionComponent');
         this.promisedReady = new CorePromisedValue();
-        CoreComponentsRegistry.register(this.element.nativeElement, this);
+        CoreDirectivesRegistry.register(this.element.nativeElement, this);
     }
 
     async ready(): Promise<void> {
@@ -74,7 +75,7 @@ export class CoreQuestionComponent implements OnInit, AsyncComponent {
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         this.offlineEnabled = CoreUtils.isTrueOrOne(this.offlineEnabled);

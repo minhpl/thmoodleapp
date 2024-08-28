@@ -19,23 +19,30 @@ import { CoreSiteHomeIndexLinkHandler } from './services/handlers/index-link';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
 import { CoreSiteHomeHomeHandler, CoreSiteHomeHomeHandlerService } from './services/handlers/sitehome-home';
 import { CoreMainMenuHomeDelegate } from '@features/mainmenu/services/home-delegate';
-import { CoreMainMenuHomeRoutingModule } from '@features/mainmenu/pages/home/home-routing.module';
-import { CoreSiteHomeProvider } from './services/sitehome';
+import { CoreMainMenuHomeRoutingModule } from '@features/mainmenu/mainmenu-home-routing.module';
 
-export const CORE_SITEHOME_SERVICES: Type<unknown>[] = [
-    CoreSiteHomeProvider,
-];
+/**
+ * Get site home services.
+ *
+ * @returns Returns site home services.
+ */
+export async function getSiteHomeServices(): Promise<Type<unknown>[]> {
+    const { CoreSiteHomeProvider } = await import('@features/sitehome/services/sitehome');
+
+    return [
+        CoreSiteHomeProvider,
+    ];
+}
 
 const mainMenuHomeRoutes: Routes = [
     {
         path: CoreSiteHomeHomeHandlerService.PAGE_NAME,
-        loadChildren: () => import('./pages/index/index.module').then(m => m.CoreSiteHomeIndexPageModule),
+        loadChildren: () => import('./sitehome-lazy.module').then(m => m.CoreSiteHomeLazyModule),
     },
 ];
 
 @NgModule({
     imports: [CoreMainMenuHomeRoutingModule.forChild({ children: mainMenuHomeRoutes })],
-    exports: [CoreMainMenuHomeRoutingModule],
     providers: [
         {
             provide: APP_INITIALIZER,

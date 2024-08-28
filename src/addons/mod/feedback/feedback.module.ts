@@ -12,21 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
+import { CoreCourseHelper } from '@features/course/services/course-helper';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
 import { CorePushNotificationsDelegate } from '@features/pushnotifications/services/push-delegate';
 import { CoreCronDelegate } from '@services/cron';
 import { CORE_SITE_SCHEMAS } from '@services/sites';
-import { AddonModFeedbackComponentsModule } from './components/components.module';
 import { OFFLINE_SITE_SCHEMA } from './services/database/feedback';
 import { AddonModFeedbackProvider } from './services/feedback';
-import { AddonModFeedbackHelperProvider } from './services/feedback-helper';
-import { AddonModFeedbackOfflineProvider } from './services/feedback-offline';
-import { AddonModFeedbackSyncProvider } from './services/feedback-sync';
 import { AddonModFeedbackAnalysisLinkHandler } from './services/handlers/analysis-link';
 import { AddonModFeedbackCompleteLinkHandler } from './services/handlers/complete-link';
 import { AddonModFeedbackIndexLinkHandler } from './services/handlers/index-link';
@@ -39,13 +36,6 @@ import { AddonModFeedbackShowEntriesLinkHandler } from './services/handlers/show
 import { AddonModFeedbackShowNonRespondentsLinkHandler } from './services/handlers/show-non-respondents-link';
 import { AddonModFeedbackSyncCronHandler } from './services/handlers/sync-cron';
 
-export const ADDON_MOD_FEEDBACK_SERVICES: Type<unknown>[] = [
-    AddonModFeedbackProvider,
-    AddonModFeedbackOfflineProvider,
-    AddonModFeedbackHelperProvider,
-    AddonModFeedbackSyncProvider,
-];
-
 const routes: Routes = [
     {
         path: AddonModFeedbackModuleHandlerService.PAGE_NAME,
@@ -56,7 +46,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModFeedbackComponentsModule,
     ],
     providers: [
         {
@@ -79,6 +68,8 @@ const routes: Routes = [
                 CoreContentLinksDelegate.registerHandler(AddonModFeedbackShowEntriesLinkHandler.instance);
                 CoreContentLinksDelegate.registerHandler(AddonModFeedbackShowNonRespondentsLinkHandler.instance);
                 CorePushNotificationsDelegate.registerClickHandler(AddonModFeedbackPushClickHandler.instance);
+
+                CoreCourseHelper.registerModuleReminderClick(AddonModFeedbackProvider.COMPONENT);
             },
         },
     ],

@@ -19,7 +19,7 @@ import {
     CoreFileUploaderHandlerData,
     CoreFileUploaderHandlerResult,
 } from '@features/fileuploader/services/fileuploader-delegate';
-import { CoreApp } from '@services/app';
+import { CorePlatform } from '@services/platform';
 import { makeSingleton } from '@singletons';
 import { CoreSharedFilesHelper } from '../sharedfiles-helper';
 /**
@@ -32,34 +32,27 @@ export class CoreSharedFilesUploadHandlerService implements CoreFileUploaderHand
     priority = 1300;
 
     /**
-     * Whether or not the handler is enabled on a site level.
-     *
-     * @return True or promise resolved with true if enabled.
+     * @inheritdoc
      */
     async isEnabled(): Promise<boolean> {
-        return CoreApp.isIOS();
+        return CorePlatform.isIOS();
     }
 
     /**
-     * Given a list of mimetypes, return the ones that are supported by the handler.
-     *
-     * @param mimetypes List of mimetypes.
-     * @return Supported mimetypes.
+     * @inheritdoc
      */
     getSupportedMimetypes(mimetypes: string[]): string[] {
         return mimetypes;
     }
 
     /**
-     * Get the data to display the handler.
-     *
-     * @return Data.
+     * @inheritdoc
      */
     getData(): CoreFileUploaderHandlerData {
         return {
             title: 'core.sharedfiles.sharedfiles',
             class: 'core-sharedfiles-fileuploader-handler',
-            icon: 'folder', // Cannot use font-awesome in action sheet.
+            icon: 'fas-folder',
             action: (
                 maxSize?: number,
                 upload?: boolean,

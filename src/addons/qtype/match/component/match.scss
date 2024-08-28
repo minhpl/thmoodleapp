@@ -5,9 +5,26 @@
 
     .addon-qtype-match-correct {
         color: var(--success);
+        --subdued-text-color: var(--success);
     }
 
     .addon-qtype-match-incorrect {
         color: var(--danger);
+        --subdued-text-color: var(--danger);
+    }
+
+    ion-select::part(label) {
+        flex-grow: 1;
+    }
+
+    div.flex-row {
+        width: 100%;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    ion-item.question-rows {
+        --inner-padding-top: var(--mdl-spacing-2);
+        --inner-padding-bottom: var(--mdl-spacing-2);
     }
 }

@@ -1,0 +1,261 @@
+@import "./globals.scss";
+@import "theme.light.scss";
+@import "theme.dark.scss";
+
+html {
+    // Add serif fallback font for km language in some devices.
+    --ion-font-family: var(--ion-default-font), serif;
+
+    // Variables in the design system should be named using the following pattern:
+    // SYSTEM-CATEGORY-CONCEPT-PROPERTY-VARIANT (where the only required part is SYSTEM)
+    // SYSTEM: The name of the design system (e.g. ion, mdl, app, etc.)
+    // CATEGORY: The category of the component (e.g. color, typography, spacing, etc.)
+    // CONCEPT: The concept of the category (e.g. component name)
+    // PROPERTY: The property of the concept in camel case (e.g. color, fontSize, spacing, etc.)
+    // VARIANT: The variant of the property (e.g. primary, size[sm, md, lg], dark/light, state  etc.)
+    //
+    // Some guide: https://medium.com/eightshapes-llc/naming-tokens-in-design-systems-9e86c7444676
+
+    // ***** SPACING category ***** //
+    @for $i from 0 to 6 {
+        --mdl-spacing-#{$i}: #{$i*4}px;
+    }
+
+    // ***** TYPOGRAPHY category ***** //
+    // Sintaxis:[ <font-style> || <font-variant> || <font-weight> ]? <font-size> [ / <line-height> ]? <font-family>
+    --mdl-typography-fontSize-sm: #{dynamic-font(12px)}; // 0.75rem
+    --mdl-typography-fontSize-md: #{dynamic-font(14px)}; // 0.875rem
+    --mdl-typography-fontSize-lg: #{dynamic-font(16px)}; // 1rem
+
+    --mdl-typography-fontWeight-normal: 400;
+    --mdl-typography-fontWeight-medium: 500;
+
+    --mdl-typography-monospace-font: Andale Mono,Monaco,Courier New,DejaVu Sans Mono,monospace;
+
+    // Body font size
+    --mdl-typography-body-fontSize-sm: var(--mdl-typography-fontSize-sm);
+    --mdl-typography-body-fontSize-md: var(--mdl-typography-fontSize-md);
+    --mdl-typography-body-fontSize-lg: var(--mdl-typography-fontSize-lg);
+
+    --mdl-typography-body-fontWeight: var(--mdl-typography-fontWeight-normal);
+    --mdl-typography-body-lineHeight: 150%;
+    --mdl-typography-body-letterSpacing: 0.5px;
+    --mdl-typography-body-paragraphSpacing: 150%;
+
+    --mdl-typography-body-font-sm: normal normal var(--mdl-typography-body-fontWeight) var(--mdl-typography-body-fontSize-sm)/var(--mdl-typography-body-lineHeight) var(--ion-font-family);
+    --mdl-typography-body-font-md: normal normal var(--mdl-typography-body-fontWeight) var(--mdl-typography-body-fontSize-md)/var(--mdl-typography-body-lineHeight) var(--ion-font-family);
+    --mdl-typography-body-font-lg: normal normal var(--mdl-typography-body-fontWeight) var(--mdl-typography-body-fontSize-lg)/var(--mdl-typography-body-lineHeight) var(--ion-font-family);
+
+    // Links
+    --mdl-typography-link-fontSize-sm: var(--mdl-typography-fontSize-sm);
+    --mdl-typography-link-fontSize-md: var(--mdl-typography-fontSize-md);
+    --mdl-typography-link-fontSize-lg: var(--mdl-typography-fontSize-lg);
+
+    --mdl-typography-link-fontWeight: var(--mdl-typography-fontWeight-normal);
+    --mdl-typography-link-lineHeight: 150%;
+    --mdl-typography-link-letterSpacing: 0.5px;
+    --mdl-typography-link-paragraphSpacing: 150%;
+
+    --mdl-typography-link-font-sm: normal normal var(--mdl-typography-link-fontWeight) var(--mdl-typography-link-fontSize-sm)/var(--mdl-typography-link-lineHeight) var(--ion-font-family);
+    --mdl-typography-link-font-md: normal normal var(--mdl-typography-link-fontWeight) var(--mdl-typography-link-fontSize-md)/var(--mdl-typography-link-lineHeight) var(--ion-font-family);
+    --mdl-typography-link-font-lg: normal normal var(--mdl-typography-link-fontWeight) var(--mdl-typography-link-fontSize-lg)/var(--mdl-typography-link-lineHeight) var(--ion-font-family);
+
+    // Labels
+    --mdl-typography-label-fontSize-sm: #{dynamic-font(10px)}; // 0.625rem
+    --mdl-typography-label-fontSize-md: #{dynamic-font(12px)};
+    --mdl-typography-label-fontSize-lg: #{dynamic-font(14px)};
+
+    --mdl-typography-label-fontWeight: var(--mdl-typography-fontWeight-medium);
+
+    --mdl-typography-label-lineHeight-sm: #{dynamic-font(16px)};
+    --mdl-typography-label-lineHeight-md: #{dynamic-font(16px)};
+    --mdl-typography-label-lineHeight-lg: #{dynamic-font(20px)};
+
+    --mdl-typography-label-letterSpacing: 0.1px;
+
+    --mdl-typography-label-font-sm: normal normal var(--mdl-typography-label-fontWeight) var(--mdl-typography-label-fontSize-sm)/var(--mdl-typography-label-lineHeight-sm) var(--ion-font-family);
+    --mdl-typography-label-font-md: normal normal var(--mdl-typography-label-fontWeight) var(--mdl-typography-label-fontSize-md)/var(--mdl-typography-label-lineHeight-md) var(--ion-font-family);
+    --mdl-typography-label-font-lg: normal normal var(--mdl-typography-label-fontWeight) var(--mdl-typography-label-fontSize-lg)/var(--mdl-typography-label-lineHeight-lg) var(--ion-font-family);
+
+    // Subtitles
+    --mdl-typography-subtitle-fontSize-sm: #{dynamic-font(14px)};
+    --mdl-typography-subtitle-fontSize-md: #{dynamic-font(16px)};
+    --mdl-typography-subtitle-fontSize-lg: #{dynamic-font(20px)};
+
+    --mdl-typography-subtitle-fontWeight: var(--mdl-typography-fontWeight-medium);
+    --mdl-typography-subtitle-lineHeight: 150%;
+    --mdl-typography-subtitle-letterSpacing: 0.1px;
+
+    --mdl-typography-subtitle-font-sm: normal normal var(--mdl-typography-subtitle-fontWeight) var(--mdl-typography-subtitle-fontSize-sm)/var(--mdl-typography-subtitle-lineHeight) var(--ion-font-family);
+    --mdl-typography-subtitle-font-md: normal normal var(--mdl-typography-subtitle-fontWeight) var(--mdl-typography-subtitle-fontSize-md)/var(--mdl-typography-subtitle-lineHeight) var(--ion-font-family);
+    --mdl-typography-subtitle-font-lg: normal normal var(--mdl-typography-subtitle-fontWeight) var(--mdl-typography-subtitle-fontSize-lg)/var(--mdl-typography-subtitle-lineHeight) var(--ion-font-family);
+
+    // Headings
+    --mdl-typography-heading1-fontSize: #{dynamic-font(28px)}; // 1.75rem
+    --mdl-typography-heading2-fontSize: #{dynamic-font(24px)}; // 1.5rem
+    --mdl-typography-heading3-fontSize: #{dynamic-font(22px)}; // 1.375rem
+    --mdl-typography-heading4-fontSize: #{dynamic-font(20px)}; // 1.25rem
+    --mdl-typography-heading5-fontSize: #{dynamic-font(18px)}; // 1.125rem
+    --mdl-typography-heading6-fontSize: #{dynamic-font(16px)}; // 1rem
+
+    --mdl-typography-heading1-fontWeight: var(--mdl-typography-fontWeight-normal);
+    --mdl-typography-heading2-fontWeight: var(--mdl-typography-fontWeight-normal);
+    --mdl-typography-heading3-fontWeight: var(--mdl-typography-fontWeight-normal);
+    --mdl-typography-heading4-fontWeight: var(--mdl-typography-fontWeight-medium);
+    --mdl-typography-heading5-fontWeight: var(--mdl-typography-fontWeight-medium);
+    --mdl-typography-heading6-fontWeight: var(--mdl-typography-fontWeight-medium);
+
+    --mdl-typography-heading-lineHeight: 130%;
+
+    --mdl-typography-heading1-font: normal normal var(--mdl-typography-heading1-fontWeight) var(--mdl-typography-heading1-fontSize)/var(--mdl-typography-heading-lineHeight) var(--ion-font-family);
+    --mdl-typography-heading2-font: normal normal var(--mdl-typography-heading2-fontWeight) var(--mdl-typography-heading2-fontSize)/var(--mdl-typography-heading-lineHeight) var(--ion-font-family);
+    --mdl-typography-heading3-font: normal normal var(--mdl-typography-heading3-fontWeight) var(--mdl-typography-heading3-fontSize)/var(--mdl-typography-heading-lineHeight) var(--ion-font-family);
+    --mdl-typography-heading4-font: normal normal var(--mdl-typography-heading4-fontWeight) var(--mdl-typography-heading4-fontSize)/var(--mdl-typography-heading-lineHeight) var(--ion-font-family);
+    --mdl-typography-heading5-font: normal normal var(--mdl-typography-heading5-fontWeight) var(--mdl-typography-heading5-fontSize)/var(--mdl-typography-heading-lineHeight) var(--ion-font-family);
+    --mdl-typography-heading6-font: normal normal var(--mdl-typography-heading6-fontWeight) var(--mdl-typography-heading6-fontSize)/var(--mdl-typography-heading-lineHeight) var(--ion-font-family);
+
+    // Icons
+    --mdl-typography-icon-fontSize-sm: #{dynamic-font(16px)};
+    --mdl-typography-icon-fontSize-md: #{dynamic-font(20px)};
+    --mdl-typography-icon-fontSize-lg: #{dynamic-font(24px)};
+
+    // ***** SHAPE category ***** //
+    --mdl-shape-borderRadius-none: 0px;
+    --mdl-shape-borderRadius-xs: 4px;
+    --mdl-shape-borderRadius-sm: 8px;
+    --mdl-shape-borderRadius-md: 12px;
+    --mdl-shape-borderRadius-lg: 16px;
+    --mdl-shape-borderRadius-xl: 24px;
+    --mdl-shape-borderRadius-round: 50%;
+
+    // ***** SHADOW category ***** //
+    --mdl-shadow-boxShadowColor: 40 40 40; //#282828;
+    --mdl-shadow-boxShadow-00: 0px 0px 0px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%);
+    --mdl-shadow-boxShadow-outline: 0px 0px 0px 2px rgb(var(--mdl-shadow-boxShadowColor) / 15%), 0px 2px 4px 0px rgb(var(--mdl-shadow-boxShadowColor) / 2%);
+    --mdl-shadow-boxShadow-01: 0px 1px 3px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%), 0px 2px 1px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%), 0px 1px 1px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-02: 0px 1px 5px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%), 0px 3px 1px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%), 0px 2px 2px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-03: 0px 1px 8px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%), 0px 3px 3px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%), 0px 3px 4px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-04: 0px 2px 4px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%), 0px 1px 10px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%), 0px 4px 5px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-06: 0px 3px 5px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%), 0px 1px 18px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%), 0px 6px 10px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-08: 0px 5px 5px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%), 0px 3px 14px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%), 0px 8px 10px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-12: 0px 7px 8px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%),0px 5px 22px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%),0px 12px 17px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-16: 0px 7px 8px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%),0px 5px 22px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%),0px 12px 17px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+    --mdl-shadow-boxShadow-24: 0px 11px 15px 0px rgb(var(--mdl-shadow-boxShadowColor) / 20%), 0px 9px 46px 0px rgb(var(--mdl-shadow-boxShadowColor) / 12%), 0px 24px 38px 0px rgb(var(--mdl-shadow-boxShadowColor) / 14%);
+
+    // ***** OPACITY category ***** //
+    --mdl-button-disabled-opacity: 0.6;
+    --mdl-input-disabled-opacity: 0.6;
+    --mdl-item-disabled-opacity: 0.4;
+    --mdl-placeholder-opacity: 0.6;
+
+    // ***** ACCESSIBILITY ***** //
+    --a11y-sizing-minTargetSize: 44px;
+    --a11y-shadow-focus-borderWidth: 2px;
+    --a11y-shadow-focus-boxShadow: inset 0 0 var(--a11y-shadow-focus-borderWidth) 1px var(--a11y-focus-color);
+    --a11y-shadow-focus-outline: var(--a11y-shadow-focus-borderWidth) solid var(--a11y-focus-color);
+    --a11y-background-focus-background: var(--ion-text-color);
+    --a11y-background-focus-opacity: 0.08;
+    --a11y-background-focus-background-rgb: rgba(var(--ion-text-color-rgb), var(--a11y-background-focus-opacity));
+
+    // @TODO ***** VARIABLES TO BE REVIEWED, RENAMED AND TIDIED ***** //
+    --text-size: var(--mdl-typography-body-fontSize-md);
+
+    --core-input-radius: var(--mdl-shape-borderRadius-xs);
+    --core-input-border-width: 1px;
+
+    --list-item-max-width: 768px;
+
+    --modal-radius: var(--mdl-shape-borderRadius-md);
+    --modal-lateral-max-width: 320px;
+    --modal-lateral-margin: 56px;
+
+    --loader-radius: var(--mdl-shape-borderRadius-xs);
+    --loader-display: block;
+
+    --drop-shadow-top: 0px 2px 5px rgb(var(--mdl-shadow-boxShadowColor) / 50%);
+    --drop-shadow-bottom: 0px -2px 5px rgb(var(--mdl-shadow-boxShadowColor) / 50%);
+    --drop-shadow-end: -2px 0px 5px rgb(var(--mdl-shadow-boxShadowColor) / 50%);
+    --drop-shadow-start: 2px 0px 5px rgb(var(--mdl-shadow-boxShadowColor) / 50%);
+
+    --ion-card-vertical-margin: 12px;
+    --ion-card-horizontal-margin: 12px;
+    --ion-card-radius: var(--mdl-shape-borderRadius-lg);
+    --ion-card-border-width: 1px;
+
+    --bottom-tabs-size: 48px;
+    --side-tabs-size: 56px;
+
+    --core-header-toolbar-button-image-size: var(--a11y-sizing-minTargetSize);
+    --core-header-toolbar-border-width: 0px;
+    --core-header-toolbar-height: 48px;
+    --core-header-shadow: none;
+
+    --ion-searchbar-height: var(--a11y-sizing-minTargetSize);
+    --ion-searchbar-border-radius: var(--core-input-radius);
+
+    --core-search-box-border-radius: var(--core-input-radius);
+
+    --core-combobox-radius: var(--core-input-radius);
+    --core-combobox-border-width: var(--core-input-border-width);
+    --core-combobox-box-shadow: none;
+
+    --core-tab-font-weight-active: var(--mdl-typography-label-fontWeight);
+    --core-tabs-height: 48px;
+
+    --core-progressbar-height: 8px;
+
+    --ion-item-detail-icon-font-size: var(--mdl-typography-icon-fontSize-md);
+    --ion-item-detail-icon-opacity: 1;
+
+    --item-divider-min-height: calc(var(--a11y-sizing-minTargetSize) + 8px);
+    --item-divider-border-width: 0px;
+
+    --spacer-vertical: 8px;
+
+    --selected-item-border-width: 5px;
+
+    --core-large-avatar-size: 80px;
+    --core-avatar-size: var(--a11y-sizing-minTargetSize);
+    --core-avatar-radius: 50%;
+
+    --core-courseimage-on-course-size: 72px;
+    --core-courseimage-radius: var(--mdl-shape-borderRadius-sm);
+
+    --core-user-menu-site-logo-max-height: 32px;
+
+    --core-messages-message-note-font-size: 75%;
+    --core-messages-avatar-size: 30px;
+
+    --core-dd-question-selected-shadow: 2px 2px 4px var(--gray-500);
+    --core-dd-question-radius: 10px;
+
+    --rotate-expandable: rotate(90deg);
+
+    --core-mainpage-sitename-display: none;
+    --core-mainpage-headerlogo-display: none;
+    --core-mainpage-headerlogo-maxheight: calc(var(--core-header-toolbar-height) - 16px);
+
+    @if ($core-dashboard-logo) {
+        --core-mainpage-headerlogo-display: inline;
+    } @else {
+        --core-mainpage-sitename-display: inline;
+    }
+}
+
+/** @deprecated since 4.3 **/
+html {
+    --small-radius: var(--mdl-shape-borderRadius-xs);
+    --medium-radius: var(--mdl-shape-borderRadius-sm);
+    --big-radius: var(--mdl-shape-borderRadius-lg);
+    --huge-radius: var(--mdl-shape-borderRadius-xl);
+}
+
+/** @deprecated since 4.4 **/
+html {
+    --font-size-normal: var(--mdl-typography-fontSize-md);
+    --a11y-min-target-size: var(--a11y-sizing-minTargetSize);
+    --a11y-focus-width: var(--a11y-shadow-focus-boxShadowSpread);
+    --a11y-focus-color: var(--a11y-shadow-focus-boxShadowColor);
+    --item-divider-font-size: var(--mdl-typography-subtitle-fontSize-md);
+    --item-divider-font-size-big: var(--mdl-typography-subtitle-fontSize-lg);
+}

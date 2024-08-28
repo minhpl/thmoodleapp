@@ -18,13 +18,15 @@ import { CoreRoutedItemsManagerSourcesTracker } from '@classes/items-management/
 import { CoreSwipeNavigationItemsManager } from '@classes/items-management/swipe-navigation-items-manager';
 import { CoreCourse } from '@features/course/services/course';
 import { CanLeave } from '@guards/can-leave';
-import { IonRefresher } from '@ionic/angular';
 import { CoreNavigator } from '@services/navigator';
 import { CoreScreen } from '@services/screen';
 import { CoreDomUtils } from '@services/utils/dom';
 import { AddonModAssignListFilterName, AddonModAssignSubmissionsSource } from '../../classes/submissions-source';
 import { AddonModAssignSubmissionComponent } from '../../components/submission/submission';
 import { AddonModAssign, AddonModAssignAssign } from '../../services/assign';
+import { CoreTime } from '@singletons/time';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { Translate } from '@singletons';
 
 /**
  * Page that displays a submission.
@@ -49,8 +51,29 @@ export class AddonModAssignSubmissionReviewPage implements OnInit, OnDestroy, Ca
     protected assign?: AddonModAssignAssign; // The assignment the submission belongs to.
     protected blindMarking = false; // Whether it uses blind marking.
     protected forceLeave = false; // To allow leaving the page without checking for changes.
+    protected logView: () => void;
 
-    constructor(protected route: ActivatedRoute) { }
+    constructor(protected route: ActivatedRoute) {
+        this.logView = CoreTime.once(() => {
+            if (!this.assign) {
+                return;
+            }
+
+            const id = this.blindMarking ? this.blindId : this.submitId;
+            const paramName = this.blindMarking ? 'blindid' : 'userid';
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: 'mod_assign_get_submission_status',
+                name: Translate.instant('addon.mod_assign.subpagetitle', {
+                    contextname: this.assign.name,
+                    subpage: Translate.instant('addon.mod_assign.grading'),
+                }),
+                data: { id, assignid: this.assign.id, category: 'assign' },
+                url: `/mod/assign/view.php?id=${this.assign.cmid}&action=grader&${paramName}=${id}`,
+            });
+        });
+    }
 
     /**
      * @inheritdoc
@@ -84,6 +107,7 @@ export class AddonModAssignSubmissionReviewPage implements OnInit, OnDestroy, Ca
             }
 
             this.fetchSubmission().finally(() => {
+                this.logView();
                 this.loaded = true;
             });
         });
@@ -99,7 +123,7 @@ export class AddonModAssignSubmissionReviewPage implements OnInit, OnDestroy, Ca
     /**
      * Check if we can leave the page or not.
      *
-     * @return Resolved if we can leave it, rejected if not.
+     * @returns Resolved if we can leave it, rejected if not.
      */
     async canLeave(): Promise<boolean> {
         if (!this.submissionComponent || this.forceLeave) {
@@ -127,7 +151,7 @@ export class AddonModAssignSubmissionReviewPage implements OnInit, OnDestroy, Ca
     /**
      * Get the submission.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchSubmission(): Promise<void> {
         this.assign = await AddonModAssign.getAssignment(this.courseId, this.moduleId);
@@ -154,7 +178,7 @@ export class AddonModAssignSubmissionReviewPage implements OnInit, OnDestroy, Ca
     /**
      * Refresh all the data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async refreshAllData(): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -185,7 +209,7 @@ export class AddonModAssignSubmissionReviewPage implements OnInit, OnDestroy, Ca
      *
      * @param refresher Refresher.
      */
-    refreshSubmission(refresher?: IonRefresher): void {
+    refreshSubmission(refresher?: HTMLIonRefresherElement): void {
         this.refreshAllData().finally(() => {
             refresher?.complete();
         });
@@ -221,8 +245,8 @@ class AddonModAssignSubmissionSwipeItemsManager extends CoreSwipeNavigationItems
     /**
      * @inheritdoc
      */
-    protected getSelectedItemPathFromRoute(route: ActivatedRouteSnapshot): string | null {
-        return route.params.submitId;
+    protected getSelectedItemPathFromRoute(route: ActivatedRouteSnapshot | ActivatedRoute): string | null {
+        return CoreNavigator.getRouteParams(route).submitId;
     }
 
 }

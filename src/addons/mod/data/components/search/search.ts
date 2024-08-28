@@ -89,7 +89,7 @@ export class AddonModDataSearchComponent implements OnInit {
     /**
      * Displays Advanced Search Fields.
      *
-     * @return Generated HTML.
+     * @returns Generated HTML.
      */
     protected renderAdvancedSearchFields(): string {
         this.jsData = {
@@ -104,12 +104,26 @@ export class AddonModDataSearchComponent implements OnInit {
         this.fieldsArray.forEach((field) => {
             let replace = '[[' + field.name + ']]';
             replace = replace.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
-            const replaceRegex = new RegExp(replace, 'gi');
+            let replaceRegex = new RegExp(replace, 'gi');
 
             // Replace field by a generic directive.
             const render = '<addon-mod-data-field-plugin mode="search" [field]="fields[' + field.id +
                 ']" [form]="form" [searchFields]="search"></addon-mod-data-field-plugin>';
             template = template.replace(replaceRegex, render);
+
+            // Replace the field name tag.
+            replace = '[[' + field.name + '#name]]';
+            replace = replace.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+            replaceRegex = new RegExp(replace, 'gi');
+
+            template = template.replace(replaceRegex, field.name);
+
+            // Replace the field description tag.
+            replace = '[[' + field.name + '#description]]';
+            replace = replace.replace(/[-[\]/{}()*+?.\\^$|]/g, '\\$&');
+            replaceRegex = new RegExp(replace, 'gi');
+
+            template = template.replace(replaceRegex, field.description);
         });
 
         // Not pluginable other search elements.
@@ -125,6 +139,18 @@ export class AddonModDataSearchComponent implements OnInit {
         [placeholder]="\'addon.mod_data.authorlastname\' | translate" formControlName="lastname"></ion-input></span>';
         template = template.replace(replaceRegex, render);
 
+        // Searching by otherfields.
+        const regex = new RegExp('##otherfields##', 'gi');
+
+        if (template.match(regex)) {
+            const unusedFields = this.fieldsArray.filter(field => !template.includes(`[field]="fields[${field.id}]`)).map((field) =>
+                `<p><strong>${field.name}</strong></p>` +
+                    '<p><addon-mod-data-field-plugin mode="search" [field]="fields[' + field.id +
+                    ']" [form]="form" [searchFields]="search"></addon-mod-data-field-plugin><p>');
+
+            template = template.replace(regex, unusedFields.join(''));
+        }
+
         // Searching by tags is not supported.
         replaceRegex = new RegExp('##tags##', 'gi');
         const message = CoreTag.areTagsAvailableInSite() ?
@@ -139,7 +165,7 @@ export class AddonModDataSearchComponent implements OnInit {
      * Retrieve the entered data in search in a form.
      *
      * @param searchedData Array with the entered form values.
-     * @return Array with the answers.
+     * @returns Array with the answers.
      */
     getSearchDataFromForm(searchedData: CoreFormFields): AddonModDataSearchEntriesAdvancedField[] {
         const advancedSearch: AddonModDataSearchEntriesAdvancedField[] = [];

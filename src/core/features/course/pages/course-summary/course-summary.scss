@@ -1,4 +1,4 @@
-@import '~theme/globals.scss';
+@use "theme/globals" as *;
 
 :host {
     --thumb-height: 180px;
@@ -27,8 +27,14 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+
+            // Fill geopaterns
+            &[src$=".svg"] {
+                min-width: 100%;
+            }
         }
 
+        /** Deprecated icon */
         ion-icon.course-icon {
             padding: 24px;
             font-size: calc(var(--thumb-height) - 48px);
@@ -38,8 +44,8 @@
 
     .course-container {
         position: relative;
-        top: calc(var(--thumb-height) - var(--big-radius));
-        border-radius: var(--big-radius) var(--big-radius) 0 0;
+        top: calc(var(--thumb-height) - var(--mdl-shape-borderRadius-lg));
+        border-radius: var(--mdl-shape-borderRadius-lg) var(--mdl-shape-borderRadius-lg) 0 0;
         background-color: var(--ion-background-color);
         box-shadow: var(--drop-shadow-top);
         clip-path: inset(-5px 0px 0px 0px);
@@ -53,7 +59,7 @@
     }
 
     h1 {
-        font-size: 20px;
+        font-size: var(--mdl-typography-heading4-fontSize);
     }
 
     .core-course-category {
@@ -63,7 +69,7 @@
 
     .core-course-dates {
         background: var(--light);
-        border-radius: var(--small-radius);
+        border-radius: var(--mdl-shape-borderRadius-xs);
         padding: 8px;
         width: 100%;
 
@@ -98,5 +104,9 @@
         .core-customfieldvalue {
             display: inline;
         }
+    }
+
+    .core-course-oib-button.hidden {
+        display: none;
     }
 }

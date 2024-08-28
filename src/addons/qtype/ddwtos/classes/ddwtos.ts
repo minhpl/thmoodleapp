@@ -15,7 +15,7 @@
 import { CoreFormatTextDirective } from '@directives/format-text';
 import { CoreTextUtils } from '@services/utils/text';
 import { CoreUtils } from '@services/utils/utils';
-import { CoreComponentsRegistry } from '@singletons/components-registry';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
 import { CoreCoordinates, CoreDom } from '@singletons/dom';
 import { CoreEventObserver } from '@singletons/events';
 import { CoreLogger } from '@singletons/logger';
@@ -130,7 +130,7 @@ export class AddonQtypeDdwtosQuestion {
      * Get the choice number of an element. It is extracted from the classes.
      *
      * @param node Element to check.
-     * @return Choice number.
+     * @returns Choice number.
      */
     getChoice(node: HTMLElement | null): number | undefined {
         return this.getClassnameNumericSuffix(node, 'choice');
@@ -141,7 +141,7 @@ export class AddonQtypeDdwtosQuestion {
      *
      * @param node The element to check.
      * @param prefix Prefix of the class to check.
-     * @return The number in the class.
+     * @returns The number in the class.
      */
     getClassnameNumericSuffix(node: HTMLElement | null, prefix: string): number | undefined {
         if (node?.classList.length) {
@@ -164,7 +164,7 @@ export class AddonQtypeDdwtosQuestion {
      * Get the group number of an element. It is extracted from the classes.
      *
      * @param node Element to check.
-     * @return Group number.
+     * @returns Group number.
      */
     getGroup(node: HTMLElement | null): number | undefined {
         return this.getClassnameNumericSuffix(node, 'group');
@@ -174,7 +174,7 @@ export class AddonQtypeDdwtosQuestion {
      * Get the number of an element ('no'). It is extracted from the classes.
      *
      * @param node Element to check.
-     * @return Number.
+     * @returns Number.
      */
     getNo(node: HTMLElement | null): number | undefined {
         return this.getClassnameNumericSuffix(node, 'no');
@@ -184,7 +184,7 @@ export class AddonQtypeDdwtosQuestion {
      * Get the place number of an element. It is extracted from the classes.
      *
      * @param node Element to check.
-     * @return Place number.
+     * @returns Place number.
      */
     getPlace(node: HTMLElement | null): number | undefined {
         return this.getClassnameNumericSuffix(node, 'place');
@@ -422,12 +422,12 @@ export class AddonQtypeDdwtosQuestion {
     /**
      * Wait for the drag home items to be in DOM.
      *
-     * @return Promise resolved when ready in the DOM.
+     * @returns Promise resolved when ready in the DOM.
      */
     protected async waitForReady(): Promise<void> {
         await CoreDom.waitToBeInDOM(this.container);
 
-        await CoreComponentsRegistry.waitComponentsReady(this.container, 'core-format-text', CoreFormatTextDirective);
+        await CoreDirectivesRegistry.waitDirectivesReady(this.container, 'core-format-text', CoreFormatTextDirective);
 
         const drag = Array.from(this.container.querySelectorAll<HTMLElement>(this.selectors.dragHomes()))[0];
 
@@ -480,17 +480,23 @@ export class AddonQtypeDdwtosQuestion {
             return;
         }
 
-        await CoreDom.waitToBeInDOM(groupItems[0]);
-
-        let maxWidth = 0;
-        let maxHeight = 0;
-        // Find max height and width.
         groupItems.forEach((item) => {
             item.innerHTML = CoreTextUtils.decodeHTML(item.innerHTML);
         });
-        // Wait to render in order to calculate size.
-        await CoreUtils.nextTick();
 
+        // Wait to render in order to calculate size.
+        if (groupItems[0].parentElement) {
+            // Wait for parent to be visible. We cannot wait for group items because they have visibility hidden.
+            await CoreDom.waitToBeVisible(groupItems[0].parentElement);
+        } else {
+            // Group items should always have a parent, add a fallback just in case.
+            await CoreDom.waitToBeInDOM(groupItems[0]);
+            await CoreUtils.nextTicks(5);
+        }
+
+        // Find max height and width.
+        let maxWidth = 0;
+        let maxHeight = 0;
         groupItems.forEach((item) => {
             maxWidth = Math.max(maxWidth, Math.ceil(item.offsetWidth));
             maxHeight = Math.max(maxHeight, Math.ceil(item.offsetHeight));

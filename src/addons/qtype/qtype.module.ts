@@ -27,6 +27,7 @@ import { AddonQtypeMatchModule } from './match/match.module';
 import { AddonQtypeMultiAnswerModule } from './multianswer/multianswer.module';
 import { AddonQtypeMultichoiceModule } from './multichoice/multichoice.module';
 import { AddonQtypeNumericalModule } from './numerical/numerical.module';
+import { AddonQtypeOrderingModule } from './ordering/ordering.module';
 import { AddonQtypeRandomSaMatchModule } from './randomsamatch/randomsamatch.module';
 import { AddonQtypeShortAnswerModule } from './shortanswer/shortanswer.module';
 import { AddonQtypeTrueFalseModule } from './truefalse/truefalse.module';
@@ -46,9 +47,10 @@ import { AddonQtypeTrueFalseModule } from './truefalse/truefalse.module';
         AddonQtypeMultiAnswerModule,
         AddonQtypeMultichoiceModule,
         AddonQtypeNumericalModule,
+        AddonQtypeOrderingModule,
         AddonQtypeRandomSaMatchModule,
         AddonQtypeShortAnswerModule,
         AddonQtypeTrueFalseModule,
     ],
 })
-export class AddonQtypeModule { }
+export class AddonQtypeModule {}

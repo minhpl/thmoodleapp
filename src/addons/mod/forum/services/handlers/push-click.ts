@@ -24,6 +24,7 @@ import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton } from '@singletons';
 
 import { AddonModForumModuleHandlerService } from './module';
+import { isSafeNumber } from '@/core/utils/types';
 
 /**
  * Handler for forum push notifications clicks.
@@ -39,40 +40,47 @@ export class AddonModForumPushClickHandlerService implements CorePushNotificatio
      * Check if a notification click is handled by this handler.
      *
      * @param notification The notification to check.
-     * @return Whether the notification click is handled by this handler
+     * @returns Whether the notification click is handled by this handler
      */
     async handles(notification: NotificationData): Promise<boolean> {
         return CoreUtils.isTrueOrOne(notification.notif)
             && notification.moodlecomponent == 'mod_forum'
-            && notification.name == 'posts';
+            && notification.name == 'posts'
+            && !!(notification.contexturl || notification.customdata?.discussionid);
     }
 
     /**
      * Handle the notification click.
      *
      * @param notification The notification to check.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async handleClick(notification: NotificationData): Promise<void> {
         const contextUrlParams = CoreUrlUtils.extractUrlParams(notification.contexturl);
         const data = notification.customdata || {};
         const courseId = Number(notification.courseid);
         const discussionId = Number(contextUrlParams.d || data.discussionid);
-        const cmId = Number(data.cmid);
+        const cmId = data.cmid && Number(data.cmid);
         const pageParams: Params = {
             forumId: Number(data.instance),
+            cmId,
+            courseId,
         };
+
+        if (!isSafeNumber(discussionId)) {
+            return;
+        }
 
         if (data.postid || contextUrlParams.urlHash) {
             pageParams.postId = Number(data.postid || contextUrlParams.urlHash.replace('p', ''));
         }
 
         await CoreUtils.ignoreErrors(
-            AddonModForum.invalidateDiscussionPosts(pageParams.discussionId, undefined, notification.site),
+            AddonModForum.invalidateDiscussionPosts(discussionId, undefined, notification.site),
         );
 
         await CoreNavigator.navigateToSitePath(
-            `${AddonModForumModuleHandlerService.PAGE_NAME}/${courseId}/${cmId}/${discussionId}`,
+            `${AddonModForumModuleHandlerService.PAGE_NAME}/discussion/${discussionId}`,
             { siteId: notification.site, params: pageParams },
         );
     }

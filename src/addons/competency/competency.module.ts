@@ -17,8 +17,6 @@ import { CoreContentLinksDelegate } from '@features/contentlinks/services/conten
 import { CoreCourseOptionsDelegate } from '@features/course/services/course-options-delegate';
 import { CorePushNotificationsDelegate } from '@features/pushnotifications/services/push-delegate';
 import { CoreUserDelegate } from '@features/user/services/user-delegate';
-import { AddonCompetencyProvider } from './services/competency';
-import { AddonCompetencyHelperProvider } from './services/competency-helper';
 import { AddonCompetencyCompetencyLinkHandler } from './services/handlers/competency-link';
 import { AddonCompetencyCourseOptionHandler } from './services/handlers/course-option';
 import { AddonCompetencyPlanLinkHandler } from './services/handlers/plan-link';
@@ -27,17 +25,25 @@ import { AddonCompetencyPushClickHandler } from './services/handlers/push-click'
 import { AddonCompetencyUserCompetencyLinkHandler } from './services/handlers/user-competency-link';
 import { AddonCompetencyUserHandler } from './services/handlers/user';
 import { Routes } from '@angular/router';
-import { CoreMainMenuRoutingModule } from '@features/mainmenu/mainmenu-routing.module';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
-import { CoreCourseIndexRoutingModule } from '@features/course/pages/index/index-routing.module';
+import { CoreCourseIndexRoutingModule } from '@features/course/course-routing.module';
 import { COURSE_PAGE_NAME } from '@features/course/course.module';
 import { PARTICIPANTS_PAGE_NAME } from '@features/user/user.module';
 
-// List of providers (without handlers).
-export const ADDON_COMPETENCY_SERVICES: Type<unknown>[] = [
-    AddonCompetencyProvider,
-    AddonCompetencyHelperProvider,
-];
+/**
+ * Get competency services.
+ *
+ * @returns Competency services.
+ */
+export async function getCompetencyServices(): Promise<Type<unknown>[]> {
+    const { AddonCompetencyProvider } = await import('@addons/competency/services/competency');
+    const { AddonCompetencyHelperProvider } = await import('@addons/competency/services/competency-helper');
+
+    return [
+        AddonCompetencyProvider,
+        AddonCompetencyHelperProvider,
+    ];
+}
 
 export const ADDON_COMPETENCY_LEARNING_PLANS_PAGE = 'learning-plans';
 export const ADDON_COMPETENCY_COMPETENCIES_PAGE = 'competencies';
@@ -70,7 +76,6 @@ const courseIndexRoutes: Routes = [
         CoreMainMenuTabRoutingModule.forChild(mainMenuChildrenRoutes),
         CoreCourseIndexRoutingModule.forChild({ children: courseIndexRoutes }),
     ],
-    exports: [CoreMainMenuRoutingModule],
     providers: [
         {
             provide: APP_INITIALIZER,

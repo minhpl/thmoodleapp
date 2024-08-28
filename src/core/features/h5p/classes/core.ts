@@ -24,17 +24,23 @@ import { CoreH5PContentValidator, CoreH5PSemantics } from './content-validator';
 import { Translate } from '@singletons';
 import { CoreH5PContentBeingSaved } from './storage';
 import { CoreH5PLibraryAddTo } from './validator';
-import { CoreText } from '@singletons/text';
+import { CorePath } from '@singletons/path';
 
 /**
  * Equivalent to H5P's H5PCore class.
  */
 export class CoreH5PCore {
 
+    static readonly API_VERSION = {
+        majorVersion: 1,
+        minorVersion: 26,
+    };
+
     static readonly STYLES = [
         'styles/h5p.css',
         'styles/h5p-confirmation-dialog.css',
         'styles/h5p-core-button.css',
+        'styles/h5p-tooltip.css',
     ];
 
     static readonly SCRIPTS = [
@@ -47,6 +53,7 @@ export class CoreH5PCore {
         'js/h5p-confirmation-dialog.js',
         'js/h5p-action-bar.js',
         'js/request-queue.js',
+        'js/h5p-tooltip.js',
     ];
 
     static readonly ADMIN_SCRIPTS = [
@@ -92,9 +99,9 @@ export class CoreH5PCore {
     /**
      * Determine the correct embed type to use.
      *
-     * @param Embed type of the content.
-     * @param Embed type of the main library.
-     * @return Either 'div' or 'iframe'.
+     * @param contentEmbedType Type of the content.
+     * @param libraryEmbedTypes Type of the main library.
+     * @returns Either 'div' or 'iframe'.
      */
     static determineEmbedType(contentEmbedType: string, libraryEmbedTypes: string): string {
         // Detect content embed type.
@@ -117,7 +124,7 @@ export class CoreH5PCore {
      * Get the hash of a list of dependencies.
      *
      * @param dependencies Dependencies.
-     * @return Hash.
+     * @returns Hash.
      */
     static getDependenciesHash(dependencies: {[machineName: string]: CoreH5PContentDependencyData}): string {
         // Build hash of dependencies.
@@ -133,13 +140,13 @@ export class CoreH5PCore {
         toHash.sort((a, b) => a.localeCompare(b));
 
         // Calculate hash.
-        return <string> Md5.hashAsciiStr(toHash.join(''));
+        return Md5.hashAsciiStr(toHash.join(''));
     }
 
     /**
      * Get core JavaScript files.
      *
-     * @return array The array containg urls of the core JavaScript files:
+     * @returns array The array containg urls of the core JavaScript files:
      */
     static getScripts(): string[] {
         const libUrl = CoreH5P.h5pCore.h5pFS.getCoreH5PPath();
@@ -149,7 +156,7 @@ export class CoreH5PCore {
             urls.push(libUrl + script);
         });
 
-        urls.push(CoreText.concatenatePaths(libUrl, 'moodle/js/h5p_overrides.js'));
+        urls.push(CorePath.concatenatePaths(libUrl, 'moodle/js/h5p_overrides.js'));
 
         return urls;
     }
@@ -158,7 +165,7 @@ export class CoreH5PCore {
      * Parses library data from a string on the form {machineName} {majorVersion}.{minorVersion}.
      *
      * @param libraryString On the form {machineName} {majorVersion}.{minorVersion}
-     * @return Object with keys machineName, majorVersion and minorVersion. Null if string is not parsable.
+     * @returns Object with keys machineName, majorVersion and minorVersion. Null if string is not parsable.
      */
     static libraryFromString(libraryString: string): CoreH5PLibraryBasicData | null {
 
@@ -178,20 +185,35 @@ export class CoreH5PCore {
     /**
      * Writes library data as string on the form {machineName} {majorVersion}.{minorVersion}.
      *
-     * @param libraryData Library data.
-     * @param folderName Use hyphen instead of space in returned string.
-     * @return String on the form {machineName} {majorVersion}.{minorVersion}.
+     * @param library Library data.
+     * @returns String on the form {machineName} {majorVersion}.{minorVersion}.
      */
-    static libraryToString(libraryData: CoreH5PLibraryBasicData | CoreH5PContentMainLibraryData, folderName?: boolean): string {
-        return ('machineName' in libraryData ? libraryData.machineName : libraryData.name) + (folderName ? '-' : ' ') +
-                libraryData.majorVersion + '.' + libraryData.minorVersion;
+    static libraryToString(library: CoreH5PLibraryBasicData | CoreH5PContentMainLibraryData): string {
+        const name = 'machineName' in library ? library.machineName : library.name;
+
+        return `${name} ${library.majorVersion}.${library.minorVersion}`;
+    }
+
+    /**
+     * Get the name of a library's folder name
+     *
+     * @param library Library data.
+     * @returns Folder name.
+     */
+    static libraryToFolderName(library: CoreH5PLibraryBasicData | CoreH5PContentMainLibraryData): string {
+        const name = 'machineName' in library ? library.machineName : library.name;
+
+        // In LMS, a property named patchVersionInFolderName is checked here. This property is only used to retrieve some icons when
+        // using the editor, and it isn't stored in DB. The check wasn't included here because the app will never have that prop.
+
+        return `${name}-${library.majorVersion}.${library.minorVersion}`;
     }
 
     /**
      * Convert strings of text into simple kebab case slugs. Based on H5PCore::slugify.
      *
      * @param input The string to slugify.
-     * @return Slugified text.
+     * @returns Slugified text.
      */
     static slugify(input: string): string {
         input = input || '';
@@ -233,7 +255,7 @@ export class CoreH5PCore {
      *
      * @param content Content data.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the filtered params, resolved with null if error.
+     * @returns Promise resolved with the filtered params, resolved with null if error.
      */
     async filterParameters(content: CoreH5PContentData, siteId?: string): Promise<string | null> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -271,8 +293,13 @@ export class CoreH5PCore {
                 if (addon.addTo?.content?.types?.length) {
                     for (let i = 0; i < addon.addTo.content.types.length; i++) {
                         const type = addon.addTo.content.types[i];
+                        let regex = type?.text?.regex;
+                        if (regex && regex[0] === '/' && regex.slice(-1) === '/') {
+                            // Regex designed for PHP. Remove the starting and ending slashes to convert them to JS format.
+                            regex = regex.substring(1, regex.length - 1);
+                        }
 
-                        if (type && type.text && type.text.regex && this.textAddonMatches(params.params, type.text.regex)) {
+                        if (regex && this.textAddonMatches(params.params, regex)) {
                             await validator.addon(addon);
 
                             // An addon shall only be added once.
@@ -292,7 +319,7 @@ export class CoreH5PCore {
                 // Update library usage.
                 try {
                     await this.h5pFramework.deleteLibraryUsage(content.id, siteId);
-                } catch (error) {
+                } catch {
                     // Ignore errors.
                 }
 
@@ -323,7 +350,7 @@ export class CoreH5PCore {
      * @param nextWeight An integer determining the order of the libraries when they are loaded.
      * @param editor Used internally to force all preloaded sub dependencies of an editor dependency to be editor dependencies.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the next weight.
+     * @returns Promise resolved with the next weight.
      */
     async findLibraryDependencies(
         dependencies: {[key: string]: CoreH5PContentDepsTreeDependency},
@@ -393,6 +420,7 @@ export class CoreH5PCore {
      *
      * @param displayOptions The display options to validate.
      * @param id Package ID.
+     * @returns Display Options.
      */
     fixDisplayOptions(displayOptions: CoreH5PDisplayOptions, id: number): CoreH5PDisplayOptions {
         displayOptions = displayOptions || {};
@@ -417,8 +445,8 @@ export class CoreH5PCore {
     /**
      * Parses library data from a string on the form {machineName} {majorVersion}.{minorVersion}.
      *
-     * @param libraryString On the form {machineName} {majorVersion}.{minorVersion}
-     * @return Object with keys machineName, majorVersion and minorVersion. Null if string is not parsable.
+     * @param content On the form {machineName} {majorVersion}.{minorVersion}
+     * @returns Object with keys machineName, majorVersion and minorVersion. Null if string is not parsable.
      */
     generateContentSlug(content: CoreH5PContentData): string {
 
@@ -447,7 +475,7 @@ export class CoreH5PCore {
      *
      * @param assets List of assets to get their URLs.
      * @param assetsFolderPath The path of the folder where the assets are.
-     * @return List of urls.
+     * @returns List of urls.
      */
     getAssetsUrls(assets: CoreH5PDependencyAsset[], assetsFolderPath: string = ''): string[] {
         const urls: string[] = [];
@@ -457,7 +485,7 @@ export class CoreH5PCore {
 
             // Add URL prefix if not external.
             if (asset.path.indexOf('://') == -1 && assetsFolderPath) {
-                url = CoreText.concatenatePaths(assetsFolderPath, url);
+                url = CorePath.concatenatePaths(assetsFolderPath, url);
             }
 
             // Add version if set.
@@ -478,7 +506,7 @@ export class CoreH5PCore {
      * @param folderName Name of the folder of the content.
      * @param prefix Make paths relative to another dir.
      * @param siteId The site ID. If not defined, current site.
-     * @return Promise resolved with the files.
+     * @returns Promise resolved with the files.
      */
     async getDependenciesFiles(
         dependencies: {[machineName: string]: CoreH5PContentDependencyData},
@@ -499,7 +527,7 @@ export class CoreH5PCore {
             return files;
         }
 
-        let cachedAssetsHash: string;
+        let cachedAssetsHash = '';
 
         if (this.aggregateAssets) {
             // Get aggregated files for assets.
@@ -531,10 +559,10 @@ export class CoreH5PCore {
 
         if (this.aggregateAssets) {
             // Aggregate and store assets.
-            await this.h5pFS.cacheAssets(files, cachedAssetsHash!, folderName, siteId);
+            await this.h5pFS.cacheAssets(files, cachedAssetsHash, folderName, siteId);
 
             // Keep track of which libraries have been cached in case they are updated.
-            await this.h5pFramework.saveCachedAssets(cachedAssetsHash!, dependencies, folderName, siteId);
+            await this.h5pFramework.saveCachedAssets(cachedAssetsHash, dependencies, folderName, siteId);
         }
 
         return files;
@@ -545,7 +573,7 @@ export class CoreH5PCore {
      *
      * @param id The H5P content ID.
      * @param siteId The site ID. If not defined, current site.
-     * @return Promise resolved with an object containing the path of each content dependency.
+     * @returns Promise resolved with an object containing the path of each content dependency.
      */
     async getDependencyRoots(id: number, siteId?: string): Promise<{[libString: string]: string}> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -556,7 +584,7 @@ export class CoreH5PCore {
 
         for (const machineName in dependencies) {
             const dependency = dependencies[machineName];
-            const folderName = CoreH5PCore.libraryToString(dependency, true);
+            const folderName = CoreH5PCore.libraryToFolderName(dependency);
 
             roots[folderName] = this.h5pFS.getLibraryFolderPath(dependency, siteId, folderName);
         }
@@ -603,7 +631,7 @@ export class CoreH5PCore {
      * Convert display options to an object.
      *
      * @param disable Display options as a number.
-     * @return Display options as object.
+     * @returns Display options as object.
      */
     getDisplayOptionsAsObject(disable: number): CoreH5PDisplayOptions {
         const displayOptions: CoreH5PDisplayOptions = {};
@@ -624,7 +652,7 @@ export class CoreH5PCore {
      *
      * @param disable The display options as a number.
      * @param id Package ID.
-     * @return Display options as object.
+     * @returns Display options as object.
      */
     getDisplayOptionsForView(disable: number, id: number): CoreH5PDisplayOptions {
         return this.fixDisplayOptions(this.getDisplayOptionsAsObject(disable), id);
@@ -633,9 +661,10 @@ export class CoreH5PCore {
     /**
      * Provide localization for the Core JS.
      *
-     * @return Object with the translations.
+     * @returns Object with the translations.
      */
-    getLocalization(): {[name: string]: string} {
+    getLocalization(): CoreH5PLocalization {
+        // Some strings weren't included in the app because they were strictly related to the H5P Content Hub.
         return {
             fullscreen: Translate.instant('core.h5p.fullscreen'),
             disableFullscreen: Translate.instant('core.h5p.disablefullscreen'),
@@ -704,6 +733,90 @@ export class CoreH5PCore {
             offlineDialogRetryMessage: Translate.instant('core.h5p.offlineDialogRetryMessage'),
             offlineDialogRetryButtonLabel: Translate.instant('core.h5p.offlineDialogRetryButtonLabel'),
             offlineSuccessfulSubmit: Translate.instant('core.h5p.offlineSuccessfulSubmit'),
+            mainTitle: Translate.instant('core.h5p.mainTitle'),
+            editInfoTitle: Translate.instant('core.h5p.editInfoTitle'),
+            cancel: Translate.instant('core.h5p.cancellabel'),
+            back: Translate.instant('core.h5p.back'),
+            next: Translate.instant('core.h5p.next'),
+            reviewInfo: Translate.instant('core.h5p.reviewInfo'),
+            share: Translate.instant('core.h5p.share'),
+            saveChanges: Translate.instant('core.h5p.saveChanges'),
+            requiredInfo: Translate.instant('core.h5p.requiredInfo'),
+            optionalInfo: Translate.instant('core.h5p.optionalInfo'),
+            reviewAndShare: Translate.instant('core.h5p.reviewAndShare'),
+            reviewAndSave: Translate.instant('core.h5p.reviewAndSave'),
+            shared: Translate.instant('core.h5p.shared'),
+            currentStep: Translate.instant('core.h5p.currentStep'),
+            sharingNote: Translate.instant('core.h5p.sharingNote'),
+            licenseDescription: Translate.instant('core.h5p.licenseDescription'),
+            licenseVersion: Translate.instant('core.h5p.licenseversion'),
+            licenseVersionDescription: Translate.instant('core.h5p.licenseVersionDescription'),
+            disciplineLabel: Translate.instant('core.h5p.disciplineLabel'),
+            disciplineDescription: Translate.instant('core.h5p.disciplineDescription'),
+            disciplineLimitReachedMessage: Translate.instant('core.h5p.disciplineLimitReachedMessage'),
+            discipline: {
+                searchPlaceholder: Translate.instant('core.h5p.discipline:searchPlaceholder'),
+                in: Translate.instant('core.h5p.discipline:in'),
+                dropdownButton: Translate.instant('core.h5p.discipline:dropdownButton'),
+            },
+            removeChip: Translate.instant('core.h5p.removeChip'),
+            keywordsPlaceholder: Translate.instant('core.h5p.keywordsPlaceholder'),
+            keywords: Translate.instant('core.h5p.keywords'),
+            keywordsDescription: Translate.instant('core.h5p.keywordsDescription'),
+            altText: Translate.instant('core.h5p.altText'),
+            reviewMessage: Translate.instant('core.h5p.reviewMessage'),
+            subContentWarning: Translate.instant('core.h5p.subContentWarning'),
+            disciplines: Translate.instant('core.h5p.disciplines'),
+            shortDescription: Translate.instant('core.h5p.shortDescription'),
+            longDescription: Translate.instant('core.h5p.longDescription'),
+            icon: Translate.instant('core.h5p.icon'),
+            screenshots: Translate.instant('core.h5p.screenshots'),
+            helpChoosingLicense: Translate.instant('core.h5p.helpChoosingLicense'),
+            shareFailed: Translate.instant('core.h5p.shareFailed'),
+            editingFailed: Translate.instant('core.h5p.editingFailed'),
+            shareTryAgain: Translate.instant('core.h5p.shareTryAgain'),
+            pleaseWait: Translate.instant('core.h5p.pleaseWait'),
+            language: Translate.instant('core.h5p.language'),
+            level: Translate.instant('core.h5p.level'),
+            shortDescriptionPlaceholder: Translate.instant('core.h5p.shortDescriptionPlaceholder'),
+            longDescriptionPlaceholder: Translate.instant('core.h5p.longDescriptionPlaceholder'),
+            description: Translate.instant('core.h5p.description'),
+            iconDescription: Translate.instant('core.h5p.iconDescription'),
+            screenshotsDescription: Translate.instant('core.h5p.screenshotsDescription'),
+            submitted: Translate.instant('core.h5p.submitted'),
+            contentLicenseTitle: Translate.instant('core.h5p.contentLicenseTitle'),
+            licenseDialogDescription: Translate.instant('core.h5p.licenseDialogDescription'),
+            publisherFieldTitle: Translate.instant('core.h5p.publisherFieldTitle'),
+            publisherFieldDescription: Translate.instant('core.h5p.publisherFieldDescription'),
+            emailAddress: Translate.instant('core.h5p.emailAddress'),
+            publisherDescription: Translate.instant('core.h5p.publisherDescription'),
+            publisherDescriptionText: Translate.instant('core.h5p.publisherDescriptionText'),
+            contactPerson: Translate.instant('core.h5p.contactPerson'),
+            phone: Translate.instant('core.h5p.phone'),
+            address: Translate.instant('core.h5p.address'),
+            city: Translate.instant('core.h5p.city'),
+            zip: Translate.instant('core.h5p.zip'),
+            country: Translate.instant('core.h5p.country'),
+            logoUploadText: Translate.instant('core.h5p.logoUploadText'),
+            acceptTerms: Translate.instant('core.h5p.acceptTerms'),
+            accountDetailsLinkText: Translate.instant('core.h5p.accountDetailsLinkText'),
+            maxLength: Translate.instant('core.h5p.maxLength'),
+            keywordExists: Translate.instant('core.h5p.keywordExists'),
+            licenseDetails: Translate.instant('core.h5p.licenseDetails'),
+            remove: Translate.instant('core.h5p.remove'),
+            removeImage: Translate.instant('core.h5p.removeImage'),
+            cancelPublishConfirmationDialogTitle: Translate.instant('core.h5p.removeImage'),
+            cancelPublishConfirmationDialogDescription: Translate.instant('core.h5p.removeImage'),
+            cancelPublishConfirmationDialogCancelButtonText: Translate.instant('core.h5p.removeImage'),
+            cancelPublishConfirmationDialogConfirmButtonText: Translate.instant('core.h5p.removeImage'),
+            add: Translate.instant('core.h5p.add'),
+            age: Translate.instant('core.h5p.age'),
+            ageDescription: Translate.instant('core.h5p.ageDescription'),
+            invalidAge: Translate.instant('core.h5p.invalidAge'),
+            keywordsExits: Translate.instant('core.h5p.keywordsExits'),
+            someKeywordsExits: Translate.instant('core.h5p.someKeywordsExits'),
+            width: Translate.instant('core.h5p.width'),
+            height: Translate.instant('core.h5p.height'),
         };
     }
 
@@ -713,7 +826,7 @@ export class CoreH5PCore {
      * @param id Content ID.
      * @param fileUrl H5P file URL. Required if id is not provided.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the content data.
+     * @returns Promise resolved with the content data.
      */
     async loadContent(id?: number, fileUrl?: string, siteId?: string): Promise<CoreH5PContentData> {
         siteId = siteId || CoreSites.getCurrentSiteId();
@@ -753,7 +866,7 @@ export class CoreH5PCore {
      *
      * @param id Content ID.
      * @param type The dependency type.
-     * @return Content dependencies, indexed by machine name.
+     * @returns Content dependencies, indexed by machine name.
      */
     loadContentDependencies(
         id: number,
@@ -770,7 +883,7 @@ export class CoreH5PCore {
      * @param majorVersion The library's major version.
      * @param minorVersion The library's minor version.
      * @param siteId The site ID. If not defined, current site.
-     * @return Promise resolved with the library data.
+     * @returns Promise resolved with the library data.
      */
     loadLibrary(machineName: string, majorVersion: number, minorVersion: number, siteId?: string): Promise<CoreH5PLibraryData> {
         return this.h5pFramework.loadLibrary(machineName, majorVersion, minorVersion, siteId);
@@ -779,7 +892,7 @@ export class CoreH5PCore {
     /**
      * Check if the current user has permission to update and install new libraries.
      *
-     * @return Whether has permissions.
+     * @returns Whether has permissions.
      */
     mayUpdateLibraries(): boolean {
         // In the app the installation only affects current user, so the user always has permissions.
@@ -793,7 +906,7 @@ export class CoreH5PCore {
      * @param folderName The name of the folder that contains the H5P.
      * @param fileUrl The online URL of the package.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with content ID.
+     * @returns Promise resolved with content ID.
      */
     async saveContent(content: CoreH5PContentBeingSaved, folderName: string, fileUrl: string, siteId?: string): Promise<number> {
         content.id = await this.h5pFramework.updateContent(content, folderName, fileUrl, siteId);
@@ -811,7 +924,7 @@ export class CoreH5PCore {
      * @param permission The permission.
      * @param id The package ID.
      * @param value Default value.
-     * @return The value to use.
+     * @returns The value to use.
      */
     setDisplayOptionOverrides(optionName: string, permission: number, id: number, value: boolean): boolean {
         const behaviour = this.h5pFramework.getOption(optionName, CoreH5PDisplayOptionBehaviour.ALWAYS_SHOW);
@@ -834,7 +947,7 @@ export class CoreH5PCore {
      *
      * @param params Parameters.
      * @param pattern Regular expression to identify pattern.
-     * @return True if params matches pattern.
+     * @returns True if params matches pattern.
      */
     protected textAddonMatches(params: unknown, pattern: string): boolean {
 
@@ -1011,3 +1124,5 @@ export type CoreH5PLibraryAddonData = CoreH5PLibraryBasicDataWithPatch & {
     preloadedCss?: string; // Comma separated list of stylesheets to load.
     addTo?: CoreH5PLibraryAddTo | null; // Plugin configuration data.
 };
+
+export type CoreH5PLocalization = Record<string, string | Record<string, string>>;

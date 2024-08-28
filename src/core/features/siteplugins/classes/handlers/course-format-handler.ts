@@ -40,7 +40,7 @@ export class CoreSitePluginsCourseFormatHandler extends CoreSitePluginsBaseHandl
      */
     displayCourseIndex(): boolean {
         // Use displaysectionselector while is not completely deprecated.
-        return this.handlerSchema.displaycourseindex ?? this.handlerSchema.displaysectionselector ?? true;
+        return this.handlerSchema.displaycourseindex ?? true;
     }
 
     /**

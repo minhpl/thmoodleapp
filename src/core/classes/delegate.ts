@@ -14,7 +14,7 @@
 
 import { CoreSites } from '@services/sites';
 import { CoreEvents } from '@singletons/events';
-import { CoreSite } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreLogger } from '@singletons/logger';
 
 /**
@@ -72,43 +72,51 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
 
     /**
      * Promise to wait for handlers to be initialized.
+     *
+     * @returns Promise resolved when handlers are enabled.
      */
-    protected handlersInitPromise: Promise<void>;
+    protected handlersInitPromise: Promise<boolean>;
 
     /**
      * Function to resolve the handlers init promise.
      */
-    protected handlersInitResolve!: () => void;
+    protected handlersInitResolve!: (enabled: boolean) => void;
 
     /**
      * Constructor of the Delegate.
      *
      * @param delegateName Delegate name used for logging purposes.
-     * @param listenSiteEvents Whether to update the handler when a site event occurs (login, site updated, ...).
      */
-    constructor(delegateName: string, listenSiteEvents: boolean = true) {
+    constructor(delegateName: string) {
         this.logger = CoreLogger.getInstance(delegateName);
 
         this.handlersInitPromise = new Promise((resolve): void => {
             this.handlersInitResolve = resolve;
         });
 
-        if (listenSiteEvents) {
-            // Update handlers on this cases.
-            CoreEvents.on(CoreEvents.LOGIN, this.updateHandlers.bind(this));
-            CoreEvents.on(CoreEvents.SITE_UPDATED, this.updateHandlers.bind(this));
-            CoreEvents.on(CoreEvents.SITE_PLUGINS_LOADED, this.updateHandlers.bind(this));
-            CoreEvents.on(CoreEvents.SITE_POLICY_AGREED, (data) => {
-                if (data.siteId === CoreSites.getCurrentSiteId()) {
-                    this.updateHandlers();
-                }
-            });
-            CoreEvents.on(CoreEvents.COMPLETE_REQUIRED_PROFILE_DATA_FINISHED, (data) => {
-                if (data.siteId === CoreSites.getCurrentSiteId()) {
-                    this.updateHandlers();
-                }
-            });
-        }
+        // Update handlers on this cases.
+        CoreEvents.on(CoreEvents.LOGIN, () => this.updateHandlers());
+        CoreEvents.on(CoreEvents.SITE_UPDATED, () => this.updateHandlers());
+        CoreEvents.on(CoreEvents.SITE_PLUGINS_LOADED, () => this.updateHandlers());
+        CoreEvents.on(CoreEvents.SITE_POLICY_AGREED, (data) => {
+            if (data.siteId === CoreSites.getCurrentSiteId()) {
+                this.updateHandlers();
+            }
+        });
+        CoreEvents.on(CoreEvents.COMPLETE_REQUIRED_PROFILE_DATA_FINISHED, (data) => {
+            if (data.siteId === CoreSites.getCurrentSiteId()) {
+                this.updateHandlers();
+            }
+        });
+    }
+
+    /**
+     * Check if the delegate is enabled so handlers are not updated if not..
+     *
+     * @returns Whether the delegate is enabled.
+     */
+    async isEnabled(): Promise<boolean> {
+        return true;
     }
 
     /**
@@ -118,7 +126,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * @param handlerName The handler name.
      * @param fnName Name of the function to execute.
      * @param params Parameters to pass to the function.
-     * @return Function returned value or default value.
+     * @returns Function returned value or default value.
      */
     protected executeFunctionOnEnabled<T = unknown>(handlerName: string, fnName: string, params?: unknown[]): T | undefined {
         return this.execute<T>(this.enabledHandlers[handlerName], fnName, params);
@@ -131,7 +139,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * @param handlerName The handler name.
      * @param fnName Name of the function to execute.
      * @param params Parameters to pass to the function.
-     * @return Function returned value or default value.
+     * @returns Function returned value or default value.
      */
     protected executeFunction<T = unknown>(handlerName: string, fnName: string, params?: unknown[]): T | undefined {
         return this.execute<T>(this.handlers[handlerName], fnName, params);
@@ -144,7 +152,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * @param handler The handler.
      * @param fnName Name of the function to execute.
      * @param params Parameters to pass to the function.
-     * @return Function returned value or default value.
+     * @returns Function returned value or default value.
      */
     private execute<T = unknown>(handler: HandlerType, fnName: string, params?: unknown[]): T | undefined {
         if (handler && handler[fnName]) {
@@ -159,7 +167,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      *
      * @param handlerName The handler name.
      * @param enabled Only enabled, or any.
-     * @return Handler.
+     * @returns Handler.
      */
     protected getHandler(handlerName: string, enabled: boolean = false): HandlerType {
         return enabled ? this.enabledHandlers[handlerName] : this.handlers[handlerName];
@@ -170,7 +178,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * E.g. blocks are indexed by blockName. If you call this function passing the blockName it will return the name.
      *
      * @param name Name used to indentify the handler.
-     * @return Full name of corresponding handler.
+     * @returns Full name of corresponding handler.
      */
     getHandlerName(name: string): string {
         const handler = this.getHandler(name, true);
@@ -188,7 +196,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * @param handlerName The handler name.
      * @param fnName Name of the function to execute.
      * @param onlyEnabled If check only enabled handlers or all.
-     * @return Function returned value or default value.
+     * @returns Function returned value or default value.
      */
     protected hasFunction(handlerName: string, fnName: string, onlyEnabled: boolean = true): boolean {
         const handler = onlyEnabled ? this.enabledHandlers[handlerName] : this.handlers[handlerName];
@@ -201,10 +209,19 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      *
      * @param name The handler name.
      * @param enabled Only enabled, or any.
-     * @return If the handler is registered or not.
+     * @returns If the handler is registered or not.
      */
     hasHandler(name: string, enabled: boolean = false): boolean {
         return enabled ? this.enabledHandlers[name] !== undefined : this.handlers[name] !== undefined;
+    }
+
+    /**
+     * Check if the delegate has at least 1 registered handler (not necessarily enabled).
+     *
+     * @returns If there is at least 1 handler.
+     */
+    hasHandlers(): boolean {
+        return Object.keys(this.handlers).length > 0;
     }
 
     /**
@@ -212,7 +229,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * This is to handle the cases where updateHandlers don't finish in the same order as they're called.
      *
      * @param time Time to check.
-     * @return Whether it's the last call.
+     * @returns Whether it's the last call.
      */
     isLastUpdateCall(time: number): boolean {
         if (!this.lastUpdateHandlersStart) {
@@ -226,7 +243,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * Register a handler.
      *
      * @param handler The handler delegate object to register.
-     * @return True when registered, false if already registered.
+     * @returns True when registered, false if already registered.
      */
     registerHandler(handler: HandlerType): boolean {
         const key = handler[this.handlerNameProperty] || handler.name;
@@ -247,8 +264,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      * Update the handler for the current site.
      *
      * @param handler The handler to check.
-     * @param time Time this update process started.
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected updateHandler(handler: HandlerType): Promise<void> {
         const siteId = CoreSites.getCurrentSiteId();
@@ -269,16 +285,18 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
         }
 
         // Checks if the handler is enabled.
-        this.updatePromises[siteId][handler.name] = promise.then((enabled: boolean) => {
+        this.updatePromises[siteId][handler.name] = promise.then((enabled) => {
             // Check that site hasn't changed since the check started.
-            if (CoreSites.getCurrentSiteId() === siteId) {
-                const key = handler[this.handlerNameProperty] || handler.name;
+            if (CoreSites.getCurrentSiteId() !== siteId) {
+                return;
+            }
 
-                if (enabled) {
-                    this.enabledHandlers[key] = handler;
-                } else {
-                    delete this.enabledHandlers[key];
-                }
+            const key = handler[this.handlerNameProperty] || handler.name;
+
+            if (enabled) {
+                this.enabledHandlers[key] = handler;
+            } else {
+                delete this.enabledHandlers[key];
             }
 
             return;
@@ -295,7 +313,7 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
      *
      * @param handler Handler to check.
      * @param site Site to check.
-     * @return Whether is enabled or disabled in site.
+     * @returns Whether is enabled or disabled in site.
      */
     protected isFeatureDisabled(handler: HandlerType, site: CoreSite): boolean {
         return this.featurePrefix !== undefined && site.isFeatureDisabled(this.featurePrefix + handler.name);
@@ -304,9 +322,19 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
     /**
      * Update the handlers for the current site.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
-    protected async updateHandlers(): Promise<void> {
+    async updateHandlers(): Promise<void> {
+        const enabled = await this.isEnabled();
+
+        if (!enabled) {
+            this.logger.debug('Delegate not enabled.');
+
+            this.handlersInitResolve(false);
+
+            return;
+        }
+
         const promises: Promise<void>[] = [];
         const now = Date.now();
 
@@ -321,14 +349,14 @@ export class CoreDelegate<HandlerType extends CoreDelegateHandler> {
 
         try {
             await Promise.all(promises);
-        } catch (e) {
+        } catch {
             // Never reject
         }
 
         // Verify that this call is the last one that was started.
         if (this.isLastUpdateCall(now)) {
             this.handlersInitialized = true;
-            this.handlersInitResolve();
+            this.handlersInitResolve(true);
 
             this.updateData();
         }
@@ -357,7 +385,7 @@ export interface CoreDelegateHandler {
     /**
      * Whether or not the handler is enabled on a site level.
      *
-     * @return Whether or not the handler is enabled on a site level.
+     * @returns Whether or not the handler is enabled on a site level.
      */
     isEnabled(): Promise<boolean>;
 }
@@ -389,7 +417,7 @@ export interface CoreDelegateDisplayHandler<HandlerData extends CoreDelegateToDi
     /**
      * Returns the data needed to render the handler.
      *
-     * @return Data.
+     * @returns Data.
      */
     getDisplayData(): HandlerData;
 }

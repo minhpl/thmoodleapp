@@ -17,6 +17,7 @@ import { CoreSites } from '@services/sites';
 import { CoreTimeUtils } from '@services/utils/time';
 import { makeSingleton } from '@singletons';
 import { COMMENTS_TABLE, COMMENTS_DELETED_TABLE, CoreCommentsDBRecord, CoreCommentsDeletedDBRecord } from './database/comments';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Service to handle offline comments.
@@ -28,16 +29,16 @@ export class CoreCommentsOfflineProvider {
      * Get all offline comments.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with comments.
+     * @returns Promise resolved with comments.
      */
     async getAllComments(siteId?: string): Promise<(CoreCommentsDBRecord | CoreCommentsDeletedDBRecord)[]> {
         const site = await CoreSites.getSite(siteId);
         const results = await Promise.all([
-            site.getDb().getRecords(COMMENTS_TABLE),
-            site.getDb().getRecords(COMMENTS_DELETED_TABLE),
+            site.getDb().getRecords<CoreCommentsDBRecord>(COMMENTS_TABLE),
+            site.getDb().getRecords<CoreCommentsDeletedDBRecord>(COMMENTS_DELETED_TABLE),
         ]);
 
-        return [].concat.apply([], results);
+        return results.flat();
     }
 
     /**
@@ -49,10 +50,10 @@ export class CoreCommentsOfflineProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the comments.
+     * @returns Promise resolved with the comments.
      */
     async getComment(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -83,10 +84,10 @@ export class CoreCommentsOfflineProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the comments.
+     * @returns Promise resolved with the comments.
      */
     async getComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -111,12 +112,12 @@ export class CoreCommentsOfflineProvider {
      * Get all offline deleted comments.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with comments.
+     * @returns Promise resolved with comments.
      */
     async getAllDeletedComments(siteId?: string): Promise<CoreCommentsDeletedDBRecord[]> {
         const site = await CoreSites.getSite(siteId);
 
-        return await site.getDb().getRecords(COMMENTS_DELETED_TABLE);
+        return site.getDb().getRecords(COMMENTS_DELETED_TABLE);
     }
 
     /**
@@ -128,10 +129,10 @@ export class CoreCommentsOfflineProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the comments.
+     * @returns Promise resolved with the comments.
      */
     async getDeletedComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -162,10 +163,10 @@ export class CoreCommentsOfflineProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if deleted, rejected if failure.
+     * @returns Promise resolved if deleted, rejected if failure.
      */
     async removeComment(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -192,10 +193,10 @@ export class CoreCommentsOfflineProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if deleted, rejected if failure.
+     * @returns Promise resolved if deleted, rejected if failure.
      */
     async removeDeletedComments(
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -223,11 +224,11 @@ export class CoreCommentsOfflineProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async saveComment(
         content: string,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -261,11 +262,11 @@ export class CoreCommentsOfflineProvider {
      * @param itemId Associated id.
      * @param area String comment area. Default empty.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if stored, rejected if failure.
+     * @returns Promise resolved if stored, rejected if failure.
      */
     async deleteComment(
         commentId: number,
-        contextLevel: string,
+        contextLevel: ContextLevel,
         instanceId: number,
         component: string,
         itemId: number,
@@ -292,7 +293,7 @@ export class CoreCommentsOfflineProvider {
      *
      * @param commentId Comment ID.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if deleted, rejected if failure.
+     * @returns Promise resolved if deleted, rejected if failure.
      */
     async undoDeleteComment(commentId: number, siteId?: string): Promise<void> {
         const site = await CoreSites.getSite(siteId);

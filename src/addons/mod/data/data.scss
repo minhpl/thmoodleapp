@@ -1,4 +1,4 @@
-@import "~theme/globals";
+@use "theme/globals" as *;
 
 /// @prop - The padding for the grid column
 $grid-column-padding:        var(--ion-grid-column-padding, 5px) !default;
@@ -22,11 +22,12 @@ $grid-column-paddings: (
     word-break: break-word;
     padding: 16px;
 
-    background-color: var(--ion-item-background);
-    border-bottom: 1px solid var(--border-color);
-
     ::ng-deep {
-        table, tbody {
+
+        @import "theme/components/moodle.scss";
+        @import "theme/components/bootstrap/bootstrap_database.scss";
+
+        table {
             display: block;
         }
 
@@ -49,13 +50,13 @@ $grid-column-paddings: (
             position: relative;
             flex-basis: 0;
             flex-grow: 1;
-            width: 100%;
+            width: 100% !important;
             max-width: 100%;
             min-height: auto;
         }
 
         // Do not let block elements to define widths or heights.
-        address, article, aside, blockquote, canvas, dd, div, dl, dt, fieldset, figcaption, figure, footer, form,
+        address, article, aside, blockquote, canvas, dd, dl, dt, fieldset, figcaption, figure, footer, form,
         h1, h2, h3, h4, h5, h6,
         header, li, main, nav, noscript, ol, p, pre, section, table, tfoot, ul, video {
             width: auto !important;

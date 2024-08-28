@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import { CorePromisedValue } from '@classes/promised-value';
 import { CoreAppSchema } from '@services/app';
-import { PromiseDefer } from '@services/utils/utils';
 
 /**
  * Database variables for CoreLocalNotifications service.
@@ -74,7 +74,22 @@ export const APP_SCHEMA: CoreAppSchema = {
 };
 
 export type CodeRequestsQueueItem = {
-    table: string;
+    table: typeof SITES_TABLE_NAME | typeof COMPONENTS_TABLE_NAME;
     id: string;
-    deferreds: PromiseDefer<number>[];
+    deferreds: CorePromisedValue<number>[];
+};
+
+export type CoreLocalNotificationsSitesDBRecord = {
+    id: string;
+    code: number;
+};
+
+export type CoreLocalNotificationsComponentsDBRecord = {
+    id: string;
+    code: number;
+};
+
+export type CoreLocalNotificationsTriggeredDBRecord = {
+    id: number;
+    at: number;
 };

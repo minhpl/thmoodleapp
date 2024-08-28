@@ -18,6 +18,7 @@ import { CoreCourseContentsPage } from '@features/course/pages/contents/contents
 import { CoreCourse } from '@features/course/services/course';
 import { CoreNavigator } from '@services/navigator';
 import { AddonModImscpProvider, AddonModImscp, AddonModImscpTocItem } from '../../services/imscp';
+import { CoreUtils } from '@services/utils/utils';
 
 /**
  * Component that displays a IMSCP.
@@ -30,6 +31,7 @@ import { AddonModImscpProvider, AddonModImscp, AddonModImscpTocItem } from '../.
 export class AddonModImscpIndexComponent extends CoreCourseModuleMainResourceComponent implements OnInit {
 
     component = AddonModImscpProvider.COMPONENT;
+    pluginName = 'imscp';
 
     items: AddonModImscpTocItem[] = [];
     hasStarted = false;
@@ -50,7 +52,7 @@ export class AddonModImscpIndexComponent extends CoreCourseModuleMainResourceCom
     /**
      * Perform the invalidate content function.
      *
-     * @return Resolved when done.
+     * @returns Resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         await AddonModImscp.invalidateContent(this.module.id, this.courseId);
@@ -69,7 +71,7 @@ export class AddonModImscpIndexComponent extends CoreCourseModuleMainResourceCom
     /**
      * Load IMSCP data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadImscp(): Promise<void> {
         const imscp = await AddonModImscp.getImscp(this.courseId, this.module.id);
@@ -87,7 +89,7 @@ export class AddonModImscpIndexComponent extends CoreCourseModuleMainResourceCom
     /**
      * Load book TOC.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadTOC(): Promise<void> {
         // Get contents. No need to refresh, it has been done in downloadResourceIfNeeded.
@@ -100,7 +102,9 @@ export class AddonModImscpIndexComponent extends CoreCourseModuleMainResourceCom
      * @inheritdoc
      */
     protected async logActivity(): Promise<void> {
-        await AddonModImscp.logView(this.module.instance, this.module.name);
+        await CoreUtils.ignoreErrors(AddonModImscp.logView(this.module.instance));
+
+        this.analyticsLogEvent('mod_imscp_view_imscp');
     }
 
     /**
@@ -124,7 +128,7 @@ export class AddonModImscpIndexComponent extends CoreCourseModuleMainResourceCom
      * Get dummy array for padding.
      *
      * @param n Array length.
-     * @return Dummy array with n elements.
+     * @returns Dummy array with n elements.
      */
     getNumberForPadding(n: number): number[] {
         return new Array(n);

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { CoreConstants } from '@/core/constants';
+import { DownloadStatus } from '@/core/constants';
 import { Component, Input, ViewChild, ElementRef, OnInit, OnDestroy, Optional } from '@angular/core';
 
 import { CoreTabsComponent } from '@components/tabs/tabs';
@@ -47,6 +47,8 @@ import {
 } from '../../services/lesson-sync';
 import { AddonModLessonModuleHandlerService } from '../../services/handlers/module';
 import { CoreTime } from '@singletons/time';
+import { CoreError } from '@classes/errors/error';
+import { Translate } from '@singletons';
 
 /**
  * Component that displays a lesson entry page.
@@ -64,7 +66,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     @Input() action?: string; // The "action" to display first.
 
     component = AddonModLessonProvider.COMPONENT;
-    moduleName = 'lesson';
+    pluginName = 'lesson';
 
     lesson?: AddonModLessonLessonWSData; // The lesson.
     selectedTab?: number; // The initial selected tab.
@@ -77,7 +79,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     leftDuringTimed?: boolean; // Whether the user has started and left a retake.
     groupInfo?: CoreGroupInfo; // The group info.
     reportLoaded?: boolean; // Whether the report data has been loaded.
-    selectedGroupName?: string; // The name of the selected group.
+    selectedGroupEmptyMessage?: string; // The message to show if the selected group is empty.
     overview?: AttemptsOverview; // Reports overview data.
     finishedOffline?: boolean; // Whether a retake was finished in offline.
     avetimeReadable?: string; // Average time in a readable format.
@@ -99,7 +101,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     }
 
     /**
-     * Component being initialized.
+     * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         super.ngOnInit();
@@ -113,7 +115,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
      * Change the group displayed.
      *
      * @param groupId Group ID to display.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async changeGroup(groupId: number): Promise<void> {
         this.reportLoaded = false;
@@ -204,7 +206,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * Load offline data for the lesson.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async loadOfflineData(): Promise<void> {
         if (!this.lesson || !this.accessInfo) {
@@ -253,7 +255,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * Fetch the reports data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchReportData(): Promise<void> {
         if (!this.module) {
@@ -270,10 +272,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     }
 
     /**
-     * Checks if sync has succeed from result sync data.
-     *
-     * @param result Data returned on the sync function.
-     * @return If suceed or not.
+     * @inheritdoc
      */
     protected hasSyncSucceed(result: AddonModLessonSyncResult): boolean {
         if (result.updated || this.dataSent) {
@@ -319,7 +318,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * Perform the invalidate content function.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async invalidateContent(): Promise<void> {
         const promises: Promise<unknown>[] = [];
@@ -346,7 +345,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
      * Compares sync event data with current data to check if refresh content is needed.
      *
      * @param syncEventData Data receiven on sync observer.
-     * @return True if refresh is needed, false otherwise.
+     * @returns True if refresh is needed, false otherwise.
      */
     protected isRefreshSyncNeeded(syncEventData: AddonModLessonAutoSyncData): boolean {
         return !!(this.lesson && syncEventData.lessonId == this.lesson.id);
@@ -373,14 +372,23 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
             return;
         }
 
-        await AddonModLesson.logViewLesson(this.lesson.id, this.password, this.lesson.name);
+        await CoreUtils.ignoreErrors(AddonModLesson.logViewLesson(this.lesson.id, this.password));
+    }
+
+    /**
+     * Call analytics.
+     */
+    protected callAnalyticsLogEvent(): void {
+        this.analyticsLogEvent('mod_lesson_view_lesson', {
+            url: this.selectedTab === 1 ? `/mod/lesson/report.php?id=${this.module.id}&action=reportoverview` : undefined,
+        });
     }
 
     /**
      * Open the lesson player.
      *
      * @param continueLast Whether to continue the last retake.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async playLesson(continueLast?: boolean): Promise<void> {
         if (!this.lesson || !this.accessInfo) {
@@ -417,8 +425,16 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
         this.dataSentObserver?.off();
 
         this.dataSentObserver = CoreEvents.on(AddonModLessonProvider.DATA_SENT_EVENT, (data) => {
-            // Ignore launch sending because it only affects timers.
-            if (data.lessonId === this.lesson?.id && data.type != 'launch') {
+            if (data.lessonId !== this.lesson?.id || data.type === 'launch') {
+                // Ignore launch sending because it only affects timers.
+                return;
+            }
+
+            if (data.type === 'finish') {
+                // Lesson finished, check completion now.
+                this.dataSent = false;
+                this.checkCompletion();
+            } else {
                 this.dataSent = true;
             }
         }, this.siteId);
@@ -428,19 +444,29 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
      * First tab selected.
      */
     indexSelected(): void {
+        const tabHasChanged = this.selectedTab !== 0;
         this.selectedTab = 0;
+
+        if (tabHasChanged) {
+            this.callAnalyticsLogEvent();
+        }
     }
 
     /**
      * Reports tab selected.
      */
     reportsSelected(): void {
+        const tabHasChanged = this.selectedTab !== 1;
         this.selectedTab = 1;
 
         if (!this.groupInfo) {
             this.fetchReportData().catch((error) => {
                 CoreDomUtils.showErrorModalDefault(error, 'Error getting report.');
             });
+        }
+
+        if (tabHasChanged) {
+            this.callAnalyticsLogEvent();
         }
     }
 
@@ -472,7 +498,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
      * Set a group to view the reports.
      *
      * @param groupId Group ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async setGroup(groupId: number): Promise<void> {
         if (!this.lesson) {
@@ -480,12 +506,15 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
         }
 
         this.group = groupId;
-        this.selectedGroupName = '';
+        this.selectedGroupEmptyMessage = '';
 
         // Search the name of the group if it isn't all participants.
         if (groupId && this.groupInfo && this.groupInfo.groups) {
             const group = this.groupInfo.groups.find(group => groupId == group.id);
-            this.selectedGroupName = group?.name || '';
+
+            this.selectedGroupEmptyMessage = group
+                ? Translate.instant('addon.mod_lesson.nolessonattemptsgroup', { $a: group.name })
+                : '';
         }
 
         // Get the overview of retakes for the group.
@@ -546,8 +575,8 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     /**
      * @inheritdoc
      */
-    protected showStatus(status: string): void {
-        this.showSpinner = status == CoreConstants.DOWNLOADING;
+    protected showStatus(status: DownloadStatus): void {
+        this.showSpinner = status === DownloadStatus.DOWNLOADING;
     }
 
     /**
@@ -561,7 +590,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
             return;
         }
 
-        if (!AddonModLesson.isLessonOffline(this.lesson) || this.currentStatus == CoreConstants.DOWNLOADED) {
+        if (!AddonModLesson.isLessonOffline(this.lesson) || this.currentStatus == DownloadStatus.DOWNLOADED) {
             // Not downloadable or already downloaded, open it.
             this.playLesson(continueLast);
 
@@ -629,12 +658,14 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     }
 
     /**
-     * Performs the sync of the activity.
-     *
-     * @return Promise resolved when done.
+     * @inheritdoc
      */
     protected async sync(): Promise<AddonModLessonSyncResult> {
-        const result = await AddonModLessonSync.syncLesson(this.lesson!.id, true);
+        if (!this.lesson) {
+            throw new CoreError('Cannot sync without a lesson.');
+        }
+
+        const result = await AddonModLessonSync.syncLesson(this.lesson.id, true);
 
         if (!result.updated && this.dataSent && this.isPrefetched()) {
             // The user sent data to server, but not in the sync process. Check if we need to fetch data.
@@ -652,7 +683,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
      * Validate a password and retrieve extra data.
      *
      * @param password The password to validate.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async validatePassword(password: string): Promise<void> {
         try {
@@ -670,7 +701,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
      * Open a certain user retake.
      *
      * @param userId User ID to view.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async openRetake(userId: number): Promise<void> {
         CoreNavigator.navigateToSitePath(
@@ -679,7 +710,7 @@ export class AddonModLessonIndexComponent extends CoreCourseModuleMainActivityCo
     }
 
     /**
-     * Component being destroyed.
+     * @inheritdoc
      */
     ngOnDestroy(): void {
         super.ngOnDestroy();

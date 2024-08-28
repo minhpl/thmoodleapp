@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Component, ViewChildren, Input, OnInit, QueryList } from '@angular/core';
+import { Component, ViewChildren, Input, OnInit, QueryList, ElementRef } from '@angular/core';
 import { ModalController } from '@singletons';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreCourse, CoreCourseBlock } from '@features/course/services/course';
 import { CoreBlockHelper } from '../../services/block-helper';
 import { CoreBlockComponent } from '../block/block';
 import { CoreUtils } from '@services/utils/utils';
-import { IonRefresher } from '@ionic/angular';
 import { CoreCoursesDashboard } from '@features/courses/services/dashboard';
+import { CoreTextUtils } from '@services/utils/text';
+import { CoreDom } from '@singletons/dom';
+import { ContextLevel } from '@/core/constants';
 
 /**
  * Component that displays the list of side blocks.
@@ -32,8 +34,9 @@ import { CoreCoursesDashboard } from '@features/courses/services/dashboard';
 })
 export class CoreBlockSideBlocksComponent implements OnInit {
 
-    @Input() contextLevel!: string;
+    @Input() contextLevel!: ContextLevel;
     @Input() instanceId!: number;
+    @Input() initialBlockInstanceId?: number;
     @Input() myDashboardPage?: string;
 
     @ViewChildren(CoreBlockComponent) blocksComponents?: QueryList<CoreBlockComponent>;
@@ -41,24 +44,28 @@ export class CoreBlockSideBlocksComponent implements OnInit {
     loaded = false;
     blocks: CoreCourseBlock[] = [];
 
+    constructor(protected elementRef: ElementRef<HTMLElement>) {}
+
     /**
      * @inheritdoc
      */
     async ngOnInit(): Promise<void> {
         this.loadContent().finally(() => {
             this.loaded = true;
+
+            this.focusInitialBlock();
         });
     }
 
     /**
      * Invalidate blocks data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async invalidateBlocks(): Promise<void> {
         const promises: Promise<void>[] = [];
 
-        if (this.contextLevel === 'course') {
+        if (this.contextLevel === ContextLevel.COURSE) {
             promises.push(CoreCourse.invalidateCourseBlocks(this.instanceId));
         } else {
             promises.push(CoreCoursesDashboard.invalidateDashboardBlocks());
@@ -77,11 +84,11 @@ export class CoreBlockSideBlocksComponent implements OnInit {
     /**
      * Convenience function to fetch the data.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async loadContent(): Promise<void> {
         try {
-            if (this.contextLevel === 'course') {
+            if (this.contextLevel === ContextLevel.COURSE) {
                 this.blocks = await CoreBlockHelper.getCourseBlocks(this.instanceId);
             } else {
                 const blocks = await CoreCoursesDashboard.getDashboardBlocks(undefined, undefined, this.myDashboardPage);
@@ -93,6 +100,9 @@ export class CoreBlockSideBlocksComponent implements OnInit {
 
             this.blocks = [];
         }
+
+        this.blocks = this.blocks.filter(block =>
+            block.name !== 'html' || (block.contents && !CoreTextUtils.htmlIsBlank(block.contents.content)));
     }
 
     /**
@@ -100,7 +110,7 @@ export class CoreBlockSideBlocksComponent implements OnInit {
      *
      * @param refresher Refresher.
      */
-    async doRefresh(refresher?: IonRefresher): Promise<void> {
+    async doRefresh(refresher?: HTMLIonRefresherElement): Promise<void> {
         await CoreUtils.ignoreErrors(this.invalidateBlocks());
 
         await this.loadContent().finally(() => {
@@ -113,6 +123,22 @@ export class CoreBlockSideBlocksComponent implements OnInit {
      */
     closeModal(): void {
         ModalController.dismiss();
+    }
+
+    /**
+     * Focus the initial block, if any.
+     */
+    private async focusInitialBlock(): Promise<void> {
+        if (!this.initialBlockInstanceId) {
+            return;
+        }
+
+        const selector = '#block-' + this.initialBlockInstanceId;
+
+        await CoreUtils.waitFor(() => !!this.elementRef.nativeElement.querySelector(selector));
+        await CoreUtils.wait(200);
+
+        CoreDom.scrollToElement(this.elementRef.nativeElement, selector, { addYAxis: -10 });
     }
 
 }

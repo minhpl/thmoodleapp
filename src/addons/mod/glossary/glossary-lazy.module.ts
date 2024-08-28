@@ -27,12 +27,8 @@ const mobileRoutes: Routes = [
         component: AddonModGlossaryIndexPage,
     },
     {
-        path: ':courseId/:cmId/entry/:entryId',
-        loadChildren: () => import('./pages/entry/entry.module').then(m => m.AddonModGlossaryEntryPageModule),
-    },
-    {
-        path: ':courseId/:cmId/edit/:timecreated',
-        loadChildren: () => import('./pages/edit/edit.module').then(m => m.AddonModGlossaryEditPageModule),
+        path: ':courseId/:cmId/entry/:entrySlug',
+        loadChildren: () => import('./glossary-entry-lazy.module').then(m => m.AddonModGlossaryEntryLazyModule),
     },
 ];
 
@@ -42,18 +38,22 @@ const tabletRoutes: Routes = [
         component: AddonModGlossaryIndexPage,
         children: [
             {
-                path: 'entry/:entryId',
-                loadChildren: () => import('./pages/entry/entry.module').then(m => m.AddonModGlossaryEntryPageModule),
-            },
-            {
-                path: 'edit/:timecreated',
-                loadChildren: () => import('./pages/edit/edit.module').then(m => m.AddonModGlossaryEditPageModule),
+                path: 'entry/:entrySlug',
+                loadChildren: () => import('./glossary-entry-lazy.module').then(m => m.AddonModGlossaryEntryLazyModule),
             },
         ],
     },
 ];
 
 const routes: Routes = [
+    {
+        path: ':courseId/:cmId/entry/new',
+        loadChildren: () => import('./glossary-edit-lazy.module').then(m => m.AddonModGlossaryEditLazyModule),
+    },
+    {
+        path: ':courseId/:cmId/entry/:entrySlug/edit',
+        loadChildren: () => import('./glossary-edit-lazy.module').then(m => m.AddonModGlossaryEditLazyModule),
+    },
     ...conditionalRoutes(mobileRoutes, () => CoreScreen.isMobile),
     ...conditionalRoutes(tabletRoutes, () => CoreScreen.isTablet),
 ];

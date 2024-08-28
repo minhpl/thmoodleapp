@@ -23,17 +23,27 @@ import {
     EventEmitter,
     OnDestroy,
 } from '@angular/core';
-import { CoreApp } from '@services/app';
-import { CoreFile } from '@services/file';
+import { CoreFile, CoreFileProvider } from '@services/file';
 import { CoreFilepool, CoreFilepoolFileActions, CoreFilepoolFileEventData } from '@services/filepool';
 import { CoreSites } from '@services/sites';
 import { CoreUrlUtils } from '@services/utils/url';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreLogger } from '@singletons/logger';
 import { CoreError } from '@classes/errors/error';
-import { CoreSite } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreEventObserver, CoreEvents } from '@singletons/events';
-import { CoreConstants } from '../constants';
+import { DownloadStatus } from '../constants';
+import { CoreNetwork } from '@services/network';
+import { Translate } from '@singletons';
+import { AsyncDirective } from '@classes/async-directive';
+import { CoreDirectivesRegistry } from '@singletons/directives-registry';
+import { CorePromisedValue } from '@classes/promised-value';
+import { CorePlatform } from '@services/platform';
+import { CoreTextUtils } from '@services/utils/text';
+import { CoreArray } from '@singletons/array';
+import { CoreMimetypeUtils } from '@services/utils/mimetype';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
+import { CoreWS } from '@services/ws';
 
 /**
  * Directive to handle external content.
@@ -48,14 +58,24 @@ import { CoreConstants } from '../constants';
 @Directive({
     selector: '[core-external-content]',
 })
-export class CoreExternalContentDirective implements AfterViewInit, OnChanges, OnDestroy {
+export class CoreExternalContentDirective implements AfterViewInit, OnChanges, OnDestroy, AsyncDirective {
 
     @Input() siteId?: string; // Site ID to use.
     @Input() component?: string; // Component to link the file to.
     @Input() componentId?: string | number; // Component ID to use in conjunction with the component.
+    @Input() url?: string | null; // The URL to use in the element, either as src or href.
+    @Input() posterUrl?: string | null; // The poster URL.
+    /**
+     * @deprecated since 4.4. Use url instead.
+     */
     @Input() src?: string;
+    /**
+     * @deprecated since 4.4. Use url instead.
+     */
     @Input() href?: string;
-    @Input('target-src') targetSrc?: string; // eslint-disable-line @angular-eslint/no-input-rename
+    /**
+     * @deprecated since 4.4. Use posterUrl instead.
+     */
     @Input() poster?: string;
     @Output() onLoad = new EventEmitter(); // Emitted when content is loaded. Only for images.
 
@@ -65,15 +85,18 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
     protected logger: CoreLogger;
     protected initialized = false;
     protected fileEventObserver?: CoreEventObserver;
+    protected onReadyPromise = new CorePromisedValue<void>();
 
     constructor(element: ElementRef) {
 
         this.element = element.nativeElement;
         this.logger = CoreLogger.getInstance('CoreExternalContentDirective');
+
+        CoreDirectivesRegistry.register(this.element, this);
     }
 
     /**
-     * View has been initialized
+     * @inheritdoc
      */
     ngAfterViewInit(): void {
         this.checkAndHandleExternalContent();
@@ -82,9 +105,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
     }
 
     /**
-     * Listen to changes.
-     *
-     * * @param {{[name: string]: SimpleChange}} changes Changes.
+     * @inheritdoc
      */
     ngOnChanges(changes: { [name: string]: SimpleChange }): void {
         if (changes && this.initialized) {
@@ -109,7 +130,7 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
         newSource.setAttribute('src', url);
 
         if (type) {
-            if (CoreApp.isAndroid() && type == 'video/quicktime') {
+            if (CorePlatform.isAndroid() && type == 'video/quicktime') {
                 // Fix for VideoJS/Chrome bug https://github.com/videojs/video.js/issues/423 .
                 newSource.setAttribute('type', 'video/mp4');
             } else {
@@ -124,62 +145,47 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      * Get the URL that should be handled and, if valid, handle it.
      */
     protected async checkAndHandleExternalContent(): Promise<void> {
-        const siteId = this.siteId || CoreSites.getRequiredCurrentSite().getId();
         const tagName = this.element.tagName.toUpperCase();
-        let targetAttr;
-        let url;
+        let targetAttr: string;
+        let url: string;
 
         // Always handle inline styles (if any).
-        this.handleInlineStyles(siteId);
+        this.handleInlineStyles(this.siteId);
 
         if (tagName === 'A' || tagName == 'IMAGE') {
             targetAttr = 'href';
-            url = this.href;
+            url = this.url ?? this.href ?? ''; // eslint-disable-line deprecation/deprecation
 
         } else if (tagName === 'IMG') {
             targetAttr = 'src';
-            url = this.src;
+            url = this.url ?? this.src ?? ''; // eslint-disable-line deprecation/deprecation
 
         } else if (tagName === 'AUDIO' || tagName === 'VIDEO' || tagName === 'SOURCE' || tagName === 'TRACK') {
             targetAttr = 'src';
-            url = this.targetSrc || this.src;
+            url = this.url ?? this.src ?? ''; // eslint-disable-line deprecation/deprecation
 
-            if (tagName === 'VIDEO') {
-                if (this.poster) {
-                    // Handle poster.
-                    this.handleExternalContent('poster', this.poster, siteId).catch(() => {
-                        // Ignore errors.
-                    });
-                }
+            if (tagName === 'VIDEO' && (this.posterUrl || this.poster)) { // eslint-disable-line deprecation/deprecation
+                // Handle poster.
+                // eslint-disable-next-line deprecation/deprecation
+                this.handleExternalContent('poster', this.posterUrl ?? this.poster ?? '').catch(() => {
+                    // Ignore errors.
+                });
             }
 
         } else {
             this.invalid = true;
-
-            return;
-        }
-
-        // Avoid handling data url's.
-        if (url && url.indexOf('data:') === 0) {
-            this.invalid = true;
-            this.onLoad.emit();
-            this.loaded = true;
+            this.onReadyPromise.resolve();
 
             return;
         }
 
         try {
-            await this.handleExternalContent(targetAttr, url, siteId);
+            await this.handleExternalContent(targetAttr, url);
         } catch (error) {
-            // Error handling content. Make sure the loaded event is triggered for images.
-            if (tagName === 'IMG') {
-                if (url) {
-                    this.waitForLoad();
-                } else {
-                    this.onLoad.emit();
-                    this.loaded = true;
-                }
-            }
+            // Error handling content. Make sure the original URL is set.
+           this.setElementUrl(targetAttr, url);
+        } finally {
+            this.onReadyPromise.resolve();
         }
     }
 
@@ -188,67 +194,92 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      *
      * @param targetAttr Attribute to modify.
      * @param url Original URL to treat.
-     * @param siteId Site ID.
-     * @return Promise resolved if the element is successfully treated.
+     * @returns Promise resolved if the element is successfully treated.
      */
-    protected async handleExternalContent(targetAttr: string, url: string, siteId?: string): Promise<void> {
+    protected async handleExternalContent(targetAttr: string, url: string): Promise<void> {
 
         const tagName = this.element.tagName;
         if (tagName == 'VIDEO' && targetAttr != 'poster') {
             this.handleVideoSubtitles(<HTMLVideoElement> this.element);
         }
 
-        const site = await CoreSites.getSite(siteId);
-        const isSiteFile = site.isSitePluginFileUrl(url);
+        const site = await CoreUtils.ignoreErrors(CoreSites.getSite(this.siteId));
+        const isSiteFile = site?.isSitePluginFileUrl(url);
 
         if (!url || !url.match(/^https?:\/\//i) || CoreUrlUtils.isLocalFileUrl(url) ||
-                (tagName === 'A' && !(isSiteFile || site.isSiteThemeImageUrl(url) || CoreUrlUtils.isGravatarUrl(url)))) {
+                (tagName === 'A' && !(isSiteFile || site?.isSiteThemeImageUrl(url) || CoreUrlUtils.isGravatarUrl(url)))) {
 
             this.logger.debug('Ignoring non-downloadable URL: ' + url);
-            if (tagName === 'SOURCE') {
-                // Restoring original src.
-                this.addSource(url);
-            }
 
             throw new CoreError('Non-downloadable URL');
         }
 
-        if (!site.canDownloadFiles() && isSiteFile) {
+        if (site && !site.canDownloadFiles() && isSiteFile) {
             this.element.parentElement?.removeChild(this.element); // Remove element since it'll be broken.
 
-            throw new CoreError('Site doesn\'t allow downloading files.');
+            throw new CoreError(Translate.instant('core.cannotdownloadfiles'));
         }
 
         const finalUrl = await this.getUrlToUse(targetAttr, url, site);
 
         this.logger.debug('Using URL ' + finalUrl + ' for ' + url);
-        if (tagName === 'SOURCE') {
-            // The browser does not catch changes in SRC, we need to add a new source.
-            this.addSource(finalUrl);
-        } else {
-            if (tagName === 'IMG') {
-                this.loaded = false;
-                this.waitForLoad();
+
+        this.setElementUrl(targetAttr, finalUrl);
+
+        if (site) {
+            this.setListeners(targetAttr, url, site);
+        }
+    }
+
+    /**
+     * Set the URL to the element.
+     *
+     * @param targetAttr Name of the attribute to set.
+     * @param url URL to set.
+     */
+    protected setElementUrl(targetAttr: string, url: string): void {
+        if (!url) {
+            // Ignore empty URLs.
+            if (this.element.tagName === 'IMG') {
+                this.onLoad.emit();
+                this.loaded = true;
             }
 
-            if (targetAttr == 'poster') {
-                // Setting the poster immediately doesn't display it in some cases. Set it to empty and then set the right one.
-                this.element.setAttribute(targetAttr, '');
-                await CoreUtils.nextTick();
-            }
-
-            this.element.setAttribute(targetAttr, finalUrl);
-            this.element.setAttribute('data-original-' + targetAttr, url);
+            return;
         }
 
-        this.setListeners(targetAttr, url, site);
+        if (this.element.tagName === 'SOURCE') {
+            // The WebView does not detect changes in SRC, we need to add a new source.
+            this.addSource(url);
+        } else {
+            this.element.setAttribute(targetAttr, url);
+
+            const originalUrl = targetAttr === 'poster' ?
+                (this.posterUrl ?? this.poster) : // eslint-disable-line deprecation/deprecation
+                (this.url ?? this.src ?? this.href); // eslint-disable-line deprecation/deprecation
+            if (originalUrl && originalUrl !== url) {
+                this.element.setAttribute('data-original-' + targetAttr, originalUrl);
+            }
+        }
+
+        if (this.element.tagName !== 'IMG') {
+            return;
+        }
+
+        if (url.startsWith('data:')) {
+            this.onLoad.emit();
+            this.loaded = true;
+        } else {
+            this.loaded = false;
+            this.waitForLoad();
+        }
     }
 
     /**
      * Handle inline styles, trying to download referenced files.
      *
      * @param siteId Site ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async handleInlineStyles(siteId?: string): Promise<void> {
         if (!siteId) {
@@ -261,18 +292,16 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
             return;
         }
 
-        let urls = inlineStyles.match(/https?:\/\/[^"') ;]*/g);
-        if (!urls || !urls.length) {
+        const urls = CoreArray.unique(Array.from(inlineStyles.match(/https?:\/\/[^"') ;]*/g) ?? []));
+        if (!urls.length) {
             return;
         }
-
-        urls = CoreUtils.uniqueArray(urls); // Remove duplicates.
 
         const promises = urls.map(async (url) => {
             const finalUrl = await CoreFilepool.getSrcByUrl(siteId, url, this.component, this.componentId, 0, true, true);
 
             this.logger.debug('Using URL ' + finalUrl + ' for ' + url + ' in inline styles');
-            inlineStyles = inlineStyles.replace(new RegExp(url, 'gi'), finalUrl);
+            inlineStyles = inlineStyles.replace(new RegExp(CoreTextUtils.escapeForRegex(url), 'gi'), finalUrl);
         });
 
         try {
@@ -322,9 +351,13 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      * @param targetAttr Attribute to modify.
      * @param url Original URL to treat.
      * @param site Site.
-     * @return Promise resolved with the URL.
+     * @returns Promise resolved with the URL.
      */
-    protected async getUrlToUse(targetAttr: string, url: string, site: CoreSite): Promise<string> {
+    protected async getUrlToUse(targetAttr: string, url: string, site?: CoreSite): Promise<string> {
+        if (!site) {
+            return this.getUrlForNoSite(url);
+        }
+
         const tagName = this.element.tagName;
         let finalUrl: string;
 
@@ -372,12 +405,42 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
     }
 
     /**
+     * Get the URL to use when there's no site (the user hasn't authenticated yet).
+     * In Android, the file will always be downloaded and served from the local file system to avoid problems with cookies.
+     * In other platforms the file will never be downloaded, we'll always use the online URL.
+     *
+     * @param url Original URL to treat.
+     * @returns Promise resolved with the URL.
+     */
+    protected async getUrlForNoSite(url: string): Promise<string> {
+        if (!CorePlatform.isAndroid()) {
+            return url;
+        }
+
+        const fileId = CoreFilepool.getFileIdByUrl(url);
+        const extension = CoreMimetypeUtils.guessExtensionFromUrl(url);
+
+        const filePath = CoreFileProvider.NO_SITE_FOLDER + '/' + fileId + (extension ? '.' + extension : '');
+        let fileEntry: FileEntry;
+
+        try {
+            // Check if the file is already downloaded.
+            fileEntry = await CoreFile.getFile(filePath);
+        } catch {
+            // File not downloaded, download it first.
+            fileEntry = await CoreWS.downloadFile(url, filePath, false);
+        }
+
+        return CoreFile.convertFileSrc(CoreFile.getFileEntryURL(fileEntry));
+    }
+
+    /**
      * Set listeners if needed.
      *
      * @param targetAttr Attribute to modify.
      * @param url Original URL to treat.
      * @param site Site.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async setListeners(targetAttr: string, url: string, site: CoreSite): Promise<void> {
         if (this.fileEventObserver) {
@@ -397,13 +460,18 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
                 return;
             }
 
+            if (this.isPlayedMedia()) {
+                // Don't update the URL if it's a media that already started playing, otherwise the media will be reloaded.
+                return;
+            }
+
             const newState = await CoreFilepool.getFileStateByUrl(site.getId(), url);
             if (newState === state) {
                 return;
             }
 
             state = newState;
-            if (state === CoreConstants.DOWNLOADING) {
+            if (state === DownloadStatus.DOWNLOADING) {
                 return;
             }
 
@@ -427,12 +495,35 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
             clickableEl.addEventListener(eventName, () => {
                 // User played media or opened a downloadable link.
                 // Download the file if in wifi and it hasn't been downloaded already (for big files).
-                if (state !== CoreConstants.DOWNLOADED && state !== CoreConstants.DOWNLOADING && CoreApp.isWifi()) {
+                if (state !== DownloadStatus.DOWNLOADED && state !== DownloadStatus.DOWNLOADING && CoreNetwork.isWifi()) {
                     // We aren't using the result, so it doesn't matter which of the 2 functions we call.
                     CoreFilepool.getUrlByUrl(site.getId(), url, this.component, this.componentId, 0, false);
                 }
             });
         }
+    }
+
+    /**
+     * Check if the source affects a media element that is already playing and not ended.
+     *
+     * @returns Whether it's a played media element.
+     */
+    protected isPlayedMedia(): boolean {
+        let mediaElement: HTMLVideoElement | HTMLAudioElement | null = null;
+
+        if (this.element.tagName === 'VIDEO') {
+            mediaElement = this.element as HTMLVideoElement;
+        } else if (this.element.tagName === 'AUDIO') {
+            mediaElement = this.element as HTMLAudioElement;
+        } else if (this.element.tagName === 'SOURCE' || this.element.tagName === 'TRACK') {
+            mediaElement = this.element.closest<HTMLVideoElement | HTMLAudioElement>('video,audio');
+        }
+
+        if (!mediaElement) {
+            return false;
+        }
+
+        return !mediaElement.paused || (mediaElement.currentTime > 0.1 && !mediaElement.ended);
     }
 
     /**
@@ -455,6 +546,13 @@ export class CoreExternalContentDirective implements AfterViewInit, OnChanges, O
      */
     ngOnDestroy(): void {
         this.fileEventObserver?.off();
+    }
+
+    /**
+     * @inheritdoc
+     */
+    async ready(): Promise<void> {
+        return this.onReadyPromise;
     }
 
 }

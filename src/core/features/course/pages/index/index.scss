@@ -1,4 +1,4 @@
-@import '~theme/globals.scss';
+@use "theme/globals" as *;
 
 :host {
     .core-format-progress-list {
@@ -20,12 +20,18 @@
             }
         }
 
+        /** Deprecated icon */
         ion-icon.course-icon {
             padding: 12px;
             font-size: calc(var(--core-courseimage-on-course-size) - 24px);
             border-radius: var(--border-radius);
             color: var(--course-color-tint);
             background: var(--course-color, transparent);
+        }
+
+        // Fill geopaterns
+        img[src$=".svg"] {
+            min-width: 100%;
         }
     }
 
@@ -42,7 +48,7 @@
     }
 
     h1 {
-        font-size: 20px;
+        font-size: var(--mdl-typography-heading4-fontSize);
     }
 
     .core-course-header {

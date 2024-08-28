@@ -15,11 +15,13 @@
 import { Subject } from 'rxjs';
 
 import { CoreLogger } from '@singletons/logger';
-import { CoreSite, CoreSiteInfoResponse, CoreSitePublicConfigResponse } from '@classes/site';
+import { CoreSite } from '@classes/sites/site';
 import { CoreFilepoolComponentFileEventData } from '@services/filepool';
 import { CoreRedirectPayload } from '@services/navigator';
 import { CoreCourseModuleCompletionData } from '@features/course/services/course-helper';
 import { CoreScreenOrientation } from '@services/screen';
+import { CoreSiteInfoResponse, CoreSitePublicConfigResponse } from '@classes/sites/unauthenticated-site';
+import { DownloadStatus } from '../constants';
 
 /**
  * Observer instance to stop listening to an event.
@@ -39,7 +41,6 @@ export interface CoreEventsData {
     [CoreEvents.SITE_ADDED]: CoreEventSiteAddedData;
     [CoreEvents.SITE_DELETED]: CoreSite;
     [CoreEvents.SESSION_EXPIRED]: CoreEventSessionExpiredData;
-    [CoreEvents.CORE_LOADING_CHANGED]: CoreEventLoadingChangedData;
     [CoreEvents.COURSE_STATUS_CHANGED]: CoreEventCourseStatusChanged;
     [CoreEvents.PACKAGE_STATUS_CHANGED]: CoreEventPackageStatusChanged;
     [CoreEvents.USER_DELETED]: CoreEventUserDeletedData;
@@ -53,6 +54,8 @@ export interface CoreEventsData {
     [CoreEvents.SECTION_STATUS_CHANGED]: CoreEventSectionStatusChangedData;
     [CoreEvents.ACTIVITY_DATA_SENT]: CoreEventActivityDataSentData;
     [CoreEvents.IAB_LOAD_START]: InAppBrowserEvent;
+    [CoreEvents.IAB_LOAD_STOP]: InAppBrowserEvent;
+    [CoreEvents.IAB_MESSAGE]: Record<string, unknown>;
     [CoreEvents.LOGIN_SITE_CHECKED]: CoreEventLoginSiteCheckedData;
     [CoreEvents.LOGIN_SITE_UNCHECKED]: CoreEventLoginSiteUncheckedData;
     [CoreEvents.SEND_ON_ENTER_CHANGED]: CoreEventSendOnEnterChangedData;
@@ -82,11 +85,7 @@ export class CoreEvents {
     static readonly SITE_UPDATED = 'site_updated';
     static readonly SITE_DELETED = 'site_deleted';
     static readonly COMPLETION_MODULE_VIEWED = 'completion_module_viewed';
-    /**
-     * Deprecated on 4.0 use COMPLETION_CHANGED instead.
-     */
     static readonly MANUAL_COMPLETION_CHANGED = 'manual_completion_changed';
-    static readonly COMPLETION_CHANGED = 'completion_changed';
     static readonly USER_DELETED = 'user_deleted';
     static readonly USER_SUSPENDED = 'user_suspended';
     static readonly USER_NO_LOGIN = 'user_no_login';
@@ -99,14 +98,12 @@ export class CoreEvents {
     static readonly LOGIN_SITE_CHECKED = 'login_site_checked';
     static readonly LOGIN_SITE_UNCHECKED = 'login_site_unchecked';
     static readonly IAB_LOAD_START = 'inappbrowser_load_start';
+    static readonly IAB_LOAD_STOP = 'inappbrowser_load_stop';
     static readonly IAB_EXIT = 'inappbrowser_exit';
+    static readonly IAB_MESSAGE = 'inappbrowser_message';
     static readonly APP_LAUNCHED_URL = 'app_launched_url'; // App opened with a certain URL (custom URL scheme).
     static readonly FILE_SHARED = 'file_shared';
     static readonly KEYBOARD_CHANGE = 'keyboard_change';
-    /**
-     * @deprecated since app 4.0. Use CoreComponentsRegistry promises instead.
-     */
-    static readonly CORE_LOADING_CHANGED = 'core_loading_changed';
     static readonly ORIENTATION_CHANGE = 'orientation_change';
     static readonly SEND_ON_ENTER_CHANGED = 'send_on_enter_changed';
     static readonly SELECT_COURSE_TAB = 'select_course_tab';
@@ -117,6 +114,8 @@ export class CoreEvents {
     static readonly DEVICE_REGISTERED_IN_MOODLE = 'device_registered_in_moodle';
     static readonly COURSE_MODULE_VIEWED = 'course_module_viewed';
     static readonly COMPLETE_REQUIRED_PROFILE_DATA_FINISHED = 'complete_required_profile_data_finished';
+    static readonly MAIN_HOME_LOADED = 'main_home_loaded';
+    static readonly FULL_SCREEN_CHANGED = 'full_screen_changed';
 
     protected static logger = CoreLogger.getInstance('CoreEvents');
     protected static observables: { [eventName: string]: Subject<unknown> } = {};
@@ -131,7 +130,7 @@ export class CoreEvents {
      * @param eventName Name of the event to listen to.
      * @param callBack Function to call when the event is triggered.
      * @param siteId Site where to trigger the event. Undefined won't check the site.
-     * @return Observer to stop listening.
+     * @returns Observer to stop listening.
      */
     static on<Fallback = unknown, Event extends string = string>(
         eventName: Event,
@@ -184,7 +183,7 @@ export class CoreEvents {
      * @param eventName Name of the event to listen to.
      * @param callBack Function to call when the event is triggered.
      * @param siteId Site where to trigger the event. Undefined won't check the site.
-     * @return Observer to stop listening.
+     * @returns Observer to stop listening.
      */
     static once<Fallback = unknown, Event extends string = string>(
         eventName: Event,
@@ -192,8 +191,7 @@ export class CoreEvents {
         siteId?: string,
     ): CoreEventObserver {
         const listener = CoreEvents.on<Fallback, Event>(eventName, (value) => {
-            setTimeout(() => listener.off(), 0);
-
+            listener.off();
             callBack(value);
         }, siteId);
 
@@ -209,7 +207,7 @@ export class CoreEvents {
      * @param eventNames Names of the events to listen to.
      * @param callBack Function to call when any of the events is triggered.
      * @param siteId Site where to trigger the event. Undefined won't check the site.
-     * @return Observer to stop listening.
+     * @returns Observer to stop listening.
      */
     static onMultiple<T = unknown>(eventNames: string[], callBack: (value: T) => void, siteId?: string): CoreEventObserver {
         const observers = eventNames.map((name) => this.on<T>(name, callBack, siteId));
@@ -227,7 +225,7 @@ export class CoreEvents {
     /**
      * Triggers an event, notifying all the observers.
      *
-     * @param event Name of the event to trigger.
+     * @param eventName Name of the event to trigger.
      * @param data Data to pass to the observers.
      * @param siteId Site where to trigger the event. Undefined means no Site.
      */
@@ -241,14 +239,14 @@ export class CoreEvents {
             if (siteId) {
                 Object.assign(data || {}, { siteId });
             }
-            this.observables[eventName].next(data);
+            this.observables[eventName].next(data || {});
         }
     }
 
     /**
      * Triggers a unique event, notifying all the observers. If the event has already been triggered, don't do anything.
      *
-     * @param event Name of the event to trigger.
+     * @param eventName Name of the event to trigger.
      * @param data Data to pass to the observers.
      * @param siteId Site where to trigger the event. Undefined means no Site.
      */
@@ -276,6 +274,15 @@ export class CoreEvents {
                 this.observables[eventName].next(data);
             }
         }
+    }
+
+    /**
+     * Wait until an event has been emitted.
+     *
+     * @param eventName Event name.
+     */
+    static waitUntil(eventName: string): Promise<void> {
+        return new Promise(resolve => this.once(eventName, () => resolve()));
     }
 
 }
@@ -320,7 +327,7 @@ export type CoreEventLoadingChangedData = {
  */
 export type CoreEventCourseStatusChanged = {
     courseId: number; // Course Id.
-    status: string;
+    status: DownloadStatus;
 };
 
 /**
@@ -329,7 +336,7 @@ export type CoreEventCourseStatusChanged = {
 export type CoreEventPackageStatusChanged = {
     component: string;
     componentId: string | number;
-    status: string;
+    status: DownloadStatus;
 };
 
 /**

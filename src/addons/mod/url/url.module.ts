@@ -12,28 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { APP_INITIALIZER, NgModule, Type } from '@angular/core';
+import { APP_INITIALIZER, NgModule } from '@angular/core';
 import { Routes } from '@angular/router';
 import { CoreContentLinksDelegate } from '@features/contentlinks/services/contentlinks-delegate';
 import { CoreCourseModuleDelegate } from '@features/course/services/module-delegate';
 import { CoreCourseModulePrefetchDelegate } from '@features/course/services/module-prefetch-delegate';
 import { CoreMainMenuTabRoutingModule } from '@features/mainmenu/mainmenu-tab-routing.module';
-import { AddonModUrlComponentsModule } from './components/components.module';
 import { AddonModUrlIndexLinkHandler } from './services/handlers/index-link';
 import { AddonModUrlListLinkHandler } from './services/handlers/list-link';
-import { AddonModUrlModuleHandler, AddonModUrlModuleHandlerService } from './services/handlers/module';
+import { AddonModUrlModuleHandler } from './services/handlers/module';
 import { AddonModUrlPrefetchHandler } from './services/handlers/prefetch';
-import { AddonModUrlProvider } from './services/url';
-import { AddonModUrlHelperProvider } from './services/url-helper';
-
-export const ADDON_MOD_URL_SERVICES: Type<unknown>[] = [
-    AddonModUrlProvider,
-    AddonModUrlHelperProvider,
-];
+import { ADDON_MOD_URL_PAGE_NAME } from './constants';
 
 const routes: Routes = [
     {
-        path: AddonModUrlModuleHandlerService.PAGE_NAME,
+        path: ADDON_MOD_URL_PAGE_NAME,
         loadChildren: () => import('./url-lazy.module').then(m => m.AddonModUrlLazyModule),
     },
 ];
@@ -41,7 +34,6 @@ const routes: Routes = [
 @NgModule({
     imports: [
         CoreMainMenuTabRoutingModule.forChild(routes),
-        AddonModUrlComponentsModule,
     ],
     providers: [
         {

@@ -19,8 +19,8 @@ import { IonContent } from '@ionic/angular';
 import { CoreNavigator } from '@services/navigator';
 import { CoreTimeUtils } from '@services/utils/time';
 import { CoreTime } from '@singletons/time';
-import { AddonModChat, AddonModChatChat, AddonModChatProvider } from '../../services/chat';
-import { AddonModChatModuleHandlerService } from '../../services/handlers/module';
+import { AddonModChat, AddonModChatChat } from '../../services/chat';
+import { ADDON_MOD_CHAT_COMPONENT, ADDON_MOD_CHAT_PAGE_NAME } from '../../constants';
 
 /**
  * Component that displays a chat.
@@ -31,13 +31,10 @@ import { AddonModChatModuleHandlerService } from '../../services/handlers/module
 })
 export class AddonModChatIndexComponent extends CoreCourseModuleMainActivityComponent implements OnInit {
 
-    component = AddonModChatProvider.COMPONENT;
-    moduleName = 'chat';
+    component = ADDON_MOD_CHAT_COMPONENT;
+    pluginName = 'chat';
     chat?: AddonModChatChat;
-    chatInfo?: {
-        date: string;
-        fromnow: string;
-    };
+    chatTime?: string;
 
     constructor(
         protected content?: IonContent,
@@ -62,17 +59,11 @@ export class AddonModChatIndexComponent extends CoreCourseModuleMainActivityComp
         this.chat = await AddonModChat.getChat(this.courseId, this.module.id);
 
         this.description = this.chat.intro;
-        const now = CoreTimeUtils.timestamp();
-        const span = (this.chat.chattime || 0) - now;
+        const chatTimeSeconds = (this.chat.chattime || 0) - CoreTimeUtils.timestamp();
 
-        if (this.chat.chattime && this.chat.schedule && span > 0) {
-            this.chatInfo = {
-                date: CoreTimeUtils.userDate(this.chat.chattime * 1000),
-                fromnow: CoreTime.formatTime(span),
-            };
-        } else {
-            this.chatInfo = undefined;
-        }
+        this.chatTime = this.chat.schedule && chatTimeSeconds > 0
+            ? CoreTime.formatTime(chatTimeSeconds)
+            : undefined;
 
         this.dataRetrieved.emit(this.chat);
     }
@@ -85,7 +76,9 @@ export class AddonModChatIndexComponent extends CoreCourseModuleMainActivityComp
             return; // Shouldn't happen.
         }
 
-        await AddonModChat.logView(this.chat.id, this.chat.name);
+        await AddonModChat.logView(this.chat.id);
+
+        this.analyticsLogEvent('mod_chat_view_chat');
     }
 
     /**
@@ -95,7 +88,7 @@ export class AddonModChatIndexComponent extends CoreCourseModuleMainActivityComp
         const title = this.chat?.name || this.moduleName;
 
         CoreNavigator.navigateToSitePath(
-            AddonModChatModuleHandlerService.PAGE_NAME + `/${this.courseId}/${this.module.id}/chat`,
+            `${ADDON_MOD_CHAT_PAGE_NAME}/${this.courseId}/${this.module.id}/chat`,
             {
                 params: {
                     title,
@@ -110,7 +103,7 @@ export class AddonModChatIndexComponent extends CoreCourseModuleMainActivityComp
      */
     viewSessions(): void {
         CoreNavigator.navigateToSitePath(
-            AddonModChatModuleHandlerService.PAGE_NAME + `/${this.courseId}/${this.module.id}/sessions`,
+            `${ADDON_MOD_CHAT_PAGE_NAME}/${this.courseId}/${this.module.id}/sessions`,
             {
                 params: {
                     chatId: this.chat!.id,

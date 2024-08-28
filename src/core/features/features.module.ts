@@ -19,17 +19,21 @@ import { CoreCommentsModule } from './comments/comments.module';
 import { CoreContentLinksModule } from './contentlinks/contentlinks.module';
 import { CoreCourseModule } from './course/course.module';
 import { CoreCoursesModule } from './courses/courses.module';
+import { CoreDataPrivacyModule } from './dataprivacy/dataprivacy.module';
 import { CoreEditorModule } from './editor/editor.module';
 import { CoreEmulatorModule } from './emulator/emulator.module';
+import { CoreEnrolModule } from './enrol/enrol.module';
 import { CoreFileUploaderModule } from './fileuploader/fileuploader.module';
 import { CoreFilterModule } from './filter/filter.module';
 import { CoreGradesModule } from './grades/grades.module';
 import { CoreH5PModule } from './h5p/h5p.module';
 import { CoreLoginModule } from './login/login.module';
 import { CoreMainMenuModule } from './mainmenu/mainmenu.module';
+import { CoreNativeModule } from '@features/native/native.module';
 import { CorePushNotificationsModule } from './pushnotifications/pushnotifications.module';
 import { CoreQuestionModule } from './question/question.module';
 import { CoreRatingModule } from './rating/rating.module';
+import { CoreRemindersModule } from './reminders/reminders.module';
 import { CoreSearchModule } from './search/search.module';
 import { CoreSettingsModule } from './settings/settings.module';
 import { CoreSharedFilesModule } from './sharedfiles/sharedfiles.module';
@@ -37,10 +41,12 @@ import { CoreSiteHomeModule } from './sitehome/sitehome.module';
 import { CoreSitePluginsModule } from './siteplugins/siteplugins.module';
 import { CoreStylesModule } from './styles/styles.module';
 import { CoreTagModule } from './tag/tag.module';
-import { CoreUserToursModule } from './usertours/user-tours.module';
 import { CoreUserModule } from './user/user.module';
+import { CoreUserToursModule } from './usertours/user-tours.module';
 import { CoreViewerModule } from './viewer/viewer.module';
 import { CoreXAPIModule } from './xapi/xapi.module';
+import { CoreReportBuilderModule } from './reportbuilder/reportbuilder.module';
+import { CorePolicyModule } from './policy/policy.module';
 
 @NgModule({
     imports: [
@@ -49,28 +55,36 @@ import { CoreXAPIModule } from './xapi/xapi.module';
         CoreContentLinksModule,
         CoreCourseModule,
         CoreCoursesModule,
+        CoreDataPrivacyModule,
         CoreEditorModule,
-        CoreEmulatorModule,
+        CoreEnrolModule,
         CoreFileUploaderModule,
         CoreFilterModule,
         CoreGradesModule,
         CoreH5PModule,
         CoreLoginModule,
         CoreMainMenuModule,
+        CoreNativeModule,
         CorePushNotificationsModule,
         CoreQuestionModule,
         CoreRatingModule,
+        CoreRemindersModule,
         CoreSearchModule,
         CoreSettingsModule,
         CoreSharedFilesModule,
         CoreSiteHomeModule,
         CoreSitePluginsModule,
-        CoreTagModule,
         CoreStylesModule,
-        CoreUserToursModule,
+        CoreTagModule,
         CoreUserModule,
+        CoreUserToursModule,
         CoreViewerModule,
         CoreXAPIModule,
+        CoreReportBuilderModule,
+        CorePolicyModule,
+
+        // Import last to allow overrides.
+        CoreEmulatorModule,
     ],
 })
 export class CoreFeaturesModule {}

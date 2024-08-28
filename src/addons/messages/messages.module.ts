@@ -32,18 +32,28 @@ import { CorePushNotificationsDelegate } from '@features/pushnotifications/servi
 import { AddonMessagesPushClickHandler } from './services/handlers/push-click';
 import { CoreUserDelegate } from '@features/user/services/user-delegate';
 import { AddonMessagesSendMessageUserHandler } from './services/handlers/user-send-message';
-import { Network, NgZone } from '@singletons';
-import { AddonMessagesSync, AddonMessagesSyncProvider } from './services/messages-sync';
+import { NgZone } from '@singletons';
+import { CoreNetwork } from '@services/network';
+import { AddonMessagesSync } from './services/messages-sync';
 import { AddonMessagesSyncCronHandler } from './services/handlers/sync-cron';
-import { CoreSitePreferencesRoutingModule } from '@features/settings/pages/site/site-routing';
-import { AddonMessagesProvider } from './services/messages';
-import { AddonMessagesOfflineProvider } from './services/messages-offline';
+import { CoreSitePreferencesRoutingModule } from '@features/settings/settings-site-routing.module';
 
-export const ADDON_MESSAGES_SERVICES: Type<unknown>[] = [
-    AddonMessagesProvider,
-    AddonMessagesOfflineProvider,
-    AddonMessagesSyncProvider,
-];
+/**
+ * Get messages services.
+ *
+ * @returns Returns messages services.
+ */
+export async function getMessagesServices(): Promise<Type<unknown>[]> {
+    const { AddonMessagesProvider } = await import('@addons/messages/services/messages');
+    const { AddonMessagesOfflineProvider } = await import('@addons/messages/services/messages-offline');
+    const { AddonMessagesSyncProvider } = await import('@addons/messages/services/messages-sync');
+
+    return [
+        AddonMessagesProvider,
+        AddonMessagesOfflineProvider,
+        AddonMessagesSyncProvider,
+    ];
+}
 
 const mainMenuChildrenRoutes: Routes = [
     {
@@ -54,7 +64,7 @@ const mainMenuChildrenRoutes: Routes = [
 const preferencesRoutes: Routes = [
     {
         path: AddonMessagesSettingsHandlerService.PAGE_NAME,
-        loadChildren: () => import('./pages/settings/settings.module').then(m => m.AddonMessagesSettingsPageModule),
+        loadChildren: () => import('./messages-settings-lazy.module').then(m => m.AddonMessagesSettingsLazyModule),
     },
 ];
 
@@ -86,7 +96,7 @@ const preferencesRoutes: Routes = [
                 CoreUserDelegate.registerHandler(AddonMessagesSendMessageUserHandler.instance);
 
                 // Sync some discussions when device goes online.
-                Network.onConnect().subscribe(() => {
+                CoreNetwork.onConnectShouldBeStable().subscribe(() => {
                     // Execute the callback in the Angular zone, so change detection doesn't stop working.
                     NgZone.run(() => {
                         AddonMessagesSync.syncAllDiscussions(undefined, true);

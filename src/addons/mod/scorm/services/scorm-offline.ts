@@ -13,7 +13,6 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { SQLiteDB } from '@classes/sqlitedb';
 import { CoreUser } from '@features/user/services/user';
 import { CoreSites } from '@services/sites';
 import { CoreSync } from '@services/sync';
@@ -23,11 +22,15 @@ import { CoreUtils } from '@services/utils/utils';
 import { makeSingleton } from '@singletons';
 import { CoreLogger } from '@singletons/logger';
 import {
+    AddonModScormAttemptDBPrimaryKeys,
     AddonModScormAttemptDBRecord,
     AddonModScormOfflineDBCommonData,
+    AddonModScormTrackDBPrimaryKeys,
     AddonModScormTrackDBRecord,
     ATTEMPTS_TABLE_NAME,
+    ATTEMPTS_TABLE_PRIMARY_KEYS,
     TRACKS_TABLE_NAME,
+    TRACKS_TABLE_PRIMARY_KEYS,
 } from './database/scorm';
 import {
     AddonModScormDataEntry,
@@ -38,6 +41,10 @@ import {
     AddonModScormUserDataMap,
     AddonModScormWSSco,
 } from './scorm';
+import { lazyMap, LazyMap } from '@/core/utils/lazy-map';
+import { asyncInstance, AsyncInstance } from '@/core/utils/async-instance';
+import { CoreDatabaseTable } from '@classes/database/database-table';
+import { CoreDatabaseCachingStrategy } from '@classes/database/database-table-proxy';
 
 /**
  * Service to handle offline SCORM.
@@ -47,8 +54,44 @@ export class AddonModScormOfflineProvider {
 
     protected logger: CoreLogger;
 
+    protected tracksTables: LazyMap<
+        AsyncInstance<CoreDatabaseTable<AddonModScormTrackDBRecord, AddonModScormTrackDBPrimaryKeys, never>>
+    >;
+
+    protected attemptsTables: LazyMap<
+        AsyncInstance<CoreDatabaseTable<AddonModScormAttemptDBRecord, AddonModScormAttemptDBPrimaryKeys, never>>
+    >;
+
     constructor() {
         this.logger = CoreLogger.getInstance('AddonModScormOfflineProvider');
+        this.tracksTables = lazyMap(
+            siteId => asyncInstance(
+                () => CoreSites.getSiteTable<AddonModScormTrackDBRecord, AddonModScormTrackDBPrimaryKeys, never>(
+                    TRACKS_TABLE_NAME,
+                    {
+                        siteId,
+                        primaryKeyColumns: [...TRACKS_TABLE_PRIMARY_KEYS],
+                        rowIdColumn: null,
+                        config: { cachingStrategy: CoreDatabaseCachingStrategy.None },
+                        onDestroy: () => delete this.tracksTables[siteId],
+                    },
+                ),
+            ),
+        );
+        this.attemptsTables = lazyMap(
+            siteId => asyncInstance(
+                () => CoreSites.getSiteTable<AddonModScormAttemptDBRecord, AddonModScormAttemptDBPrimaryKeys, never>(
+                    ATTEMPTS_TABLE_NAME,
+                    {
+                        siteId,
+                        primaryKeyColumns: [...ATTEMPTS_TABLE_PRIMARY_KEYS],
+                        rowIdColumn: null,
+                        config: { cachingStrategy: CoreDatabaseCachingStrategy.None },
+                        onDestroy: () => delete this.tracksTables[siteId],
+                    },
+                ),
+            ),
+        );
     }
 
     /**
@@ -61,7 +104,7 @@ export class AddonModScormOfflineProvider {
      * @param newAttempt New attempt number.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when the attempt number changes.
+     * @returns Promise resolved when the attempt number changes.
      */
     async changeAttemptNumber(
         scormId: number,
@@ -76,40 +119,43 @@ export class AddonModScormOfflineProvider {
 
         this.logger.debug(`Change attempt number from ${attempt} to ${newAttempt} in SCORM ${scormId}`);
 
-        // Update the attempt number.
-        const db = site.getDb();
-        const currentAttemptConditions: AddonModScormOfflineDBCommonData = {
-            scormid: scormId,
-            userid: userId,
-            attempt,
-        };
-        const newAttemptConditions: AddonModScormOfflineDBCommonData = {
-            scormid: scormId,
-            userid: userId,
-            attempt: newAttempt,
-        };
-        const newAttemptData: Partial<AddonModScormAttemptDBRecord> = {
-            attempt: newAttempt,
-            timemodified: CoreTimeUtils.timestamp(),
-        };
-
         // Block the SCORM so it can't be synced.
         CoreSync.blockOperation(AddonModScormProvider.COMPONENT, scormId, 'changeAttemptNumber', site.id);
 
         try {
-            await db.updateRecords(ATTEMPTS_TABLE_NAME, newAttemptData, currentAttemptConditions);
+            const currentAttemptConditions = {
+                sql: 'scormid = ? AND userid = ? AND attempt = ?',
+                sqlParams: [scormId, userId, attempt],
+                js: (record: AddonModScormOfflineDBCommonData) =>
+                    record.scormid === scormId &&
+                    record.userid === userId &&
+                    record.attempt === attempt,
+            };
+
+            await this.attemptsTables[site.id].updateWhere(
+                { attempt: newAttempt, timemodified: CoreTimeUtils.timestamp() },
+                currentAttemptConditions,
+            );
 
             try {
                 // Now update the attempt number of all the tracks and mark them as not synced.
-                const newTrackData: Partial<AddonModScormTrackDBRecord> = {
-                    attempt: newAttempt,
-                    synced: 0,
-                };
-
-                await db.updateRecords(TRACKS_TABLE_NAME, newTrackData, currentAttemptConditions);
+                await this.tracksTables[site.id].updateWhere(
+                    { attempt: newAttempt, synced: 0 },
+                    currentAttemptConditions,
+                );
             } catch (error) {
                 // Failed to update the tracks, restore the old attempt number.
-                await db.updateRecords(ATTEMPTS_TABLE_NAME, { attempt }, newAttemptConditions);
+                await this.attemptsTables[site.id].updateWhere(
+                    { attempt },
+                    {
+                        sql: 'scormid = ? AND userid = ? AND attempt = ?',
+                        sqlParams: [scormId, userId, newAttempt],
+                        js: (attempt) =>
+                            attempt.scormid === scormId &&
+                            attempt.userid === userId &&
+                            attempt.attempt === newAttempt,
+                    },
+                );
 
                 throw error;
             }
@@ -128,7 +174,7 @@ export class AddonModScormOfflineProvider {
      * @param snapshot Optional. Snapshot to store in the attempt.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when the new attempt is created.
+     * @returns Promise resolved when the new attempt is created.
      */
     async createNewAttempt(
         scorm: AddonModScormScorm,
@@ -148,7 +194,6 @@ export class AddonModScormOfflineProvider {
         CoreSync.blockOperation(AddonModScormProvider.COMPONENT, scorm.id, 'createNewAttempt', site.id);
 
         // Create attempt in DB.
-        const db = site.getDb();
         const entry: AddonModScormAttemptDBRecord = {
             scormid: scorm.id,
             userid: userId,
@@ -166,7 +211,7 @@ export class AddonModScormOfflineProvider {
         }
 
         try {
-            await db.insertRecord(ATTEMPTS_TABLE_NAME, entry);
+            await this.attemptsTables[site.id].insert(entry);
 
             // Store all the data in userData.
             const promises: Promise<void>[] = [];
@@ -196,7 +241,7 @@ export class AddonModScormOfflineProvider {
      * @param attempt Attempt number.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when all the data has been deleted.
+     * @returns Promise resolved when all the data has been deleted.
      */
     async deleteAttempt(scormId: number, attempt: number, siteId?: string, userId?: number): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -204,16 +249,15 @@ export class AddonModScormOfflineProvider {
 
         this.logger.debug(`Delete offline attempt ${attempt} in SCORM ${scormId}`);
 
-        const db = site.getDb();
-        const conditions: AddonModScormOfflineDBCommonData = {
+        const conditions = {
             scormid: scormId,
             userid: userId,
             attempt,
         };
 
         await Promise.all([
-            db.deleteRecords(ATTEMPTS_TABLE_NAME, conditions),
-            db.deleteRecords(TRACKS_TABLE_NAME, conditions),
+            this.attemptsTables[site.id].delete(conditions),
+            this.tracksTables[site.id].delete(conditions),
         ]);
     }
 
@@ -222,7 +266,7 @@ export class AddonModScormOfflineProvider {
      * This function is based in Moodle's scorm_format_interactions.
      *
      * @param scoUserData Userdata from a certain SCO.
-     * @return Formatted userdata.
+     * @returns Formatted userdata.
      */
     protected formatInteractions(scoUserData: Record<string, AddonModScormDataValue>): Record<string, AddonModScormDataValue> {
         const formatted: Record<string, AddonModScormDataValue> = {};
@@ -277,12 +321,12 @@ export class AddonModScormOfflineProvider {
      * Get all the offline attempts in a certain site.
      *
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when the offline attempts are retrieved.
+     * @returns Promise resolved when the offline attempts are retrieved.
      */
     async getAllAttempts(siteId?: string): Promise<AddonModScormOfflineAttempt[]> {
-        const db = await CoreSites.getSiteDb(siteId);
+        siteId ??= CoreSites.getCurrentSiteId();
 
-        const attempts = await db.getAllRecords<AddonModScormAttemptDBRecord>(ATTEMPTS_TABLE_NAME);
+        const attempts = await this.attemptsTables[siteId].getMany();
 
         return attempts.map((attempt) => this.parseAttempt(attempt));
     }
@@ -294,13 +338,13 @@ export class AddonModScormOfflineProvider {
      * @param attempt Attempt number.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved with the attempt.
+     * @returns Promise resolved with the attempt.
      */
     async getAttempt(scormId: number, attempt: number, siteId?: string, userId?: number): Promise<AddonModScormOfflineAttempt> {
         const site = await CoreSites.getSite(siteId);
         userId = userId || site.getUserId();
 
-        const attemptRecord = await site.getDb().getRecord<AddonModScormAttemptDBRecord>(ATTEMPTS_TABLE_NAME, {
+        const attemptRecord = await this.attemptsTables[site.id].getOneByPrimaryKey({
             scormid: scormId,
             userid: userId,
             attempt,
@@ -316,7 +360,7 @@ export class AddonModScormOfflineProvider {
      * @param attempt Attempt number.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved with time the attempt was created, undefined if attempt not found.
+     * @returns Promise resolved with time the attempt was created, undefined if attempt not found.
      */
     async getAttemptCreationTime(scormId: number, attempt: number, siteId?: string, userId?: number): Promise<number | undefined> {
         try {
@@ -334,13 +378,13 @@ export class AddonModScormOfflineProvider {
      * @param scormId SCORM ID.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when the offline attempts are retrieved.
+     * @returns Promise resolved when the offline attempts are retrieved.
      */
     async getAttempts(scormId: number, siteId?: string, userId?: number): Promise<AddonModScormOfflineAttempt[]> {
         const site = await CoreSites.getSite(siteId);
         userId = userId || site.getUserId();
 
-        const attempts = await site.getDb().getRecords<AddonModScormAttemptDBRecord>(ATTEMPTS_TABLE_NAME, {
+        const attempts = await this.attemptsTables[site.id].getMany({
             scormid: scormId,
             userid: userId,
         });
@@ -355,7 +399,7 @@ export class AddonModScormOfflineProvider {
      * @param attempt Attempt number.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved with the snapshot or undefined if no snapshot.
+     * @returns Promise resolved with the snapshot or undefined if no snapshot.
      */
     async getAttemptSnapshot(
         scormId: number,
@@ -376,7 +420,7 @@ export class AddonModScormOfflineProvider {
      * Get launch URLs from a list of SCOs, indexing them by SCO ID.
      *
      * @param scos List of SCOs.
-     * @return Launch URLs indexed by SCO ID.
+     * @returns Launch URLs indexed by SCO ID.
      */
     protected getLaunchUrlsFromScos(scos: AddonModScormWSSco[]): Record<number, string> {
         scos = scos || [];
@@ -399,7 +443,7 @@ export class AddonModScormOfflineProvider {
      * @param excludeNotSynced Whether it should only return synced entries.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved with the entries.
+     * @returns Promise resolved with the entries.
      */
     async getScormStoredData(
         scormId: number,
@@ -428,7 +472,7 @@ export class AddonModScormOfflineProvider {
             conditions.synced = 1;
         }
 
-        const tracks = await site.getDb().getRecords<AddonModScormTrackDBRecord>(TRACKS_TABLE_NAME, conditions);
+        const tracks = await this.tracksTables[site.id].getMany(conditions);
 
         return this.parseTracks(tracks);
     }
@@ -442,7 +486,7 @@ export class AddonModScormOfflineProvider {
      *             SCOs that have something stored and cmi.launch_data will be undefined.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when the user data is retrieved.
+     * @returns Promise resolved when the user data is retrieved.
      */
     async getScormUserData(
         scormId: number,
@@ -484,7 +528,7 @@ export class AddonModScormOfflineProvider {
                 response[scoId] = {
                     scoid: scoId,
                     userdata: {
-                        userid: userId!,
+                        userid: userId ?? site.getUserId(),
                         scoid: scoId,
                         timemodified: 0,
                     },
@@ -492,7 +536,7 @@ export class AddonModScormOfflineProvider {
                 };
             }
 
-            response[scoId].userdata[entry.element] = entry.value!;
+            response[scoId].userdata[entry.element] = entry.value ?? '';
             if (entry.timemodified > Number(response[scoId].userdata.timemodified)) {
                 response[scoId].userdata.timemodified = entry.timemodified;
             }
@@ -580,7 +624,7 @@ export class AddonModScormOfflineProvider {
      * @param scoData User data for the given SCO.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not set use site's current user.
-     * @return Promise resolved when the insert is done.
+     * @returns Promise resolved when the insert is done.
      */
     protected async insertTrack(
         scormId: number,
@@ -598,7 +642,6 @@ export class AddonModScormOfflineProvider {
         userId = userId || site.getUserId();
 
         const scoUserData = scoData?.userdata || {};
-        const db = site.getDb();
         let lessonStatusInserted = false;
 
         if (forceCompleted) {
@@ -611,7 +654,16 @@ export class AddonModScormOfflineProvider {
                 if (scoUserData['cmi.core.lesson_status'] == 'incomplete') {
                     lessonStatusInserted = true;
 
-                    await this.insertTrackToDB(db, userId, scormId, scoId, attempt, 'cmi.core.lesson_status', 'completed');
+                    await this.tracksTables[site.id].insert({
+                        userid: userId,
+                        scormid: scormId,
+                        scoid: scoId,
+                        attempt,
+                        element: 'cmi.core.lesson_status',
+                        value: JSON.stringify('completed'),
+                        timemodified: CoreTimeUtils.timestamp(),
+                        synced: 0,
+                    });
                 }
             }
         }
@@ -622,78 +674,32 @@ export class AddonModScormOfflineProvider {
         }
 
         try {
-            await this.insertTrackToDB(db, userId, scormId, scoId, attempt, element, value);
+            await this.tracksTables[site.id].insert({
+                userid: userId,
+                scormid: scormId,
+                scoid: scoId,
+                attempt,
+                element,
+                value: value === undefined ? null : JSON.stringify(value),
+                timemodified: CoreTimeUtils.timestamp(),
+                synced: 0,
+            });
         } catch (error) {
             if (lessonStatusInserted) {
                 // Rollback previous insert.
-                await this.insertTrackToDB(db, userId, scormId, scoId, attempt, 'cmi.core.lesson_status', 'incomplete');
+                await this.tracksTables[site.id].insert({
+                    userid: userId,
+                    scormid: scormId,
+                    scoid: scoId,
+                    attempt,
+                    element: 'cmi.core.lesson_status',
+                    value: JSON.stringify('incomplete'),
+                    timemodified: CoreTimeUtils.timestamp(),
+                    synced: 0,
+                });
             }
 
             throw error;
-        }
-    }
-
-    /**
-     * Insert a track in the DB.
-     *
-     * @param db Site's DB.
-     * @param userId User ID.
-     * @param scormId SCORM ID.
-     * @param scoId SCO ID.
-     * @param attempt Attempt number.
-     * @param element Name of the element to insert.
-     * @param value Value of the element to insert.
-     * @param synchronous True if insert should NOT return a promise. Please use it only if synchronous is a must.
-     * @return Returns a promise if synchronous=false, otherwise returns a boolean.
-     */
-    protected insertTrackToDB(
-        db: SQLiteDB,
-        userId: number,
-        scormId: number,
-        scoId: number,
-        attempt: number,
-        element: string,
-        value: AddonModScormDataValue | undefined,
-        synchronous: true,
-    ): boolean;
-    protected insertTrackToDB(
-        db: SQLiteDB,
-        userId: number,
-        scormId: number,
-        scoId: number,
-        attempt: number,
-        element: string,
-        value?: AddonModScormDataValue,
-        synchronous?: false,
-    ): Promise<number>;
-    protected insertTrackToDB(
-        db: SQLiteDB,
-        userId: number,
-        scormId: number,
-        scoId: number,
-        attempt: number,
-        element: string,
-        value?: AddonModScormDataValue,
-        synchronous?: boolean,
-    ): boolean | Promise<number> {
-        const entry: AddonModScormTrackDBRecord = {
-            userid: userId,
-            scormid: scormId,
-            scoid: scoId,
-            attempt,
-            element: element,
-            value: value === undefined ? null : JSON.stringify(value),
-            timemodified: CoreTimeUtils.timestamp(),
-            synced: 0,
-        };
-
-        if (synchronous) {
-            // The insert operation is always asynchronous, always return true.
-            db.insertRecord(TRACKS_TABLE_NAME, entry);
-
-            return true;
-        } else {
-            return db.insertRecord(TRACKS_TABLE_NAME, entry);
         }
     }
 
@@ -710,7 +716,7 @@ export class AddonModScormOfflineProvider {
      * @param forceCompleted True if SCORM forces completed.
      * @param scoData User data for the given SCO.
      * @param userId User ID. If not set use current user.
-     * @return Promise resolved when the insert is done.
+     * @returns Promise resolved when the insert is done.
      */
     protected insertTrackSync(
         scormId: number,
@@ -730,8 +736,7 @@ export class AddonModScormOfflineProvider {
         }
 
         const scoUserData = scoData?.userdata || {};
-        const db = CoreSites.getRequiredCurrentSite().getDb();
-        let lessonStatusInserted = false;
+        const siteId = CoreSites.getRequiredCurrentSite().id;
 
         if (forceCompleted) {
             if (element == 'cmi.core.lesson_status' && value == 'incomplete') {
@@ -741,11 +746,16 @@ export class AddonModScormOfflineProvider {
             }
             if (element == 'cmi.core.score.raw') {
                 if (scoUserData['cmi.core.lesson_status'] == 'incomplete') {
-                    lessonStatusInserted = true;
-
-                    if (!this.insertTrackToDB(db, userId, scormId, scoId, attempt, 'cmi.core.lesson_status', 'completed', true)) {
-                        return false;
-                    }
+                    this.tracksTables[siteId].syncInsert({
+                        userid: userId,
+                        scormid: scormId,
+                        scoid: scoId,
+                        attempt,
+                        element: 'cmi.core.lesson_status',
+                        value: JSON.stringify('completed'),
+                        timemodified: CoreTimeUtils.timestamp(),
+                        synced: 0,
+                    });
                 }
             }
         }
@@ -755,15 +765,16 @@ export class AddonModScormOfflineProvider {
             return true;
         }
 
-        if (!this.insertTrackToDB(db, userId, scormId, scoId, attempt, element, value, true)) {
-            // Insert failed.
-            if (lessonStatusInserted) {
-                // Rollback previous insert.
-                this.insertTrackToDB(db, userId, scormId, scoId, attempt, 'cmi.core.lesson_status', 'incomplete', true);
-            }
-
-            return false;
-        }
+        this.tracksTables[siteId].syncInsert({
+            userid: userId,
+            scormid: scormId,
+            scoid: scoId,
+            attempt,
+            element: element,
+            value: value === undefined ? null : JSON.stringify(value),
+            timemodified: CoreTimeUtils.timestamp(),
+            synced: 0,
+        });
 
         return true;
     }
@@ -776,7 +787,7 @@ export class AddonModScormOfflineProvider {
      * @param scoId SCO ID.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when marked.
+     * @returns Promise resolved when marked.
      */
     async markAsSynced(scormId: number, attempt: number, scoId: number, siteId?: string, userId?: number): Promise<void> {
         const site = await CoreSites.getSite(siteId);
@@ -784,7 +795,7 @@ export class AddonModScormOfflineProvider {
 
         this.logger.debug(`Mark SCO ${scoId} as synced for attempt ${attempt} in SCORM ${scormId}`);
 
-        await site.getDb().updateRecords(TRACKS_TABLE_NAME, { synced: 1 }, <Partial<AddonModScormTrackDBRecord>> {
+        await this.tracksTables[site.id].update({ synced: 1 }, {
             scormid: scormId,
             userid: userId,
             attempt,
@@ -823,7 +834,7 @@ export class AddonModScormOfflineProvider {
      * Removes the default data form user data.
      *
      * @param userData User data.
-     * @return User data without default data.
+     * @returns User data without default data.
      */
     protected removeDefaultData(userData: AddonModScormUserDataMap): AddonModScormUserDataMap {
         const result: AddonModScormUserDataMap = CoreUtils.clone(userData);
@@ -845,7 +856,7 @@ export class AddonModScormOfflineProvider {
      * @param userData User data for this attempt and SCO.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when data is saved.
+     * @returns Promise resolved when data is saved.
      */
     async saveTracks(
         scorm: AddonModScormScorm,
@@ -891,7 +902,7 @@ export class AddonModScormOfflineProvider {
      * @param attempt Attempt number.
      * @param tracks Tracking data to store.
      * @param userData User data for this attempt and SCO.
-     * @return True if data to insert is valid, false otherwise. Returning true doesn't mean that the data
+     * @returns True if data to insert is valid, false otherwise. Returning true doesn't mean that the data
      *         has been stored, this function can return true but the insertion can still fail somehow.
      */
     saveTracksSync(
@@ -930,7 +941,7 @@ export class AddonModScormOfflineProvider {
      * @param userData Contains user's data.
      * @param param Name of parameter that should be checked.
      * @param ifEmpty Value to be replaced with if param is not set.
-     * @return Value from userData[param] if set, ifEmpty otherwise.
+     * @returns Value from userData[param] if set, ifEmpty otherwise.
      */
     protected scormIsset(
         userData: Record<string, AddonModScormDataValue>,
@@ -952,7 +963,7 @@ export class AddonModScormOfflineProvider {
      * @param userData User data to store as snapshot.
      * @param siteId Site ID. If not defined, current site.
      * @param userId User ID. If not defined use site's current user.
-     * @return Promise resolved when snapshot has been stored.
+     * @returns Promise resolved when snapshot has been stored.
      */
     async setAttemptSnapshot(
         scormId: number,
@@ -971,10 +982,13 @@ export class AddonModScormOfflineProvider {
             snapshot: JSON.stringify(this.removeDefaultData(userData)),
         };
 
-        await site.getDb().updateRecords(ATTEMPTS_TABLE_NAME, newData, <Partial<AddonModScormAttemptDBRecord>> {
-            scormid: scormId,
-            userid: userId,
-            attempt,
+        await this.attemptsTables[site.id].updateWhere(newData, {
+            sql: 'scormid = ? AND userid = ? AND attempt = ?',
+            sqlParams: [scormId, userId, attempt],
+            js: (record: AddonModScormOfflineDBCommonData) =>
+                record.scormid === scormId &&
+                record.userid === userId &&
+                record.attempt === attempt,
         });
     }
 

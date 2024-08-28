@@ -14,13 +14,15 @@
 
 import { Component, OnInit } from '@angular/core';
 import { CoreUser } from '@features/user/services/user';
-import { IonRefresher } from '@ionic/angular';
 import { CoreNavigator } from '@services/navigator';
 import { CoreSites } from '@services/sites';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreUtils } from '@services/utils/utils';
 import { AddonModChat } from '../../services/chat';
 import { AddonModChatFormattedSessionMessage, AddonModChatHelper } from '../../services/chat-helper';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { Translate } from '@singletons';
+import { CoreTime } from '@singletons/time';
 
 /**
  * Page that displays list of chat session messages.
@@ -28,7 +30,7 @@ import { AddonModChatFormattedSessionMessage, AddonModChatHelper } from '../../s
 @Component({
     selector: 'page-addon-mod-chat-session-messages',
     templateUrl: 'session-messages.html',
-    styleUrls: ['session-messages.scss'],
+    styleUrls: ['../../../../../theme/components/discussion.scss', 'session-messages.scss'],
 })
 export class AddonModChatSessionMessagesPage implements OnInit {
 
@@ -42,6 +44,24 @@ export class AddonModChatSessionMessagesPage implements OnInit {
     protected sessionStart!: number;
     protected sessionEnd!: number;
     protected groupId!: number;
+    protected logView: () => void;
+
+    constructor() {
+        this.logView = CoreTime.once(async () => {
+            await CoreUtils.ignoreErrors(AddonModChat.logViewSessions(this.cmId, {
+                start: this.sessionStart,
+                end: this.sessionEnd,
+            }));
+
+            CoreAnalytics.logEvent({
+                type: CoreAnalyticsEventType.VIEW_ITEM,
+                ws: 'mod_chat_view_sessions',
+                name: Translate.instant('addon.mod_chat.messages'),
+                data: { chatid: this.chatId, category: 'chat', start: this.sessionStart, end: this.sessionEnd },
+                url: `/mod/chat/report.php?id=${this.cmId}&start=${this.sessionStart}&end=${this.sessionEnd}`,
+            });
+        });
+    }
 
     /**
      * @inheritdoc
@@ -70,7 +90,7 @@ export class AddonModChatSessionMessagesPage implements OnInit {
     /**
      * Fetch session messages.
      *
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async fetchMessages(): Promise<void> {
         try {
@@ -92,7 +112,7 @@ export class AddonModChatSessionMessagesPage implements OnInit {
 
                 const message = this.messages[index];
 
-                if (message.beep && message.beep != String(this.currentUserId)) {
+                if (message.beep && message.beep !== this.currentUserId) {
                     this.loadMessageBeepWho(message);
                 }
             }
@@ -113,13 +133,13 @@ export class AddonModChatSessionMessagesPage implements OnInit {
      * Get the user fullname for a beep.
      *
      * @param id User Id before parsing.
-     * @return User fullname.
+     * @returns User fullname.
      */
-    protected async getUserFullname(id: string): Promise<string> {
-        const idNumber = parseInt(id, 10);
+    protected async getUserFullname(id: string | number): Promise<string> {
+        const idNumber = Number(id);
 
         if (isNaN(idNumber)) {
-            return id;
+            return String(id);
         }
 
         try {
@@ -128,7 +148,7 @@ export class AddonModChatSessionMessagesPage implements OnInit {
             return user.fullname;
         } catch {
             // Error getting profile.
-            return id;
+            return String(id);
         }
     }
 
@@ -137,7 +157,7 @@ export class AddonModChatSessionMessagesPage implements OnInit {
      *
      * @param refresher Refresher.
      */
-    async refreshMessages(refresher: IonRefresher): Promise<void> {
+    async refreshMessages(refresher: HTMLIonRefresherElement): Promise<void> {
         try {
             await CoreUtils.ignoreErrors(AddonModChat.invalidateSessionMessages(this.chatId, this.sessionStart, this.groupId));
 

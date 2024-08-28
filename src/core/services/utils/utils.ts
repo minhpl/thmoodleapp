@@ -13,11 +13,9 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { InAppBrowserObject, InAppBrowserOptions } from '@ionic-native/in-app-browser';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { InAppBrowserObject, InAppBrowserOptions } from '@awesome-cordova-plugins/in-app-browser';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 import { Subscription } from 'rxjs';
-
-import { CoreApp } from '@services/app';
 import { CoreEvents } from '@singletons/events';
 import { CoreFile } from '@services/file';
 import { CoreLang } from '@services/lang';
@@ -25,8 +23,7 @@ import { CoreWS } from '@services/ws';
 import { CoreDomUtils } from '@services/utils/dom';
 import { CoreMimetypeUtils } from '@services/utils/mimetype';
 import { CoreTextUtils } from '@services/utils/text';
-import { CoreWSError } from '@classes/errors/wserror';
-import { makeSingleton, Clipboard, InAppBrowser, FileOpener, WebIntent, QRScanner, Translate, NgZone } from '@singletons';
+import { makeSingleton, Clipboard, InAppBrowser, FileOpener, WebIntent, Translate, NgZone } from '@singletons';
 import { CoreLogger } from '@singletons/logger';
 import { CoreViewerQRScannerComponent } from '@features/viewer/components/qr-scanner/qr-scanner';
 import { CoreCanceledError } from '@classes/errors/cancelederror';
@@ -34,9 +31,18 @@ import { CoreFileEntry } from '@services/file-helper';
 import { CoreConstants } from '@/core/constants';
 import { CoreWindow } from '@singletons/window';
 import { CoreColors } from '@singletons/colors';
-import { CoreError } from '@classes/errors/error';
+import { CorePromisedValue } from '@classes/promised-value';
+import { CorePlatform } from '@services/platform';
+import { CoreErrorWithOptions } from '@classes/errors/errorwithoptions';
+import { CoreFilepool } from '@services/filepool';
+import { CoreSites } from '@services/sites';
+import { CoreCancellablePromise } from '@classes/cancellable-promise';
+import { CoreAnalytics, CoreAnalyticsEventType } from '@services/analytics';
+import { CoreUrlUtils } from './url';
+import { QRScanner } from '@features/native/plugins';
+import { CoreArray } from '@singletons/array';
 
-type TreeNode<T> = T & { children: TreeNode<T>[] };
+export type TreeNode<T> = T & { children: TreeNode<T>[] };
 
 /*
  * "Utils" service with helper functions.
@@ -49,7 +55,7 @@ export class CoreUtilsProvider {
     protected logger: CoreLogger;
     protected iabInstance?: InAppBrowserObject;
     protected uniqueIds: {[name: string]: number} = {};
-    protected qrScanData?: {deferred: PromiseDefer<string>; observable: Subscription};
+    protected qrScanData?: {deferred: CorePromisedValue<string>; observable: Subscription};
     protected initialColorSchemeContent = 'light dark';
 
     constructor() {
@@ -61,7 +67,7 @@ export class CoreUtilsProvider {
      *
      * @param error Error object or message.
      * @param defaultError Message to show if the error is not a string.
-     * @return New error message.
+     * @returns New error message.
      */
     addDataNotDownloadedError(error: Error | string, defaultError?: string): string {
         const errorMessage = CoreTextUtils.getErrorMessageFromError(error) || defaultError || '';
@@ -78,14 +84,14 @@ export class CoreUtilsProvider {
      * Similar to Promise.all, but if a promise fails this function's promise won't be rejected until ALL promises have finished.
      *
      * @param promises Promises.
-     * @return Promise resolved if all promises are resolved and rejected if at least 1 promise fails.
+     * @returns Promise resolved if all promises are resolved and rejected if at least 1 promise fails.
      */
-    async allPromises(promises: Promise<unknown>[]): Promise<void> {
+    async allPromises(promises: unknown[]): Promise<void> {
         if (!promises || !promises.length) {
-            return Promise.resolve();
+            return;
         }
 
-        const getPromiseError = async (promise): Promise<Error | void> => {
+        const getPromiseError = async (promise: unknown): Promise<Error | void> => {
             try {
                 await promise;
             } catch (error) {
@@ -105,7 +111,7 @@ export class CoreUtilsProvider {
      * Combination of allPromises and ignoreErrors functions.
      *
      * @param promises Promises.
-     * @return Promise resolved if all promises are resolved and rejected if at least 1 promise fails.
+     * @returns Promise resolved if all promises are resolved and rejected if at least 1 promise fails.
      */
     async allPromisesIgnoringErrors(promises: Promise<unknown>[]): Promise<void> {
         await CoreUtils.ignoreErrors(this.allPromises(promises));
@@ -119,7 +125,7 @@ export class CoreUtilsProvider {
      * @param array The array to convert.
      * @param propertyName The name of the property to use as the key. If not provided, the whole item will be used.
      * @param result Object where to put the properties. If not defined, a new object will be created.
-     * @return The object.
+     * @returns The object.
      */
     arrayToObject<T>(
         array: T[] = [],
@@ -136,6 +142,16 @@ export class CoreUtilsProvider {
     }
 
     /**
+     * Log an unhandled error.
+     *
+     * @param message Message to contextualize the error.
+     * @param error Error to log.
+     */
+    logUnhandledError(message: string, error: unknown): void {
+        this.logger.error(message, error);
+    }
+
+    /**
      * Converts an array of objects to an indexed array, using a property of each entry as the key.
      * Every entry will contain an array of the found objects of the property identifier.
      * E.g. [{id: 10, name: 'A'}, {id: 10, name: 'B'}] => {10: [ {id: 10, name: 'A'}, {id: 10, name: 'B'} ] }
@@ -143,7 +159,7 @@ export class CoreUtilsProvider {
      * @param array The array to convert.
      * @param propertyName The name of the property to use as the key. If not provided, the whole item will be used.
      * @param result Object where to put the properties. If not defined, a new object will be created.
-     * @return The object.
+     * @returns The object.
      */
     arrayToObjectMultiple<T>(
         array: T[] = [],
@@ -172,7 +188,7 @@ export class CoreUtilsProvider {
      * @param maxLevels Number of levels to reach if 2 objects are compared.
      * @param level Current deep level (when comparing objects).
      * @param undefinedIsNull True if undefined is equal to null. Defaults to true.
-     * @return Whether both items are equal.
+     * @returns Whether both items are equal.
      */
     basicLeftCompare(
         itemA: any, // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -224,7 +240,7 @@ export class CoreUtilsProvider {
      * Check if a URL has a redirect.
      *
      * @param url The URL to check.
-     * @return Promise resolved with boolean_ whether there is a redirect.
+     * @returns Promise resolved with boolean_ whether there is a redirect.
      */
     async checkRedirect(url: string): Promise<boolean> {
         if (!window.fetch) {
@@ -244,7 +260,7 @@ export class CoreUtilsProvider {
         try {
             const response = await this.timeoutPromise(window.fetch(url, initOptions), CoreWS.getRequestTimeout());
 
-            return !!response && response.redirected;
+            return response.redirected;
         } catch (error) {
             if (error.timeout && controller) {
                 // Timeout, abort the request.
@@ -266,11 +282,29 @@ export class CoreUtilsProvider {
     }
 
     /**
+     * Get inapp browser instance (if any).
+     *
+     * @returns IAB instance, undefined if not open.
+     */
+    getInAppBrowserInstance(): InAppBrowserObject | undefined  {
+        return this.iabInstance;
+    }
+
+    /**
+     * Check if inapp browser is open.
+     *
+     * @returns Whether it's open.
+     */
+    isInAppBrowserOpen(): boolean {
+        return !!this.iabInstance;
+    }
+
+    /**
      * Clone a variable. It should be an object, array or primitive type.
      *
      * @param source The variable to clone.
      * @param level Depth we are right now inside a cloned object. It's used to prevent reaching max call stack size.
-     * @return Cloned variable.
+     * @returns Cloned variable.
      */
     clone<T>(source: T, level: number = 0): T {
         if (level >= 20) {
@@ -317,6 +351,7 @@ export class CoreUtilsProvider {
      * @param from Object to copy the properties from.
      * @param to Object where to store the properties.
      * @param clone Whether the properties should be cloned (so they are different instances).
+     * @deprecated since 4.4. Not used anymore.
      */
     copyProperties(from: Record<string, unknown>, to: Record<string, unknown>, clone: boolean = true): void {
         for (const name in from) {
@@ -332,7 +367,7 @@ export class CoreUtilsProvider {
      * Copies a text to clipboard and shows a toast message.
      *
      * @param text Text to be copied
-     * @return Promise resolved when text is copied.
+     * @returns Promise resolved when text is copied.
      */
     async copyToClipboard(text: string): Promise<void> {
         try {
@@ -343,7 +378,7 @@ export class CoreUtilsProvider {
             virtualInput.innerHTML = text;
             virtualInput.select();
             virtualInput.setSelectionRange(0, 99999);
-            document.execCommand('copy');
+            document.execCommand('copy'); // eslint-disable-line deprecation/deprecation
         }
 
         // Show toast using ionicLoading.
@@ -351,21 +386,10 @@ export class CoreUtilsProvider {
     }
 
     /**
-     * Create a "fake" WS error for local errors.
-     *
-     * @param message The message to include in the error.
-     * @param needsTranslate If the message needs to be translated.
-     * @return Fake WS error.
-     * @deprecated since 3.9.5. Just create the error directly.
-     */
-    createFakeWSError(message: string, needsTranslate?: boolean): CoreWSError {
-        return CoreWS.createFakeWSError(message, needsTranslate);
-    }
-
-    /**
      * Empties an array without losing its reference.
      *
      * @param array Array to empty.
+     * @deprecated since 4.4. Not used anymore.
      */
     emptyArray(array: unknown[]): void {
         array.length = 0; // Empty array without losing its reference.
@@ -375,6 +399,7 @@ export class CoreUtilsProvider {
      * Removes all properties from an object without losing its reference.
      *
      * @param object Object to remove the properties.
+     * @deprecated since 4.4. Not used anymore.
      */
     emptyObject(object: Record<string, unknown>): void {
         for (const key in object) {
@@ -388,7 +413,7 @@ export class CoreUtilsProvider {
      * Execute promises one depending on the previous.
      *
      * @param orderedPromisesData Data to be executed.
-     * @return Promise resolved when all promises are resolved.
+     * @returns Promise resolved when all promises are resolved.
      */
     executeOrderedPromises(orderedPromisesData: OrderedPromiseData[]): Promise<void> {
         const promises: Promise<void>[] = [];
@@ -426,7 +451,7 @@ export class CoreUtilsProvider {
      *
      * @param obj Object to flatten.
      * @param useDotNotation Whether to use dot notation '.' or square brackets '['.
-     * @return Flattened object.
+     * @returns Flattened object.
      */
     flattenObject(obj: Record<string, unknown>, useDotNotation?: boolean): Record<string, unknown> {
         const toReturn = {};
@@ -460,18 +485,11 @@ export class CoreUtilsProvider {
      *
      * @param array Array to filter.
      * @param regex RegExp to apply to each string.
-     * @return Filtered array.
+     * @returns Filtered array.
+     * @deprecated since 4.4. Use CoreArray.filterByRegexp instead.
      */
     filterByRegexp(array: string[], regex: RegExp): string[] {
-        if (!array || !array.length) {
-            return [];
-        }
-
-        return array.filter((entry) => {
-            const matches = entry.match(regex);
-
-            return matches && matches.length;
-        });
+        return CoreArray.filterByRegexp(array, regex);
     }
 
     /**
@@ -482,12 +500,11 @@ export class CoreUtilsProvider {
      *                    after 'checkAll'.
      * @param checkAll True if it should check all the sites, false if it should check only 1 and treat them all
      *                 depending on this result.
-     * @param ...args All the params sent after checkAll will be passed to isEnabledFn.
-     * @return Promise resolved with the list of enabled sites.
+     * @returns Promise resolved with the list of enabled sites.
      */
-    filterEnabledSites<P extends unknown[]>(
+    async filterEnabledSites<P extends unknown[]>(
         siteIds: string[],
-        isEnabledFn: (siteId, ...args: P) => boolean | Promise<boolean>,
+        isEnabledFn: (siteId: string, ...args: P) => boolean | Promise<boolean>,
         checkAll?: boolean,
         ...args: P
     ): Promise<string[]> {
@@ -506,16 +523,14 @@ export class CoreUtilsProvider {
             }
         }
 
-        return this.allPromises(promises).catch(() => {
-            // Ignore errors.
-        }).then(() => {
-            if (!checkAll) {
-                // Checking 1 was enough, so it will either return all the sites or none.
-                return enabledSites.length ? siteIds : [];
-            } else {
-                return enabledSites;
-            }
-        });
+        await CoreUtils.ignoreErrors(this.allPromises(promises));
+
+        if (!checkAll) {
+            // Checking 1 was enough, so it will either return all the sites or none.
+            return enabledSites.length ? siteIds : [];
+        } else {
+            return enabledSites;
+        }
     }
 
     /**
@@ -523,7 +538,7 @@ export class CoreUtilsProvider {
      * Based on Moodle's format_float.
      *
      * @param float The float to print.
-     * @return Locale float.
+     * @returns Locale float.
      */
     formatFloat(float: unknown): string {
         if (float === undefined || float === null || typeof float == 'boolean') {
@@ -532,8 +547,7 @@ export class CoreUtilsProvider {
 
         const localeSeparator = Translate.instant('core.decsep');
 
-        // Convert float to string.
-        const floatString = float + '';
+        const floatString = String(float);
 
         return floatString.replace('.', localeSeparator);
     }
@@ -548,7 +562,7 @@ export class CoreUtilsProvider {
      * @param idFieldName Name of the children field to match with parent.
      * @param rootParentId The id of the root.
      * @param maxDepth Max Depth to convert to tree. Children found will be in the last level of depth.
-     * @return Array with the formatted tree, children will be on each node under children field.
+     * @returns Array with the formatted tree, children will be on each node under children field.
      */
     formatTree<T>(
         list: T[],
@@ -561,18 +575,30 @@ export class CoreUtilsProvider {
         const mapDepth = {};
         const tree: TreeNode<T>[] = [];
 
+        // Create a map first to avoid problems with not sorted.
         list.forEach((node: TreeNode<T>, index): void => {
             const id = node[idFieldName];
-            const parent = node[parentFieldName];
-            node.children = [];
 
-            if (!id || !parent) {
+            if (id === undefined) {
+                this.logger.error(`Node with incorrect ${idFieldName}:${id} found on formatTree`);
+            }
+
+            if (node.children === undefined) {
+                node.children = [];
+            }
+            map[id] = index;
+        });
+
+        list.forEach((node: TreeNode<T>): void => {
+            const id = node[idFieldName];
+            const parent = node[parentFieldName];
+
+            if (id === undefined || parent === undefined) {
                 this.logger.error(`Node with incorrect ${idFieldName}:${id} or ${parentFieldName}:${parent} found on formatTree`);
             }
 
             // Use map to look-up the parents.
-            map[id] = index;
-            if (parent != rootParentId) {
+            if (parent !== rootParentId) {
                 const parentNode = list[map[parent]] as TreeNode<T>;
                 if (parentNode) {
                     if (mapDepth[parent] == maxDepth) {
@@ -612,7 +638,7 @@ export class CoreUtilsProvider {
      * Get country name based on country code.
      *
      * @param code Country code (AF, ES, US, ...).
-     * @return Country name. If the country is not found, return the country code.
+     * @returns Country name. If the country is not found, return the country code.
      */
     getCountryName(code: string): string {
         const countryKey = 'assets.countries.' + code;
@@ -624,54 +650,52 @@ export class CoreUtilsProvider {
     /**
      * Get list of countries with their code and translated name.
      *
-     * @return Promise resolved with the list of countries.
+     * @returns Promise resolved with the list of countries.
      */
-    getCountryList(): Promise<Record<string, string>> {
+    async getCountryList(): Promise<Record<string, string>> {
         // Get the keys of the countries.
-        return this.getCountryKeysList().then((keys) => {
-            // Now get the code and the translated name.
-            const countries = {};
+        const keys = await this.getCountryKeysList();
 
-            keys.forEach((key) => {
-                if (key.indexOf('assets.countries.') === 0) {
-                    const code = key.replace('assets.countries.', '');
-                    countries[code] = Translate.instant(key);
-                }
-            });
+        // Now get the code and the translated name.
+        const countries: Record<string, string> = {};
 
-            return countries;
+        keys.forEach((key) => {
+            if (key.indexOf('assets.countries.') === 0) {
+                const code = key.replace('assets.countries.', '');
+                countries[code] = Translate.instant(key);
+            }
         });
+
+        return countries;
     }
 
     /**
      * Get list of countries with their code and translated name. Sorted by the name of the country.
      *
-     * @return Promise resolved with the list of countries.
+     * @returns Promise resolved with the list of countries.
      */
-    getCountryListSorted(): Promise<CoreCountry[]> {
+    async getCountryListSorted(): Promise<CoreCountry[]> {
         // Get the keys of the countries.
-        return this.getCountryList().then((countries) => {
-            // Sort translations.
-            const sortedCountries: { code: string; name: string }[] = [];
+        const countries = await this.getCountryList();
 
-            Object.keys(countries).sort((a, b) => countries[a].localeCompare(countries[b])).forEach((key) => {
-                sortedCountries.push({ code: key, name: countries[key] });
-            });
-
-            return sortedCountries;
-        });
+        // Sort translations.
+        return Object.keys(countries)
+            .sort((a, b) => countries[a].localeCompare(countries[b]))
+            .map((code) => ({ code, name: countries[code] }));
     }
 
     /**
      * Get the list of language keys of the countries.
      *
-     * @return Promise resolved with the countries list. Rejected if not translated.
+     * @returns Promise resolved with the countries list. Rejected if not translated.
      */
-    protected getCountryKeysList(): Promise<string[]> {
+    protected async getCountryKeysList(): Promise<string[]> {
         // It's possible that the current language isn't translated, so try with default language first.
         const defaultLang = CoreLang.getDefaultLanguage();
 
-        return this.getCountryKeysListForLanguage(defaultLang).catch(() => {
+        try {
+            return await this.getCountryKeysListForLanguage(defaultLang);
+        } catch {
             // Not translated, try to use the fallback language.
             const fallbackLang = CoreLang.getFallbackLanguage();
 
@@ -681,14 +705,14 @@ export class CoreUtilsProvider {
             }
 
             return this.getCountryKeysListForLanguage(fallbackLang);
-        });
+        }
     }
 
     /**
      * Get the list of language keys of the countries, based on the translation table for a certain language.
      *
      * @param lang Language to check.
-     * @return Promise resolved with the countries list. Rejected if not translated.
+     * @returns Promise resolved with the countries list. Rejected if not translated.
      */
     protected async getCountryKeysListForLanguage(lang: string): Promise<string[]> {
         // Get the translation table for the language.
@@ -717,26 +741,29 @@ export class CoreUtilsProvider {
      * This function is in here instead of MimetypeUtils to prevent circular dependencies.
      *
      * @param url The URL of the file.
-     * @return Promise resolved with the mimetype.
+     * @returns Promise resolved with the mimetype.
      */
-    getMimeTypeFromUrl(url: string): Promise<string> {
+    async getMimeTypeFromUrl(url: string): Promise<string> {
         // First check if it can be guessed from the URL.
         const extension = CoreMimetypeUtils.guessExtensionFromUrl(url);
         const mimetype = extension && CoreMimetypeUtils.getMimeType(extension);
 
-        if (mimetype) {
-            return Promise.resolve(mimetype);
+        // Ignore PHP extension for now, it could be serving a file.
+        if (mimetype && extension !== 'php') {
+            return mimetype;
         }
 
         // Can't be guessed, get the remote mimetype.
-        return CoreWS.getRemoteFileMimeType(url).then(mimetype => mimetype || '');
+        const remoteMimetype = await CoreWS.getRemoteFileMimeType(url);
+
+        return remoteMimetype || mimetype || '';
     }
 
     /**
      * Get a unique ID for a certain name.
      *
      * @param name The name to get the ID for.
-     * @return Unique ID.
+     * @returns Unique ID.
      */
     getUniqueId(name: string): number {
         if (!this.uniqueIds[name]) {
@@ -750,7 +777,7 @@ export class CoreUtilsProvider {
      * Check if a file is a FileEntry
      *
      * @param file File.
-     * @return Type guard indicating if the file is a FileEntry.
+     * @returns Type guard indicating if the file is a FileEntry.
      */
     isFileEntry(file: CoreFileEntry): file is FileEntry {
         return 'isFile' in file;
@@ -759,8 +786,8 @@ export class CoreUtilsProvider {
     /**
      * Check if an unknown value is a FileEntry.
      *
-     * @param value Value to check.
-     * @return Type guard indicating if the file is a FileEntry.
+     * @param file Object to check.
+     * @returns Type guard indicating if the file is a FileEntry.
      */
     valueIsFileEntry(file: unknown): file is FileEntry {
         // We cannot use instanceof because FileEntry is a type. Check some of the properties.
@@ -772,7 +799,7 @@ export class CoreUtilsProvider {
      * Check if a value is an object.
      *
      * @param object Variable.
-     * @return Type guard indicating if this is an object.
+     * @returns Type guard indicating if this is an object.
      */
     isObject(object: unknown): object is Record<string, unknown> {
         return typeof object === 'object' && object !== null;
@@ -782,7 +809,7 @@ export class CoreUtilsProvider {
      * Given a list of files, check if there are repeated names.
      *
      * @param files List of files.
-     * @return String with error message if repeated, false if no repeated.
+     * @returns String with error message if repeated, false if no repeated.
      */
     hasRepeatedFilenames(files: CoreFileEntry[]): string | false {
         if (!files || !files.length) {
@@ -811,7 +838,7 @@ export class CoreUtilsProvider {
      *
      * @param array Array to search.
      * @param regex RegExp to apply to each string.
-     * @return Index of the first string that matches the RegExp. -1 if not found.
+     * @returns Index of the first string that matches the RegExp. -1 if not found.
      */
     indexOfRegexp(array: string[], regex: RegExp): number {
         if (!array || !array.length) {
@@ -834,7 +861,7 @@ export class CoreUtilsProvider {
      * Return true if the param is false (bool), 0 (number) or "0" (string).
      *
      * @param value Value to check.
-     * @return Whether the value is false, 0 or "0".
+     * @returns Whether the value is false, 0 or "0".
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     isFalseOrZero(value: any): boolean {
@@ -845,7 +872,7 @@ export class CoreUtilsProvider {
      * Return true if the param is true (bool), 1 (number) or "1" (string).
      *
      * @param value Value to check.
-     * @return Whether the value is true, 1 or "1".
+     * @returns Whether the value is true, 1 or "1".
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     isTrueOrOne(value: any): boolean {
@@ -856,7 +883,7 @@ export class CoreUtilsProvider {
      * Given an error returned by a WS call, check if the error is generated by the app or it has been returned by the WebService.
      *
      * @param error Error to check.
-     * @return Whether the error was returned by the WebService.
+     * @returns Whether the error was returned by the WebService.
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     isWebServiceError(error: any): boolean {
@@ -877,7 +904,7 @@ export class CoreUtilsProvider {
      * Given an error returned by a WS call, check if the error is a token expired error.
      *
      * @param error Error to check.
-     * @return Whether the error is a token expired error.
+     * @returns Whether the error is a token expired error.
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     isExpiredTokenError(error: any): boolean {
@@ -893,7 +920,7 @@ export class CoreUtilsProvider {
      * @param defaultLabel Element that will become default option, if not defined, it won't be added.
      * @param separator The separator used within the list string. Default ','.
      * @param defaultValue Element that will become default option value. Default 0.
-     * @return The now assembled array
+     * @returns The now assembled array
      */
     makeMenuFromList<T>(
         list: string,
@@ -923,17 +950,17 @@ export class CoreUtilsProvider {
      * @param array1 The first array.
      * @param array2 The second array.
      * @param [key] Key of the property that must be unique. If not specified, the whole entry.
-     * @return Merged array.
+     * @returns Merged array.
      */
     mergeArraysWithoutDuplicates<T>(array1: T[], array2: T[], key?: string): T[] {
-        return this.uniqueArray(array1.concat(array2), key) as T[];
+        return CoreArray.unique(array1.concat(array2), key) as T[];
     }
 
     /**
      * Check if a value isn't null or undefined.
      *
      * @param value Value to check.
-     * @return True if not null and not undefined.
+     * @returns True if not null and not undefined.
      */
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     notNullOrUndefined(value: any): boolean {
@@ -945,7 +972,7 @@ export class CoreUtilsProvider {
      *
      * @param path The local path of the file to be open.
      * @param options Options.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     async openFile(path: string, options: CoreUtilsOpenFileOptions = {}): Promise<void> {
         // Convert the path to a native path if needed.
@@ -954,13 +981,34 @@ export class CoreUtilsProvider {
         const extension = CoreMimetypeUtils.getFileExtension(path);
         const mimetype = extension && CoreMimetypeUtils.getMimeType(extension);
 
-        if (mimetype == 'text/html' && CoreApp.isAndroid()) {
+        if (mimetype == 'text/html' && CorePlatform.isAndroid()) {
             // Open HTML local files in InAppBrowser, in system browser some embedded files aren't loaded.
             this.openInApp(path);
 
             return;
-        } else if (extension === 'apk' && CoreApp.isAndroid()) {
-            throw new CoreError(Translate.instant('core.cannotinstallapk'));
+        } else if (extension === 'apk' && CorePlatform.isAndroid()) {
+            const url = await CoreUtils.ignoreErrors(
+                CoreFilepool.getFileUrlByPath(CoreSites.getCurrentSiteId(), CoreFile.removeBasePath(path)),
+            );
+
+            // @todo MOBILE-4167: Handle urls with expired tokens.
+
+            throw new CoreErrorWithOptions(
+                Translate.instant('core.cannotinstallapkinfo'),
+                Translate.instant('core.cannotinstallapk'),
+                url
+                    ? [
+                        {
+                            text: Translate.instant('core.openinbrowser'),
+                            handler: () => this.openInBrowser(url),
+                        },
+                        {
+                            text: Translate.instant('core.cancel'),
+                            role: 'cancel',
+                        },
+                    ]
+                    : undefined,
+            );
         }
 
         // Path needs to be decoded, the file won't be opened if the path has %20 instead of spaces and so.
@@ -970,11 +1018,29 @@ export class CoreUtilsProvider {
             // Error, use the original path.
         }
 
-        try {
+        const openFile = async (mimetype?: string) => {
             if (this.shouldOpenWithDialog(options)) {
                 await FileOpener.showOpenWithDialog(path, mimetype || '');
             } else {
                 await FileOpener.open(path, mimetype || '');
+            }
+        };
+
+        try {
+            try {
+                await openFile(mimetype);
+            } catch (error) {
+                if (!extension || !error || Number(error.status) !== 9) {
+                    throw error;
+                }
+
+                // Cannot open mimetype. Check if there is a deprecated mimetype for the extension.
+                const deprecatedMimetype = CoreMimetypeUtils.getDeprecatedMimeType(extension);
+                if (!deprecatedMimetype || deprecatedMimetype === mimetype) {
+                    throw error;
+                }
+
+                await openFile(deprecatedMimetype);
             }
         } catch (error) {
             this.logger.error('Error opening file ' + path + ' with mimetype ' + mimetype);
@@ -991,23 +1057,19 @@ export class CoreUtilsProvider {
 
     /**
      * Open a URL using InAppBrowser.
-     * Do not use for files, refer to {@link openFile}.
+     * Do not use for files, refer to {@link CoreUtilsProvider.openFile}.
      *
      * @param url The URL to open.
      * @param options Override default options passed to InAppBrowser.
-     * @return The opened window.
+     * @returns The opened window.
      */
-    openInApp(url: string, options?: InAppBrowserOptions): InAppBrowserObject | undefined {
-        if (!url) {
-            return;
-        }
-
+    openInApp(url: string, options?: CoreUtilsOpenInAppOptions): InAppBrowserObject {
         options = options || {};
         options.usewkwebview = 'yes'; // Force WKWebView in iOS.
         options.enableViewPortScale = options.enableViewPortScale ?? 'yes'; // Enable zoom on iOS by default.
         options.allowInlineMediaPlayback = options.allowInlineMediaPlayback ?? 'yes'; // Allow playing inline videos in iOS.
 
-        if (!options.location && CoreApp.isIOS() && url.indexOf('file://') === 0) {
+        if (!options.location && CorePlatform.isIOS() && url.indexOf('file://') === 0) {
             // The URL uses file protocol, don't show it on iOS.
             // In Android we keep it because otherwise we lose the whole toolbar.
             options.location = 'no';
@@ -1015,15 +1077,14 @@ export class CoreUtilsProvider {
 
         this.setInAppBrowserToolbarColors(options);
 
+        this.iabInstance?.close(); // Close window if there is one already open, only allow one.
+
         this.iabInstance = InAppBrowser.create(url, '_blank', options);
 
-        if (CoreApp.isMobile()) {
-            let loadStopSubscription;
+        if (CorePlatform.isMobile()) {
             const loadStartUrls: string[] = [];
 
-            // Trigger global events when a url is loaded or the window is closed. This is to make it work like in Ionic 1.
             const loadStartSubscription = this.iabInstance.on('loadstart').subscribe((event) => {
-                // Execute the callback in the Angular zone, so change detection doesn't stop working.
                 NgZone.run(() => {
                     // Store the last loaded URLs (max 10).
                     loadStartUrls.push(event.url);
@@ -1035,29 +1096,35 @@ export class CoreUtilsProvider {
                 });
             });
 
-            if (CoreApp.isAndroid()) {
-                // Load stop is needed with InAppBrowser v3. Custom URL schemes no longer trigger load start, simulate it.
-                loadStopSubscription = this.iabInstance.on('loadstop').subscribe((event) => {
-                    // Execute the callback in the Angular zone, so change detection doesn't stop working.
-                    NgZone.run(() => {
-                        if (loadStartUrls.indexOf(event.url) == -1) {
-                            // The URL was stopped but not started, probably a custom URL scheme.
-                            CoreEvents.trigger(CoreEvents.IAB_LOAD_START, event);
-                        }
-                    });
+            const loadStopSubscription = this.iabInstance.on('loadstop').subscribe((event) => {
+                NgZone.run(() => {
+                    CoreEvents.trigger(CoreEvents.IAB_LOAD_STOP, event);
                 });
-            }
+            });
+
+            const messageSubscription = this.iabInstance.on('message').subscribe((event) => {
+                NgZone.run(() => {
+                    CoreEvents.trigger(CoreEvents.IAB_MESSAGE, event.data);
+                });
+            });
 
             const exitSubscription = this.iabInstance.on('exit').subscribe((event) => {
-                // Execute the callback in the Angular zone, so change detection doesn't stop working.
                 NgZone.run(() => {
                     loadStartSubscription.unsubscribe();
-                    loadStopSubscription && loadStopSubscription.unsubscribe();
+                    loadStopSubscription.unsubscribe();
+                    messageSubscription.unsubscribe();
                     exitSubscription.unsubscribe();
+
+                    this.iabInstance = undefined;
                     CoreEvents.trigger(CoreEvents.IAB_EXIT, event);
                 });
             });
         }
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.OPEN_LINK,
+            link: CoreUrlUtils.unfixPluginfileURL(options.originalUrl ?? url),
+        });
 
         return this.iabInstance;
     }
@@ -1066,7 +1133,7 @@ export class CoreUtilsProvider {
      * Given some IAB options, set the toolbar colors properties to the right values.
      *
      * @param options Options to change.
-     * @return Changed options.
+     * @returns Changed options.
      */
     protected setInAppBrowserToolbarColors(options: InAppBrowserOptions): InAppBrowserOptions {
         if (options.toolbarcolor) {
@@ -1107,19 +1174,26 @@ export class CoreUtilsProvider {
 
     /**
      * Open a URL using a browser.
-     * Do not use for files, refer to {@link openFile}.
+     * Do not use for files, refer to {@link CoreUtilsProvider.openFile}.
      *
      * @param url The URL to open.
      * @param options Options.
      */
     async openInBrowser(url: string, options: CoreUtilsOpenInBrowserOptions = {}): Promise<void> {
+        // eslint-disable-next-line deprecation/deprecation
+        const originaUrl = CoreUrlUtils.unfixPluginfileURL(options.originalUrl ?? options.browserWarningUrl ?? url);
         if (options.showBrowserWarning || options.showBrowserWarning === undefined) {
             try {
-                await CoreWindow.confirmOpenBrowserIfNeeded(options.browserWarningUrl ?? url);
+                await CoreWindow.confirmOpenBrowserIfNeeded(originaUrl);
             } catch (error) {
                 return; // Cancelled, stop.
             }
         }
+
+        CoreAnalytics.logEvent({
+            type: CoreAnalyticsEventType.OPEN_LINK,
+            link: originaUrl,
+        });
 
         window.open(url, '_system');
     }
@@ -1129,10 +1203,10 @@ export class CoreUtilsProvider {
      * Specially useful for audio and video since they can be streamed.
      *
      * @param url The URL of the file.
-     * @return Promise resolved when opened.
+     * @returns Promise resolved when opened.
      */
     async openOnlineFile(url: string): Promise<void> {
-        if (CoreApp.isAndroid()) {
+        if (CorePlatform.isAndroid()) {
             // In Android we need the mimetype to open it.
             const mimetype = await this.ignoreErrors(this.getMimeTypeFromUrl(url));
 
@@ -1147,12 +1221,21 @@ export class CoreUtilsProvider {
                 type: mimetype,
             };
 
-            return WebIntent.startActivity(options).catch((error) => {
+            try {
+                await WebIntent.startActivity(options);
+
+                CoreAnalytics.logEvent({
+                    type: CoreAnalyticsEventType.OPEN_LINK,
+                    link: CoreUrlUtils.unfixPluginfileURL(url),
+                });
+
+                return;
+            } catch (error) {
                 this.logger.error('Error opening online file ' + url + ' with mimetype ' + mimetype);
                 this.logger.error('Error: ', JSON.stringify(error));
 
                 throw new Error(Translate.instant('core.erroropenfilenoapp'));
-            });
+            }
         }
 
         // In the rest of platforms we need to open them in InAppBrowser.
@@ -1163,7 +1246,7 @@ export class CoreUtilsProvider {
      * Converts an object into an array, losing the keys.
      *
      * @param obj Object to convert.
-     * @return Array with the values of the object but losing the keys.
+     * @returns Array with the values of the object but losing the keys.
      */
     objectToArray<T>(obj: Record<string, T>): T[] {
         return Object.keys(obj).map((key) => obj[key]);
@@ -1179,7 +1262,7 @@ export class CoreUtilsProvider {
      * @param valueName Name of the properties where to store the values.
      * @param sortByKey True to sort keys alphabetically, false otherwise. Has priority over sortByValue.
      * @param sortByValue True to sort values alphabetically, false otherwise.
-     * @return Array of objects with the name & value of each property.
+     * @returns Array of objects with the name & value of each property.
      */
     objectToArrayOfObjects<
         A extends Record<string,unknown> = Record<string, unknown>,
@@ -1248,18 +1331,14 @@ export class CoreUtilsProvider {
      * @param keyName Name of the properties where the keys are stored.
      * @param valueName Name of the properties where the values are stored.
      * @param keyPrefix Key prefix if neededs to delete it.
-     * @return Object.
+     * @returns Object.
      */
     objectToKeyValueMap<T = unknown>(
         objects: Record<string, unknown>[],
         keyName: string,
         valueName: string,
         keyPrefix?: string,
-    ): {[name: string]: T} | undefined {
-        if (!objects) {
-            return;
-        }
-
+    ): {[name: string]: T} {
         const prefixSubstr = keyPrefix ? keyPrefix.length : 0;
         const mapped = {};
         objects.forEach((item) => {
@@ -1276,7 +1355,7 @@ export class CoreUtilsProvider {
      *
      * @param object Object to convert.
      * @param removeEmpty Whether to remove params whose value is null/undefined.
-     * @return GET params.
+     * @returns GET params.
      */
     objectToGetParams(object: Record<string, unknown>, removeEmpty: boolean = true): string {
         // First of all, flatten the object so all properties are in the first level.
@@ -1307,7 +1386,7 @@ export class CoreUtilsProvider {
      *
      * @param data Object.
      * @param prefix Prefix to add.
-     * @return Prefixed object.
+     * @returns Prefixed object.
      */
     prefixKeys(data: Record<string, unknown>, prefix: string): Record<string, unknown> {
         const newObj = {};
@@ -1322,31 +1401,29 @@ export class CoreUtilsProvider {
 
     /**
      * Function to enumerate enum keys.
+     *
+     * @param enumeration Enumeration object.
+     * @returns Keys of the enumeration.
      */
-    enumKeys<O, K extends keyof O = keyof O>(enumeration: O): K[] {
+    enumKeys<O extends object, K extends keyof O = keyof O>(enumeration: O): K[] {
         return Object.keys(enumeration).filter(k => Number.isNaN(+k)) as K[];
     }
 
     /**
-     * Similar to AngularJS $q.defer().
+     * Create a deferred promise that can be resolved or rejected explicitly.
      *
-     * @return The deferred promise.
+     * @returns The deferred promise.
+     * @deprecated since 4.1. Use CorePromisedValue instead.
      */
-    promiseDefer<T>(): PromiseDefer<T> {
-        const deferred: Partial<PromiseDefer<T>> = {};
-        deferred.promise = new Promise((resolve, reject): void => {
-            deferred.resolve = resolve as (value?: T | undefined) => void;
-            deferred.reject = reject;
-        });
-
-        return deferred as PromiseDefer<T>;
+    promiseDefer<T>(): CorePromisedValue<T> {
+        return new CorePromisedValue<T>();
     }
 
     /**
      * Given a promise, returns true if it's rejected or false if it's resolved.
      *
      * @param promise Promise to check
-     * @return Promise resolved with boolean: true if the promise is rejected or false if it's resolved.
+     * @returns Promise resolved with boolean: true if the promise is rejected or false if it's resolved.
      */
     async promiseFails(promise: Promise<unknown>): Promise<boolean> {
         try {
@@ -1362,7 +1439,7 @@ export class CoreUtilsProvider {
      * Given a promise, returns true if it's resolved or false if it's rejected.
      *
      * @param promise Promise to check
-     * @return Promise resolved with boolean: true if the promise it's resolved or false if it's rejected.
+     * @returns Promise resolved with boolean: true if the promise it's resolved or false if it's rejected.
      */
     async promiseWorks(promise: Promise<unknown>): Promise<boolean> {
         try {
@@ -1382,7 +1459,7 @@ export class CoreUtilsProvider {
      * @param obj1 The first object or array.
      * @param obj2 The second object or array.
      * @param key Key to check.
-     * @return Whether the two objects/arrays have the same value (or lack of one) for a given key.
+     * @returns Whether the two objects/arrays have the same value (or lack of one) for a given key.
      */
     sameAtKeyMissingIsBlank(
         obj1: Record<string, unknown> | unknown[],
@@ -1407,7 +1484,7 @@ export class CoreUtilsProvider {
      * {b: 2, a: 1} -> '{"a":1,"b":2}'
      *
      * @param obj Object to stringify.
-     * @return Stringified object.
+     * @returns Stringified object.
      */
     sortAndStringify(obj: Record<string, unknown>): string {
         return JSON.stringify(this.sortProperties(obj));
@@ -1417,7 +1494,7 @@ export class CoreUtilsProvider {
      * Given an object, sort its properties and the properties of all the nested objects.
      *
      * @param obj The object to sort. If it isn't an object, the original value will be returned.
-     * @return Sorted object.
+     * @returns Sorted object.
      */
     sortProperties<T>(obj: T): T {
         if (obj != null && typeof obj == 'object' && !Array.isArray(obj)) {
@@ -1437,7 +1514,7 @@ export class CoreUtilsProvider {
      * Given an object, sort its values. Values need to be primitive values, it cannot have subobjects.
      *
      * @param obj The object to sort. If it isn't an object, the original value will be returned.
-     * @return Sorted object.
+     * @returns Sorted object.
      */
     sortValues<T>(obj: T): T {
         if (typeof obj == 'object' && !Array.isArray(obj)) {
@@ -1456,16 +1533,16 @@ export class CoreUtilsProvider {
      *
      * @param promise The promise to timeout.
      * @param time Number of milliseconds of the timeout.
-     * @return Promise with the timeout.
+     * @returns Promise with the timeout.
      */
-    timeoutPromise<T>(promise: Promise<T>, time: number): Promise<T | void> {
+    timeoutPromise<T>(promise: Promise<T>, time: number): Promise<T> {
         return new Promise((resolve, reject): void => {
             let timedOut = false;
-            const resolveBeforeTimeout = () => {
+            const resolveBeforeTimeout = (value: T) => {
                 if (timedOut) {
                     return;
                 }
-                resolve();
+                resolve(value);
             };
             const timeout = setTimeout(
                 () => {
@@ -1483,16 +1560,15 @@ export class CoreUtilsProvider {
     }
 
     /**
-     * Converts locale specific floating point/comma number back to standard PHP float value.
+     * Converts locale specific floating point/comma number back to a standard float number.
      * Do NOT try to do any math operations before this conversion on any user submitted floats!
      * Based on Moodle's unformat_float function.
      *
      * @param localeFloat Locale aware float representation.
      * @param strict If true, then check the input and return false if it is not a valid number.
-     * @return False if bad format, empty string if empty value or the parsed float if not.
+     * @returns False if bad format, empty string if empty value or the parsed float if not.
      */
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    unformatFloat(localeFloat: any, strict?: boolean): false | '' | number {
+    unformatFloat(localeFloat: string | number | null | undefined, strict?: boolean): false | '' | number {
         // Bad format on input type number.
         if (localeFloat === undefined) {
             return false;
@@ -1504,7 +1580,7 @@ export class CoreUtilsProvider {
         }
 
         // Convert float to string.
-        localeFloat += '';
+        localeFloat = String(localeFloat);
         localeFloat = localeFloat.trim();
 
         if (localeFloat == '') {
@@ -1514,10 +1590,12 @@ export class CoreUtilsProvider {
         localeFloat = localeFloat.replace(' ', ''); // No spaces - those might be used as thousand separators.
         localeFloat = localeFloat.replace(Translate.instant('core.decsep'), '.');
 
-        const parsedFloat = parseFloat(localeFloat);
+        // Use Number instead of parseFloat because the latter truncates the number when it finds ",", while Number returns NaN.
+        // If the number still has "," then it means it's not a valid separator.
+        const parsedFloat = Number(localeFloat);
 
         // Bad format.
-        if (strict && (!isFinite(localeFloat) || isNaN(parsedFloat))) {
+        if (strict && (!isFinite(parsedFloat) || isNaN(parsedFloat))) {
             return false;
         }
 
@@ -1529,22 +1607,11 @@ export class CoreUtilsProvider {
      *
      * @param array The array to treat.
      * @param [key] Key of the property that must be unique. If not specified, the whole entry.
-     * @return Array without duplicate values.
+     * @returns Array without duplicate values.
+     * @deprecated since 4.4. Use CoreArray.unique instead.
      */
     uniqueArray<T>(array: T[], key?: string): T[] {
-        const unique = {}; // Use an object to make it faster to check if it's duplicate.
-
-        return array.filter(entry => {
-            const value = key ? entry[key] : entry;
-
-            if (value in unique) {
-                return false;
-            }
-
-            unique[value] = true;
-
-            return true;
-        });
+        return CoreArray.unique(array, key);
     }
 
     /**
@@ -1552,7 +1619,7 @@ export class CoreUtilsProvider {
      *
      * @param fn Function to debounce.
      * @param delay Time that must pass until the function is called.
-     * @return Debounced function.
+     * @returns Debounced function.
      */
     debounce<T extends unknown[]>(fn: (...args: T) => unknown, delay: number): (...args: T) => void {
         let timeoutID: number;
@@ -1571,7 +1638,7 @@ export class CoreUtilsProvider {
      *
      * @param fn Function to throttle.
      * @param duration Time that must pass until the function is called.
-     * @return Throttled function.
+     * @returns Throttled function.
      */
     throttle<T extends unknown[]>(fn: (...args: T) => unknown, duration: number): (...args: T) => void {
         let shouldWait = false;
@@ -1594,20 +1661,20 @@ export class CoreUtilsProvider {
     /**
      * Check whether the app can scan QR codes.
      *
-     * @return Whether the app can scan QR codes.
+     * @returns Whether the app can scan QR codes.
      */
     canScanQR(): boolean {
-        return CoreApp.isMobile();
+        return CorePlatform.isMobile();
     }
 
     /**
      * Open a modal to scan a QR code.
      *
      * @param title Title of the modal. Defaults to "QR reader".
-     * @return Promise resolved with the captured text or undefined if cancelled or error.
+     * @returns Promise resolved with the captured text or undefined if cancelled or error.
      */
     async scanQR(title?: string): Promise<string | undefined> {
-        return await CoreDomUtils.openModal<string>({
+        return CoreDomUtils.openModal<string>({
             component: CoreViewerQRScannerComponent,
             cssClass: 'core-modal-fullscreen',
             componentProps: {
@@ -1619,10 +1686,10 @@ export class CoreUtilsProvider {
     /**
      * Start scanning for a QR code.
      *
-     * @return Promise resolved with the QR string, rejected if error or cancelled.
+     * @returns Promise resolved with the QR string, rejected if error or cancelled.
      */
     async startScanQR(): Promise<string | undefined> {
-        if (!CoreApp.isMobile()) {
+        if (!CorePlatform.isMobile()) {
             return Promise.reject('QRScanner isn\'t available in browser.');
         }
 
@@ -1638,12 +1705,12 @@ export class CoreUtilsProvider {
 
             if (this.qrScanData && this.qrScanData.deferred) {
                 // Already scanning.
-                return this.qrScanData.deferred.promise;
+                return this.qrScanData.deferred;
             }
 
             // Start scanning.
             this.qrScanData = {
-                deferred: this.promiseDefer(),
+                deferred: new CorePromisedValue(),
 
                 // When text is received, stop scanning and return the text.
                 observable: QRScanner.scan().subscribe(text => this.stopScanQR(text, false)),
@@ -1662,7 +1729,7 @@ export class CoreUtilsProvider {
                     colorSchemeMeta.setAttribute('content', 'normal');
                 }
 
-                return this.qrScanData.deferred.promise;
+                return this.qrScanData.deferred;
             } catch (e) {
                 this.stopScanQR(e, true);
 
@@ -1700,7 +1767,7 @@ export class CoreUtilsProvider {
         this.qrScanData.observable.unsubscribe(); // Stop scanning.
 
         if (error) {
-            this.qrScanData.deferred.reject(data);
+            this.qrScanData.deferred.reject(typeof data === 'string' ? new Error(data) : data);
         } else if (data !== undefined) {
             this.qrScanData.deferred.resolve(data as string);
         } else {
@@ -1714,12 +1781,12 @@ export class CoreUtilsProvider {
      * Ignore errors from a promise.
      *
      * @param promise Promise to ignore errors.
-     * @param fallbackResult Value to return if the promise is rejected.
-     * @return Promise with ignored errors, resolving to the fallback result if provided.
+     * @param fallback Value to return if the promise is rejected.
+     * @returns Promise with ignored errors, resolving to the fallback result if provided.
      */
-    async ignoreErrors<Result>(promise: Promise<Result>): Promise<Result | undefined>;
+    async ignoreErrors<Result>(promise?: Promise<Result>): Promise<Result | undefined>;
     async ignoreErrors<Result, Fallback>(promise: Promise<Result>, fallback: Fallback): Promise<Result | Fallback>;
-    async ignoreErrors<Result, Fallback>(promise: Promise<Result>, fallback?: Fallback): Promise<Result | Fallback | undefined> {
+    async ignoreErrors<Result, Fallback>(promise?: Promise<Result>, fallback?: Fallback): Promise<Result | Fallback | undefined> {
         try {
             const result = await promise;
 
@@ -1734,14 +1801,50 @@ export class CoreUtilsProvider {
      * Wait some time.
      *
      * @param milliseconds Number of milliseconds to wait.
-     * @return Promise resolved after the time has passed.
+     * @returns Promise resolved after the time has passed.
      */
     wait(milliseconds: number): Promise<void> {
         return new Promise(resolve => setTimeout(resolve, milliseconds));
     }
 
     /**
+     * Wait until a given condition is met.
+     *
+     * @param condition Condition.
+     * @returns Cancellable promise.
+     */
+    waitFor(condition: () => boolean): CoreCancellablePromise<void>;
+    waitFor(condition: () => boolean, options: CoreUtilsWaitOptions): CoreCancellablePromise<void>;
+    waitFor(condition: () => boolean, interval: number): CoreCancellablePromise<void>;
+    waitFor(condition: () => boolean, optionsOrInterval: CoreUtilsWaitOptions | number = {}): CoreCancellablePromise<void> {
+        const options = typeof optionsOrInterval === 'number' ? { interval: optionsOrInterval } : optionsOrInterval;
+
+        if (condition()) {
+            return CoreCancellablePromise.resolve();
+        }
+
+        const startTime = Date.now();
+        let intervalId: number | undefined;
+
+        return new CoreCancellablePromise<void>(
+            async (resolve) => {
+                intervalId = window.setInterval(() => {
+                    if (!condition() && (!options.timeout || (Date.now() - startTime < options.timeout))) {
+                        return;
+                    }
+
+                    resolve();
+                    window.clearInterval(intervalId);
+                }, options.interval ?? 50);
+            },
+            () => window.clearInterval(intervalId),
+        );
+    }
+
+    /**
      * Wait until the next tick.
+     *
+     * @returns Promise resolved when tick has been done.
      */
     nextTick(): Promise<void> {
         return this.wait(0);
@@ -1760,41 +1863,17 @@ export class CoreUtilsProvider {
      * Given some options, check if a file should be opened with showOpenWithDialog.
      *
      * @param options Options.
-     * @return Boolean.
+     * @returns Boolean.
      */
     shouldOpenWithDialog(options: CoreUtilsOpenFileOptions = {}): boolean {
         const openFileAction = options.iOSOpenFileAction ?? CoreConstants.CONFIG.iOSDefaultOpenFileAction;
 
-        return CoreApp.isIOS() && openFileAction == OpenFileAction.OPEN_WITH;
+        return CorePlatform.isIOS() && openFileAction == OpenFileAction.OPEN_WITH;
     }
 
 }
 
 export const CoreUtils = makeSingleton(CoreUtilsProvider);
-
-/**
- * Deferred promise. It's similar to the result of $q.defer() in AngularJS.
- */
-export type PromiseDefer<T> = {
-    /**
-     * The promise.
-     */
-    promise: Promise<T>;
-
-    /**
-     * Function to resolve the promise.
-     *
-     * @param value The resolve value.
-     */
-    resolve: (value?: T) => void; // Function to resolve the promise.
-
-    /**
-     * Function to reject the promise.
-     *
-     * @param reason The reject param.
-     */
-    reject: (reason?: unknown) => void;
-};
 
 /**
  * Data for each entry of executeOrderedPromises.
@@ -1839,7 +1918,26 @@ export type CoreUtilsOpenFileOptions = {
  */
 export type CoreUtilsOpenInBrowserOptions = {
     showBrowserWarning?: boolean; // Whether to display a warning before opening in browser. Defaults to true.
-    browserWarningUrl?: string; // The URL to display in the warning message. Use it to hide sensitive information.
+    originalUrl?: string; // Original URL to open (in case the URL was treated, e.g. to add a token or an auto-login).
+    /**
+     * @deprecated since 4.3. Use originalUrl instead.
+     */
+    browserWarningUrl?: string;
+};
+
+/**
+ * Options for opening in InAppBrowser.
+ */
+export type CoreUtilsOpenInAppOptions = InAppBrowserOptions & {
+    originalUrl?: string; // Original URL to open (in case the URL was treated, e.g. to add a token or an auto-login).
+};
+
+/**
+ * Options for waiting.
+ */
+export type CoreUtilsWaitOptions = {
+    interval?: number;
+    timeout?: number;
 };
 
 /**

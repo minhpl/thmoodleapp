@@ -41,7 +41,7 @@ export class AddonModWikiCreateLinkHandlerService extends CoreContentLinksHandle
      * @param route Activated route if current route is wiki index page, null otherwise.
      * @param subwikiId Subwiki ID to check.
      * @param siteId Site ID.
-     * @return Promise resolved with boolean: whether current view belongs to the same wiki.
+     * @returns Promise resolved with boolean: whether current view belongs to the same wiki.
      */
     protected async currentStateIsSameWiki(route: ActivatedRoute | null, subwikiId: number, siteId: string): Promise<boolean> {
         if (!route) {
@@ -49,8 +49,8 @@ export class AddonModWikiCreateLinkHandlerService extends CoreContentLinksHandle
             return false;
         }
 
-        const params = route.snapshot.params;
-        const queryParams = route.snapshot.queryParams;
+        const params = CoreNavigator.getRouteParams(route);
+        const queryParams = CoreNavigator.getRouteQueryParams(route);
 
         if (queryParams.subwikiId == subwikiId) {
             // Same subwiki, so it's same wiki.
@@ -103,6 +103,10 @@ export class AddonModWikiCreateLinkHandlerService extends CoreContentLinksHandle
 
                 try {
                     const route = CoreNavigator.getCurrentRoute({ pageComponent: AddonModWikiIndexPage });
+                    if (!route) {
+                        // Current view isn't wiki index.
+                        return;
+                    }
                     const subwikiId = parseInt(params.swid, 10);
                     const wikiId = parseInt(params.wid, 10);
                     let path = AddonModWikiModuleHandlerService.PAGE_NAME;
@@ -112,7 +116,9 @@ export class AddonModWikiCreateLinkHandlerService extends CoreContentLinksHandle
 
                     if (isSameWiki) {
                         // User is seeing the wiki, we can get the module from the wiki params.
-                        path = path + `/${route!.snapshot.params.courseId}/${route!.snapshot.params.cmId}/edit`;
+                        const routeParams = CoreNavigator.getRouteParams(route);
+
+                        path = path + `/${routeParams.courseId}/${routeParams.cmId}/edit`;
                     } else if (wikiId) {
                         // The URL specifies which wiki it belongs to. Get the module.
                         const module = await CoreCourse.getModuleBasicInfoByInstance(

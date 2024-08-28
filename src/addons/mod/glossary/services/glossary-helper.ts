@@ -13,12 +13,11 @@
 // limitations under the License.
 
 import { Injectable } from '@angular/core';
-import { FileEntry } from '@ionic-native/file/ngx';
+import { FileEntry } from '@awesome-cordova-plugins/file/ngx';
 import { CoreFileUploader, CoreFileUploaderStoreFilesResult } from '@features/fileuploader/services/fileuploader';
 import { CoreFile } from '@services/file';
 import { CoreUtils } from '@services/utils/utils';
 import { AddonModGlossaryOffline } from './glossary-offline';
-import { AddonModGlossaryNewEntry, AddonModGlossaryNewEntryWithFiles } from './glossary';
 import { makeSingleton } from '@singletons';
 import { CoreFileEntry } from '@services/file-helper';
 
@@ -35,7 +34,7 @@ export class AddonModGlossaryHelperProvider {
      * @param entryName The name of the entry.
      * @param timeCreated The time the entry was created.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved when deleted.
+     * @returns Promise resolved when deleted.
      */
     async deleteStoredFiles(glossaryId: number, entryName: string, timeCreated: number, siteId?: string): Promise<void> {
         const folderPath = await AddonModGlossaryOffline.getEntryFolder(glossaryId, entryName, timeCreated, siteId);
@@ -50,37 +49,12 @@ export class AddonModGlossaryHelperProvider {
      * @param entryName The name of the entry.
      * @param timeCreated The time the entry was created.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved with the files.
+     * @returns Promise resolved with the files.
      */
     async getStoredFiles(glossaryId: number, entryName: string, timeCreated: number, siteId?: string): Promise<FileEntry[]> {
         const folderPath = await AddonModGlossaryOffline.getEntryFolder(glossaryId, entryName, timeCreated, siteId);
 
         return CoreFileUploader.getStoredFiles(folderPath);
-    }
-
-    /**
-     * Check if the data of an entry has changed.
-     *
-     * @param entry Current data.
-     * @param files Files attached.
-     * @param original Original content.
-     * @return True if data has changed, false otherwise.
-     */
-    hasEntryDataChanged(
-        entry: AddonModGlossaryNewEntry,
-        files: CoreFileEntry[],
-        original?: AddonModGlossaryNewEntryWithFiles,
-    ): boolean {
-        if (!original || original.concept === undefined) {
-            // There is no original data.
-            return !!(entry.definition || entry.concept || files.length > 0);
-        }
-
-        if (original.definition != entry.definition || original.concept != entry.concept) {
-            return true;
-        }
-
-        return CoreFileUploader.areFileListDifferent(files, original.files);
     }
 
     /**
@@ -92,7 +66,7 @@ export class AddonModGlossaryHelperProvider {
      * @param timeCreated The time the entry was created.
      * @param files List of files.
      * @param siteId Site ID. If not defined, current site.
-     * @return Promise resolved if success, rejected otherwise.
+     * @returns Promise resolved if success, rejected otherwise.
      */
     async storeFiles(
         glossaryId: number,

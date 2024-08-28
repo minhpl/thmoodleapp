@@ -18,10 +18,29 @@ import { Subject, BehaviorSubject } from 'rxjs';
 import { CoreDelegate, CoreDelegateHandler } from '@classes/delegate';
 import { CoreUtils } from '@services/utils/utils';
 import { CoreEvents } from '@singletons/events';
-import { CoreUserProfile, CoreUserProvider } from './user';
+import { CoreUserProfile, USER_PROFILE_REFRESHED } from './user';
 import { makeSingleton } from '@singletons';
 import { CoreCourses, CoreCourseUserAdminOrNavOptionIndexed } from '@features/courses/services/courses';
 import { CoreSites } from '@services/sites';
+
+export enum CoreUserProfileHandlerType {
+    LIST_ITEM = 'listitem', // User profile handler type to be shown as a list item.
+    LIST_ACCOUNT_ITEM = 'account_listitem', // User profile handler type to be shown as a list item and it's related to an account.
+    BUTTON = 'button', // User profile handler type to be shown as a button.
+}
+
+declare module '@singletons/events' {
+
+    /**
+     * Augment CoreEventsData interface with events specific to this service.
+     *
+     * @see https://www.typescriptlang.org/docs/handbook/declaration-merging.html#module-augmentation
+     */
+    export interface CoreEventsData {
+        [USER_DELEGATE_UPDATE_HANDLER_EVENT]: CoreUserUpdateHandlerData;
+    }
+
+}
 
 /**
  * Interface that all user profile handlers must implement.
@@ -33,13 +52,11 @@ export interface CoreUserProfileHandler extends CoreDelegateHandler {
     priority: number;
 
     /**
-     * A type should be specified among these:
-     * - TYPE_COMMUNICATION: will be displayed under the user avatar. Should have icon. Spinner not used.
-     * - TYPE_NEW_PAGE: will be displayed as a list of items. Should have icon. Spinner not used.
-     *     Default value if none is specified.
-     * - TYPE_ACTION: will be displayed as a button and should not redirect to any state. Spinner use is recommended.
+     * The type of Handler.
+     *
+     * @see CoreUserProfileHandlerType for more info.
      */
-    type: string;
+    type: CoreUserProfileHandlerType;
 
     /**
      * If isEnabledForUser Cache should be enabled.
@@ -53,7 +70,7 @@ export interface CoreUserProfileHandler extends CoreDelegateHandler {
      * @param contextId Context ID.
      * @param navOptions Navigation options for the course.
      * @param admOptions Admin options for the course.
-     * @return Whether or not the handler is enabled for a user.
+     * @returns Whether or not the handler is enabled for a user.
      */
     isEnabledForContext?(
         context: CoreUserDelegateContext,
@@ -68,7 +85,7 @@ export interface CoreUserProfileHandler extends CoreDelegateHandler {
      * @param user User object.
      * @param context Context.
      * @param contextId Context ID.
-     * @return Whether or not the handler is enabled for a user.
+     * @returns Whether or not the handler is enabled for a user.
      */
     isEnabledForUser?(user: CoreUserProfile, context: CoreUserDelegateContext, contextId: number): Promise<boolean>;
 
@@ -78,7 +95,7 @@ export interface CoreUserProfileHandler extends CoreDelegateHandler {
      * @param user User object.
      * @param context Context.
      * @param contextId Context ID.
-     * @return Data to be shown.
+     * @returns Data to be shown.
      */
     getDisplayData(user: CoreUserProfile, context: CoreUserDelegateContext, contextId: number): CoreUserProfileHandlerData;
 }
@@ -93,7 +110,7 @@ export interface CoreUserProfileHandlerData {
     title: string;
 
     /**
-     * Name of the icon to display. Mandatory for TYPE_COMMUNICATION.
+     * Name of the icon to display. Mandatory for CoreUserProfileHandlerType.BUTTON.
      */
     icon?: string;
 
@@ -103,32 +120,34 @@ export interface CoreUserProfileHandlerData {
     class?: string;
 
     /**
-     * If enabled, element will be hidden. Only for TYPE_NEW_PAGE and TYPE_ACTION.
+     * If enabled, element will be hidden. Only for CoreUserProfileHandlerType.LIST_ITEM.
      */
     hidden?: boolean;
 
     /**
-     * If enabled will show an spinner. Only for TYPE_ACTION.
+     * If enabled will show an spinner.
+     *
+     * @deprecated since 4.4. Not used anymore.
      */
     spinner?: boolean;
 
     /**
-     * If the handler has badge to show or not. Only for TYPE_NEW_PAGE.
+     * If the handler has badge to show or not. Only for CoreUserProfileHandlerType.LIST_ITEM.
      */
     showBadge?: boolean;
 
     /**
-     * Text to display on the badge. Only used if showBadge is true and only for TYPE_NEW_PAGE.
+     * Text to display on the badge. Only used if showBadge is true and only for CoreUserProfileHandlerType.LIST_ITEM.
      */
     badge?: string;
 
     /**
-     * Accessibility text to add on the badge. Only used if showBadge is true and only for TYPE_NEW_PAGE.
+     * Accessibility text to add on the badge. Only used if showBadge is true and only for CoreUserProfileHandlerType.LIST_ITEM.
      */
     badgeA11yText?: string;
 
     /**
-     * If true, the badge number is being loaded. Only used if showBadge is true and only for TYPE_NEW_PAGE.
+     * If true, the badge number is being loaded. Only used if showBadge is true and only for CoreUserProfileHandlerType.LIST_ITEM.
      */
     loading?: boolean;
 
@@ -169,6 +188,11 @@ export interface CoreUserProfileHandlerToDisplay {
 }
 
 /**
+ * Delegate update handler event.
+ */
+export const USER_DELEGATE_UPDATE_HANDLER_EVENT = 'CoreUserDelegate_update_handler_event';
+
+/**
  * Service to interact with plugins to be shown in user profile. Provides functions to register a plugin
  * and notify an update in the data.
  */
@@ -177,21 +201,22 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
 
     /**
      * User profile handler type for communication.
+     *
+     * @deprecated since 4.4. Use CoreUserProfileHandlerType.BUTTON instead.
      */
     static readonly TYPE_COMMUNICATION = 'communication';
     /**
      * User profile handler type for new page.
+     *
+     * @deprecated since 4.4. Use CoreUserProfileHandlerType.LIST_ITEM instead.
      */
     static readonly TYPE_NEW_PAGE = 'newpage';
     /**
      * User profile handler type for actions.
+     *
+     * @deprecated since 4.4. Use CoreUserProfileHandlerType.BUTTON instead.
      */
     static readonly TYPE_ACTION = 'action';
-
-    /**
-     * Update handler information event.
-     */
-    static readonly UPDATE_HANDLER_EVENT = 'CoreUserDelegate_update_handler_event';
 
     /**
      * Cache object that checks enabled for use.
@@ -204,9 +229,9 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
     protected userHandlers: Record<number, Record<string, CoreUserDelegateHandlersData>> = {};
 
     constructor() {
-        super('CoreUserDelegate', true);
+        super('CoreUserDelegate');
 
-        CoreEvents.on(CoreUserDelegateService.UPDATE_HANDLER_EVENT, (data) => {
+        CoreEvents.on(USER_DELEGATE_UPDATE_HANDLER_EVENT, (data) => {
             const handlersData = this.getHandlersData(data.userId, data.context, data.contextId);
 
             // Search the handler.
@@ -225,7 +250,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
             this.clearHandlerCache();
         });
 
-        CoreEvents.on(CoreUserProvider.PROFILE_REFRESHED, (data) => {
+        CoreEvents.on(USER_PROFILE_REFRESHED, (data) => {
             const context = data.courseId ? CoreUserDelegateContext.COURSE : CoreUserDelegateContext.SITE;
             this.clearHandlerCache(data.userId, context, data.courseId);
         });
@@ -237,7 +262,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
      * @param userId User ID.
      * @param context Context.
      * @param contextId Context ID.
-     * @return True if handlers are loaded, false otherwise.
+     * @returns True if handlers are loaded, false otherwise.
      */
     areHandlersLoaded(userId: number, context: CoreUserDelegateContext, contextId?: number): boolean {
         return this.getHandlersData(userId, context, contextId).loaded;
@@ -270,7 +295,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
      * @param user The user object.
      * @param context Context.
      * @param contextId Context ID.
-     * @return Resolved with the handlers.
+     * @returns Resolved with the handlers.
      */
     getProfileHandlersFor(
         user: CoreUserProfile,
@@ -288,7 +313,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
      * @param user The user object.
      * @param context Context.
      * @param contextId Context ID.
-     * @return Promise resolved when done.
+     * @returns Promise resolved when done.
      */
     protected async calculateUserHandlers(
         user: CoreUserProfile,
@@ -328,7 +353,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
                         name: name,
                         data: handler.getDisplayData(user, context, courseId),
                         priority: handler.priority || 0,
-                        type: handler.type || CoreUserDelegateService.TYPE_NEW_PAGE,
+                        type: handler.type || CoreUserProfileHandlerType.LIST_ITEM,
                     });
                 }
             } catch {
@@ -351,7 +376,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
      * @param contextId Context ID.
      * @param navOptions Navigation options for the course.
      * @param admOptions Admin options for the course.
-     * @return Whether or not the handler is enabled for a user.
+     * @returns Whether or not the handler is enabled for a user.
      */
     protected async getAndCacheEnabledForUserFromHandler(
         handler: CoreUserProfileHandler,
@@ -431,7 +456,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
      * @param userId User ID.
      * @param context Context.
      * @param contextId Context ID.
-     * @return Cache key.
+     * @returns Cache key.
      */
     protected getCacheKey(userId: number, context: CoreUserDelegateContext, contextId?: number): string {
         return `${userId}#${this.getContextKey(context, contextId)}`;
@@ -442,7 +467,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
      *
      * @param context Context.
      * @param contextId Context ID.
-     * @return String to identify the context.
+     * @returns String to identify the context.
      */
     protected getContextKey(context: CoreUserDelegateContext, contextId?: number): string {
         return `${context}#${contextId ?? 0}`;
@@ -454,7 +479,7 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
      * @param userId User ID.
      * @param context Context.
      * @param contextId Context ID.
-     * @return Handlers data.
+     * @returns Handlers data.
      */
     protected getHandlersData(userId: number, context: CoreUserDelegateContext, contextId?: number): CoreUserDelegateHandlersData {
         // Initialize the data if it doesn't exist.
@@ -470,6 +495,24 @@ export class CoreUserDelegateService extends CoreDelegate<CoreUserProfileHandler
         }
 
         return this.userHandlers[userId][contextKey];
+    }
+
+    /**
+     * @inheritdoc
+     */
+    registerHandler(handler: CoreUserProfileHandler): boolean {
+        const type = handler.type as string;
+
+        // eslint-disable-next-line deprecation/deprecation
+        if (type == CoreUserDelegateService.TYPE_COMMUNICATION || type == CoreUserDelegateService.TYPE_ACTION) {
+            handler.type = CoreUserProfileHandlerType.BUTTON;
+        // eslint-disable-next-line deprecation/deprecation
+        } else if (type == CoreUserDelegateService.TYPE_NEW_PAGE) {
+            handler.type = CoreUserProfileHandlerType.LIST_ITEM;
+
+        }
+
+        return super.registerHandler(handler);
     }
 
 }

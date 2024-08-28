@@ -12,10 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { Platform } from '@singletons';
+import { CorePlatform } from '@services/platform';
 
-export default async function(): Promise<void> {
-    await Platform.ready();
+/**
+ * Initializes the application and sets up the InAppBrowser if available.
+ */
+export default async function initializeApp(): Promise<void> {
+    await CorePlatform.ready();
 
     if (!window.cordova?.InAppBrowser) {
         return;
