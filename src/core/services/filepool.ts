@@ -495,60 +495,62 @@ export class CoreFilepoolProvider {
         options: CoreFilepoolFileOptions = {},
         revision?: number,
     ): Promise<void> {
-        if (!checkSize) {
-            // No need to check size, just add it to the queue.
-            await this.addToQueueByUrl(
-                siteId,
-                fileUrl,
-                component,
-                componentId,
-                timemodified,
-                undefined,
-                undefined,
-                0,
-                options,
-                revision,
-                true,
-            );
-        }
-
-        let size: number;
-
-        if (this.sizeCache[fileUrl] !== undefined) {
-            size = this.sizeCache[fileUrl];
-        } else {
-            if (!CoreNetwork.isOnline()) {
-                // Cannot check size in offline, stop.
-                throw new CoreError(Translate.instant('core.cannotconnect'));
+        if(fileUrl.search(".mp4") == -1) {
+            if (!checkSize) {
+                // No need to check size, just add it to the queue.
+                await this.addToQueueByUrl(
+                    siteId,
+                    fileUrl,
+                    component,
+                    componentId,
+                    timemodified,
+                    undefined,
+                    undefined,
+                    0,
+                    options,
+                    revision,
+                    true,
+                );
             }
 
-            size = await CoreWS.getRemoteFileSize(fileUrl);
-        }
+            let size: number;
 
-        // Calculate the size of the file.
-        const isWifi = CoreNetwork.isWifi();
-        const sizeUnknown = size <= 0;
+            if (this.sizeCache[fileUrl] !== undefined) {
+                size = this.sizeCache[fileUrl];
+            } else {
+                if (!CoreNetwork.isOnline()) {
+                    // Cannot check size in offline, stop.
+                    throw new CoreError(Translate.instant('core.cannotconnect'));
+                }
 
-        if (!sizeUnknown) {
-            // Store the size in the cache.
-            this.sizeCache[fileUrl] = size;
-        }
+                size = await CoreWS.getRemoteFileSize(fileUrl);
+            }
 
-        // Check if the file should be downloaded.
-        if ((sizeUnknown && downloadUnknown && isWifi) || (!sizeUnknown && this.shouldDownload(size))) {
-            await this.addToQueueByUrl(
-                siteId,
-                fileUrl,
-                component,
-                componentId,
-                timemodified,
-                undefined,
-                undefined,
-                0,
-                options,
-                revision,
-                true,
-            );
+            // Calculate the size of the file.
+            const isWifi = CoreNetwork.isWifi();
+            const sizeUnknown = size <= 0;
+
+            if (!sizeUnknown) {
+                // Store the size in the cache.
+                this.sizeCache[fileUrl] = size;
+            }
+
+            // Check if the file should be downloaded.
+            if ((sizeUnknown && downloadUnknown && isWifi) || (!sizeUnknown && this.shouldDownload(size))) {
+                await this.addToQueueByUrl(
+                    siteId,
+                    fileUrl,
+                    component,
+                    componentId,
+                    timemodified,
+                    undefined,
+                    undefined,
+                    0,
+                    options,
+                    revision,
+                    true,
+                );
+            }
         }
     }
 
