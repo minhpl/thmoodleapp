@@ -259,6 +259,8 @@ export class CoreUrlUtilsProvider {
             }
         }
 
+        docsUrl = "https://evstep.vn";
+
         try {
             let lang = await CoreLang.getCurrentLanguage(CoreLangFormat.LMS);
             lang = CoreLang.getParentLanguage() || lang;

@@ -41,7 +41,7 @@
                     <p *ngIf="siteInfo?.siteName" class="ion-no-margin ion-no-padding core-sitename">
                         <core-format-text [text]="siteInfo?.siteName" [filter]="false" />
                     </p>
-                    <p class="core-siteurl" *ngIf="displaySiteUrl">{{site.siteUrl}}</p>
+                    <!-- <p class="core-siteurl" *ngIf="displaySiteUrl">{{site.siteUrl}}</p> -->
                 </div>
 
                 <div class="core-login-user">
@@ -90,8 +90,8 @@
                 </ng-container>
 
                 <!-- Additional Login methods -->
-                <core-login-methods *ngIf="siteConfig" [siteConfig]="siteConfig" [reconnect]="true" [siteUrl]="site.siteUrl"
-                    [redirectData]="redirectData" />
+                <!-- <core-login-methods *ngIf="siteConfig" [siteConfig]="siteConfig" [reconnect]="true" [siteUrl]="site.siteUrl"
+                    [redirectData]="redirectData" /> -->
             </div>
         </div>
     </core-loading>
