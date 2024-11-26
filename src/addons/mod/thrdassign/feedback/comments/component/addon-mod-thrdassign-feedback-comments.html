@@ -1,0 +1,28 @@
+<!-- Read only. -->
+<ion-item class="ion-text-wrap" *ngIf="(text || canEdit) && !edit">
+    <ion-label>
+        <h2>{{ plugin.name }}</h2>
+        <p>
+            <core-format-text [component]="component" [componentId]="thrdassign.cmid" collapsible-item [text]="text" contextLevel="module"
+                [contextInstanceId]="thrdassign.cmid" [courseId]="thrdassign.course" />
+        </p>
+    </ion-label>
+    <div slot="end">
+        <div class="ion-text-end">
+            <ion-button fill="clear" *ngIf="canEdit" (click)="editComment()" [ariaLabel]="'core.edit' | translate">
+                <ion-icon name="fas-pen" slot="icon-only" aria-hidden="true" />
+            </ion-button>
+        </div>
+        <ion-note *ngIf="!isSent" color="dark">
+            <ion-icon name="fas-clock" aria-hidden="true" /> {{ 'core.notsent' | translate }}
+        </ion-note>
+    </div>
+</ion-item>
+
+<!-- Edit -->
+<ion-item class="ion-text-wrap" *ngIf="edit && loaded">
+    <ion-label class="sr-only">{{ plugin.name }}</ion-label>
+    <core-rich-text-editor [control]="control" [placeholder]="plugin.name" name="thrdassignfeedbackcomments_editor" [component]="component"
+        [componentId]="thrdassign.cmid" [autoSave]="true" contextLevel="module" [contextInstanceId]="thrdassign.cmid"
+        elementId="thrdassignfeedbackcomments_editor" [draftExtraParams]="{userid: userId, action: 'grade'}" />
+</ion-item>
