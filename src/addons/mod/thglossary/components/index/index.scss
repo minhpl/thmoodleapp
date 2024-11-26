@@ -1,0 +1,13 @@
+:host {
+
+    .addon-mod-thglossary-index--offline-entries {
+        border-bottom: 1px solid var(--stroke);
+    }
+
+    .addon-mod-thglossary-index--offline-entry {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+    }
+
+}
